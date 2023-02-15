@@ -4,5 +4,8 @@ authors = ["tudor <tudor.pahomi@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+Constants = "26e1ccdb-dc7d-4967-a216-0e9bd72dc499"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+myLibs = "0cc41259-d48e-4a81-8a6d-ec7e330e4bca"
+myPlots = "ab28f933-13dd-4a82-b110-d2be63b453ac"

@@ -1,7 +1,10 @@
 using Revise, Test 
 
+import BMCMSOTS  
 
-import BMCMSOTS 
+include("../input_file.jl")
+
+
 
 for fn in [
 

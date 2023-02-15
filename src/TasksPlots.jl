@@ -2,10 +2,60 @@ module TasksPlots
 #############################################################################
 
 
+#import LinearAlgebra,QuadGK,Optim
+
+#import myLibs: Utils, ComputeTasks, Algebra, Parameters, Lattices
+#import myLibs.Parameters:UODict 
+
+import myPlots
+
+using myLibs.ComputeTasks: CompTask   
+
+using myPlots: PlotTask 
+
+import ..ChecksWLO, ..Helpers 
+
+using ..Helpers.hParameters: Calculation  
 
 
+#===========================================================================#
+#
+function Completeness(init_dict::AbstractDict; kwargs...)#::PlotTask
+#
+#---------------------------------------------------------------------------#
 
+	task = CompTask(Calculation(ChecksWLO, init_dict; kwargs...))
 
+	function plot(P::AbstractDict)::Dict{String,Any}
+		
+		data= task.get_data(P; fromPlot=true, mute=false, target=nothing)
+
+		@show data 
+
+		x = Vector(LinRange(0,2pi,100))
+
+		return Dict{String,Any}(
+
+			"x"=> x,
+
+			"xlim" => extrema(x),
+
+			"ylim" => [-1.5,1.5],
+
+			"y" => sin.(x),
+
+			"ylabel" => "y",
+
+			"xlabel" => "x",
+
+			"label" => "sin",
+			)
+
+	end 
+
+	return PlotTask(task, "Curves_yofx", plot)
+
+end 
 
 
 
