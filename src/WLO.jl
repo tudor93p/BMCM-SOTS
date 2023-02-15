@@ -1,11 +1,12 @@
 module WLO 
 #############################################################################
 
-
 import LinearAlgebra, Statistics 
 
 import myLibs:Utils 
 
+import ..Helpers: PeriodicFuns 
+
 
 
 
@@ -14,99 +15,6 @@ import myLibs:Utils
 #
 #
 #---------------------------------------------------------------------------#
-
-function closest_periodic_a(a::Real,
-													b::Real,
-													T::Real,
-													nmax::Int=1,
-													)::Float64 
-
-#	a + T*argmin((n::Int)::Float64->abs(a + n*T - b), -nmax:nmax)
-	a_::Float64 = copy(a)
-
-	for n in -nmax:nmax
-
-		if abs(a + n*T - b) < abs(a_ - b)
-
-			a_ = a + n*T 
-
-		end 
-
-	end 
-
-	return a_
-
-end  
-
-function closest_periodic_a(a::Real,
-													B::AbstractArray{<:Real},
-													T::Real,
-													nmax::Int=1
-													)::Float64 
-
-	out = Float64[a, abs(a-B[1])]
-	
-	current = Float64[a+nmax*T, 0]
-
-	for n in -nmax:nmax
-
-		for b in B 
-	
-			current[2] = abs(current[1]-b)
-			
-			if current[2] < out[2]
-				
-				out .= current
-	
-			end 
-	
-		end 
-
-		current[1] -= T  
-
-	end 
-
-	return out[1] 
-
-end 
-
-
-function closest_periodic_b(a::Real,
-														B::AbstractArray{<:Real},
-														args...
-													)::Float64
-
-	B[argmin(Utils.dist_periodic(a, B, args...))]
-
-end 
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-function periods_outside_interval(j::Real, a::Real, b::Real, T::Real)::Int 
-
-	ceil(max(0,(min(a,b)-j)/T))-ceil(max(0,(j-max(a,b))/T))
-
-end 
-
-function bring_periodic_to_interval(j::T1, a::Real, b::Real, T::T2
-																		)::promote_type(T1,T2) where {
-																												T1<:Real,T2<:Real}
-
-	j + T*periods_outside_interval(j, a, b, T)
-
-end  
-
-
-
-
-function dist_modulo(x::Real,m::Real=1)::Real 
-
-	min(abs(x),m-abs(x))
-
-end 
 
 
 #===========================================================================#
@@ -261,13 +169,13 @@ function wcc_stat!(storage::AbstractVector{Float64},
 
 	init_run_ms!(storage) 
 
-	setindex!(X, closest_periodic_a(X[1], quantized_values, 1), 1)
+	setindex!(X, PeriodicFuns.closest_periodic_a(X[1], quantized_values, 1), 1)
 
 	run_m!(storage, X[1])
 	
 	for i = 2:lastindex(X)
 
-		setindex!(X, closest_periodic_a(X[i], X[i-1], 1), i)
+		setindex!(X, PeriodicFuns.closest_periodic_a(X[i], X[i-1], 1), i)
 
 		run_m!(storage, X[i])
 
@@ -275,11 +183,11 @@ function wcc_stat!(storage::AbstractVector{Float64},
 
 
 	setindex!(S, 
-						closest_periodic_a(run_mean(storage), quantized_values, 1), 
+						PeriodicFuns.closest_periodic_a(run_mean(storage), quantized_values, 1), 
 						1)
 
 	setindex!(S, 
-						Statistics.stdm(X, closest_periodic_b(S[1], quantized_values, 1)),
+						Statistics.stdm(X, PeriodicFuns.closest_periodic_b(S[1], quantized_values, 1)),
 						2)
 
 
@@ -337,24 +245,24 @@ end
 
 
 
-function matmul!(A::AbstractMatrix{T},
-								 B::AbstractMatrix{Tb},
-								 C::AbstractMatrix{Tc},
-								 f1::Function=identity
-								 )::Nothing where {T<:Number,Tb<:T,Tc<:T}
-
-	A .= 0 
-
-	for k in axes(C,2), j in axes(B,2), i in axes(B,1)
-
-		A[i,k] += f1(B[i,j]) * C[j,k]
-
-	end 
-
-	return 
-
-end  
-
+#function matmul!(A::AbstractMatrix{T},
+#								 B::AbstractMatrix{Tb},
+#								 C::AbstractMatrix{Tc},
+#								 f1::Function=identity
+#								 )::Nothing where {T<:Number,Tb<:T,Tc<:T}
+#
+#	A .= 0 
+#
+#	for k in axes(C,2), j in axes(B,2), i in axes(B,1)
+#
+#		A[i,k] += f1(B[i,j]) * C[j,k]
+#
+#	end 
+#
+#	return 
+#
+#end  
+#
 
 function overlap(wf1::AbstractMatrix{T1},
 								 wf2::AbstractMatrix{T2}=wf1;
@@ -378,17 +286,18 @@ function overlap!(A::AbstractMatrix{<:Number},
 								 dim::Int=2
 								 )::Nothing 
 
-	for (j,wf2j) in enumerate(eachslice(wf2,dims=dim))
+	if dim==2 
 		
-		for (i,wf1i) in enumerate(eachslice(wf1,dims=dim))
+		LinearAlgebra.mul!(A, wf1', wf2)
 
-			setindex!(A, LinearAlgebra.dot(wf1i, wf2j), i, j)
+	elseif dim==1 
+		
+		LinearAlgebra.mul!(A, wf1, wf2')
 
-		end 
+		conj!(A)
 
 	end 
 
-#	matmul!(A, transpose(wf1), wf2, conj)
 
 	return 
 
@@ -684,7 +593,7 @@ function unitary_part!(G)
 
 	svd = LinearAlgebra.svd!(G)  
 
-	matmul!(G, svd.U, svd.Vt)
+	LinearAlgebra.mul!(G, svd.U, svd.Vt)
 
 end 
 
@@ -732,30 +641,44 @@ function check_start_int(n::Int, k0::Real)
 
 end 
 
+function check_nr_kPoints(n::Int)
 
-get_kij((i,j)::NTuple{2,Int}, args...)::Vector{Float64} = get_kij(i,j,args...)
-
-function get_kij(i::Int, j::Int, n::Int, k0::Real)::Vector{Float64}
-
-	@assert n>2 "Too few k points"
-	@assert 1 <= i < n
-	@assert 1 <= j < n
-	
-	k = [Float64(i-1), Float64(j-1)]
-	
-	k .*= -2pi/(n-1) 
-
-	k .+= 2pi + k0
-
-	return k
+	@assert n>2 "Too few k points" 
 
 end 
 
-function ind_minusk(i::Int,n::Int, k0::Real)::Int 
 
-	check_start_int(k0)
+function get_kij(n::Int, k0::Real)::Function 
 
-	return bring_periodic_to_interval(Int(round(k0*(n-1)/pi))+2-i, 1, n-1, n-1)
+	check_nr_kPoints(n)
+
+	check_start_int(n, k0)
+
+
+	get_kij_((i,j)::NTuple{2,Int})::Vector{Float64} = get_kij_(i,j)
+
+	function get_kij_(i::Int, j::Int)::Vector{Float64}
+	
+		@assert 1 <= i < n
+		@assert 1 <= j < n
+		
+		k = [Float64(i-1), Float64(j-1)]
+		
+		k .*= -2pi/(n-1) 
+	
+		k .+= 2pi + k0
+	
+		return k
+	
+	end  
+
+	return get_kij_
+
+end 
+
+function ind_minusk(i::Int, n::Int, k0::Real)::Int 
+
+	PeriodicFuns.bring_periodic_to_interval(Int(round(k0*(n-1)/pi))+2-i, 1, n-1, n-1)
 
 end 
 
@@ -808,7 +731,7 @@ function get_one_wrapper(get_one::Function,
 												 j::Int,
 												 data_...
 												)
-	
+
 	get_one(ij_to_arg(i,j), data_...)
 
 end 
@@ -836,6 +759,16 @@ function init_storage(item1::Tuple, args...)::Vector
 end 
 
 
+function store_on_mesh(get_one::Function, 
+												arg2::AbstractArray{<:Number},
+											 data...
+												)
+
+
+	store_on_mesh(get_one, nr_kPoints_from_mesh(arg2), arg2, data...)
+
+end   
+
 
 function store_on_mesh(get_one::Function, 
 											 n::Int,
@@ -846,7 +779,10 @@ function store_on_mesh(get_one::Function,
 											 data...
 												)
 
+
 	storage = init_storage(get_one_wrapper(get_one, arg2, 1,1, data...), n)
+
+
 
 	store_on_mesh!(get_one, n, arg2, storage, data...)
 
@@ -925,25 +861,6 @@ end
 
 
 
-
-function reduce_index(i::Int, period::Int)::Int 
-
-	i>period && return reduce_index(i-period, period)
-
-	i<1 && return reduce_index(i+period, period)
-
-	return i
-
-end 
-
-
-function cycseldim(A::AbstractArray{T,N}, d::Int, i::Int
-									 )::AbstractArray{T,N-1} where {N,T<:Number}
-
-	selectdim(A, d, reduce_index(i, size(A,d)))
-
-end 
-
 function get_item_ij((i,j)::Union{AbstractVector{Int},
 																	Tuple{Int,Int}},
 										 storage::AbstractArray{T,N}
@@ -957,7 +874,7 @@ function get_item_ij(i::Int, j::Int,
 										 storage::AbstractArray{T,N}
 										 )::AbstractArray{T,N-2} where T<:Number where N
 
-	cycseldim(cycseldim(storage, N, j), N-1, i)
+	PeriodicFuns.cycseldim(PeriodicFuns.cycseldim(storage, N, j), N-1, i)
 
 end 
 
@@ -1039,12 +956,13 @@ end
 
 function wlo_from_mesh(
 											 IJ0::Union{AbstractVector{Int},Tuple{Int,Int}},
-											 n::Int,
 											 dir::Int,
 											 wfs::AbstractArray{ComplexF64,4},
-											 )::Matrix{ComplexF64}
+											 )::Matrix{ComplexF64} 
 
-	mapreduce(*, 1:n-1) do k 
+	@assert 1<=dir<=2 "Direction must be 1=='x' or 2=='y'"
+
+	return mapreduce(*, 1:nr_kPoints_from_mesh(wfs)-1) do k 
 
 		unitary_overlap(get_item_ij(k, dir, IJ0, wfs),
 										get_item_ij(k+1, dir, IJ0, wfs))
@@ -1063,33 +981,51 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function wlo1_on_mesh(dir1::Int, Hdata...)
+function wlo1_on_mesh(dir1::Int, n::Int, k0::Real, Hdata...)
 
-	Bloch_WFs = store_on_mesh(first∘occupied_subspace, get_kij, Hdata...)
+	Bloch_WFs = store_on_mesh(first∘occupied_subspace, n, 
+														get_kij(n,k0), Hdata...)
 
 	return store_on_mesh(wlo_from_mesh, tuple, dir1, Bloch_WFs), Bloch_WFs 
 
 end 
 
 
-function wlo1_on_mesh(dir1::AbstractVector{Int}, Hdata...)
+function wlo1_on_mesh(dir1::AbstractVector{Int}, 
+											n::Int, k0::Real,
+											Hdata...)
 
-	Bloch_WFs = store_on_mesh(first∘occupied_subspace, get_kij, Hdata...)
+	Bloch_WFs = store_on_mesh(first∘occupied_subspace, n, 
+														get_kij(n,k0), Hdata...)
 
-	w1 = store_on_mesh(wlo_from_mesh, tuple, dir1[1], Bloch_WFs)
 
-	return (w1, (wlo1_on_mesh(d1, Bloch_WFs) for d1 in dir1[2:end])...), Bloch_WFs
+	w1 = store_on_mesh(wlo_from_mesh, n, tuple, dir1[1], Bloch_WFs)
+
+
+	return (
+					(w1, (wlo1_on_mesh(d1, n, Bloch_WFs) for d1 in dir1[2:end])...), 
+					Bloch_WFs
+					)
 
 end 
 
 
 
-function wlo1_on_mesh(dir1::Int, Bloch_WFs::AbstractArray,
+function wlo1_on_mesh(dir1::Int, n::Int, Bloch_WFs::AbstractArray,
 											)
 
-	store_on_mesh(wlo_from_mesh, tuple, dir1, Bloch_WFs)
+	store_on_mesh(wlo_from_mesh, n, tuple, dir1, Bloch_WFs)
+
 
 end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -1103,11 +1039,20 @@ function Wannier_subspace_on_mesh_one(ij::NTuple{2,Int},
 
 end 
 
+	
+function nr_kPoints_from_mesh(W::AbstractArray)::Int 
+	
+	only(unique(size(W)[end-1:end]))+1
+
+end 
+
+
 function Wannier_subspace_on_mesh(W::AbstractArray,
 													s::Union{Function,Real}, 
 													)
 
-	store_on_mesh(Wannier_subspace_on_mesh_one, tuple, W, s)
+	store_on_mesh(Wannier_subspace_on_mesh_one, 
+								nr_kPoints_from_mesh(W), tuple, W, s)
 
 end 
 
@@ -1143,8 +1088,12 @@ function Wannier_band_basis_mesh(
 																 eigvecs::AbstractArray,
 																 Bloch_WFs::AbstractArray
 																 )
-																 
-	store_on_mesh(Wannier_band_basis0, tuple, Bloch_WFs, eigvecs),eigvecs
+	(															 
+	store_on_mesh(Wannier_band_basis0, 
+								nr_kPoints_from_mesh(Bloch_WFs), 
+								tuple, Bloch_WFs, eigvecs),
+	eigvecs
+	)
 
 end  
 
@@ -1165,7 +1114,9 @@ function wlo2_on_mesh(
 
 	nested_WF_dir1 = Wannier_band_basis_mesh(data...)[1]
 
-	return store_on_mesh(wlo_from_mesh, tuple, dir2, nested_WF_dir1)
+	return store_on_mesh(wlo_from_mesh, 
+											 nr_kPoints_from_mesh(nested_WF_dir1),
+											 tuple, dir2, nested_WF_dir1)
 	
 end 
 
@@ -1333,7 +1284,7 @@ function Wannier_min_gap(W::AbstractMatrix)::Float64
 	
 	nu = get_periodic_eigvals(W)
 
-	D = [dist_modulo(nu[i] - nu[j]) for i=1:length(nu) for j=i+1:length(nu)]
+	D = [Utils.dist_periodic(nu[i],nu[j],1) for i=1:length(nu) for j=i+1:length(nu)] 
 
 	return minimum(D) 
 
@@ -1438,124 +1389,6 @@ function Wannier_subspace(W::AbstractMatrix,
 
 end 
 
-
-
-#===========================================================================#
-#
-# more generically implemented Modified Gram-Schmidt. Update myLibs.Algebra
-#
-#---------------------------------------------------------------------------#
-
-function GS_get_ind_matr(X::AbstractMatrix, i::Int; dim::Int, kw...
-								 )::AbstractVector
-
-		selectdim(X, dim, i)
-
-end 
-
-
-function GramSchmidt!(V::AbstractMatrix, iter_axis::Int=2;
-										 kwargs...)::Nothing
-
-	GramSchmidt_!(V, V, size(V,iter_axis), GS_get_ind_matr; 
-								dim=iter_axis, kwargs...)
-
-end 
-
-
-function GramSchmidt!(V::AbstractVector{<:AbstractVector};
-										 kwargs...
-										 )::Nothing 
-
-	GramSchmidt_!(V, V, length(V), getindex; kwargs...)
-
-end 
-
-
-
-
-function GramSchmidt(V::AbstractVector{<:AbstractVector}; kwargs...
-										 )::Vector{Vector{<:Number}}
-
-	isempty(V) && return Vector{Vector{Float64}}(undef, 0)
-
-	isempty(V[1]) && return [Vector{Float64}(undef, 0) for v in V]
-
-
-	U = [zeros(promote_type(Float64, typeof(V[1][1])), length(V[1])) for v in V]
-
-	GramSchmidt_!(U, V, length(V), getindex; kwargs...)
-
-	return U
-
-end 
-
-
-function GramSchmidt(V::AbstractMatrix, iter_axis::Int=2;
-										 kwargs...)::Matrix{<:Number} 
-
-	isempty(V) && return Matrix{Float64}(undef, 0, 0)
-
-
-	U = zeros(promote_type(Float64, typeof(V[1])), size(V))
-
-	GramSchmidt_!(U, V, size(V,iter_axis), GS_get_ind_matr; 
-								dim=iter_axis, kwargs...)
-
-	return U 
-
-end 
-
-
-
-function GramSchmidt_!(out_U::Tu, inp_V::Tv,
-											 jmax::Int,
-											 get_ind::Function;
-											 normalize::Bool=true, tol::Float64=1e-10,
-											 kwargs...
-											 )::Nothing where {
-																				 T<:Union{AbstractMatrix, 
-																									AbstractVector{<:AbstractVector}},
-																				 Tu<:T, Tv<:T} 
-
-
-	jmax < 1 && return 
-
-
-	u = zero(get_ind(out_U,1; kwargs...))
-
-	@assert jmax<=length(u) "Too many vectors"
-
-	norm = zeros(1)
-
-	for j=1:jmax 
-
-		setindex!(u, get_ind(inp_V, j; kwargs...), :)
-
-		for i in 1:j-1
-
-			u -= LinearAlgebra.dot(get_ind(out_U, i; kwargs...), u) * get_ind(out_U, i; kwargs...)
-
-		end 
-
-
-		if normalize 
-		
-			norm[1] = LinearAlgebra.norm(u)
-
-			@assert norm[1]>tol "Invalid input matrix for Gram-Schmidt!"
-			
-			u ./= norm[1]
-
-		end 
-
-		setindex!(get_ind(out_U, j; kwargs...), u, :)
-
-	end
-
-  return
-
-end
 
 
 
@@ -1752,7 +1585,7 @@ function Wannier_band_basis!(w::AbstractMatrix,
 
 #	W = Wannier_subspace(wlo1(k, dir1, Hdata...), subspace)
 
-#	matmul!(w, U, W) 
+#	LinearAlgebra.mul!(w, U, W) 
 
 	return 
 end 
@@ -1849,7 +1682,15 @@ function plot_wcc(ax, xy::Int, W_, K_; s::Real=10, loc=nothing,kwargs...)
 
 	ax.set_ylabel("\$\\nu_$d1\$",rotation=0)
 
-	gap = max(1e-12, minimum(WLO.dist_modulo, diff(W,dims=1)))
+
+	@show size(W)
+
+	error("dist_modulo,diff -> Utils.dist_periodic") 
+
+#	x->Utils.dist_periodic(0,w,1)
+
+	gap = max(1e-12, minimum(PeriodicFuns.dist_modulo, diff(W,dims=1)))
+
 
 	gap = gap<1e-10 ? "0.0" : string(round(gap, digits = Int(ceil(-log10(gap)))+2))[1:min(end,6)]
 

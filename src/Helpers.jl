@@ -4,6 +4,9 @@ module Helpers
 
 include("ParamFlow.jl") # module hParameters + function Calculation 
 
+include("PeriodicFuns.jl") 
+
+include("Algebra.jl")
 
 
 

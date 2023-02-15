@@ -5,7 +5,7 @@ import PyPlot
 import myLibs: Groups, Utils
 
 
-import DelimitedFiles 
+#import DelimitedFiles 
 
 const quantized_wcc2_values = [0,0.5]
 
@@ -199,7 +199,10 @@ function plot_Wx_Wy_old(ax,
 
 		ax[xy].set_ylabel("\$\\nu_$d1\$",rotation=0)
 
-		gap = max(1e-12, minimum(WLO.dist_modulo, diff(W,dims=1)))
+	@show size(W)
+
+	error("dist_modulo,diff -> Utils.dist_periodic") 
+	gap = max(1e-12, minimum(WLO.dist_modulo, diff(W,dims=1)))
 
 		gap = gap<1e-10 ? "0.0" : string(round(gap, digits = Int(ceil(-log10(gap)))+2))[1:min(end,6)]
 
@@ -373,6 +376,7 @@ function get_wcc2((W1eig,psiH), d2::Int)::Matrix{Float64}
 	w2s = [WLO.wlo2_on_mesh(d2, w1wf, psiH) for (w1wf,) in W1eig[3-d2]]
 
 	w2 = cat(w2s..., dims=(1,2))
+
 
 	return reshape(WLO.store_on_mesh(WLO.get_periodic_eigvals, w2), size(w2,1),:)
 
@@ -553,13 +557,17 @@ function symmetrize!(A::AbstractMatrix, op::Symbol)::Nothing
 
 end  
 
-function sepSymmString(opers::AbstractString)::Vector{Symbol}
+function sepSymmString(opers_::AbstractString)::Vector{Symbol}
 
-	sopers = Symbol.("oper" .* filter(!isempty, split(opers," ")))
+	opers  = filter(!isempty, split(opers_,"+"))
 	
-	return isempty(sopers) ? Symbol[] : sopers
+	(isempty(opers) ||	in("None",opers)) && return Symbol[]
 
-end 
+	return Symbol.("oper" .* opers)
+	
+end  
+
+
 
 function getOpFun(op::AbstractString)::Function 
 

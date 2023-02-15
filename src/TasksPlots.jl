@@ -20,7 +20,7 @@ using ..Helpers.hParameters: Calculation
 
 #===========================================================================#
 #
-function Completeness(init_dict::AbstractDict; kwargs...)#::PlotTask
+function CheckQuantiz(init_dict::AbstractDict; kwargs...)#::PlotTask
 #
 #---------------------------------------------------------------------------#
 

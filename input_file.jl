@@ -15,17 +15,17 @@ input_checks  = Dict{Symbol,Any}(
 
   :allparams => (
 
-		theta = [1/4]*2pi,
+		braiding_time = [1/4],
 					
 		nr_kPoints = [30],
 
-		preserved_symmetries = ["All", "None", "Mx", "Ct", "Mx Ct"],
+		preserved_symmetries = ["None", "Mx", "Ct", "Mx+Ct"],
 	
 		nr_perturb_strength = [3],
 		
 		max_perturb_strength = [0.4],
 	
-		nr_perturb_instances = [2]
+		nr_perturb_instances = [2],
 
 		kPoint_start = [-1],
 
@@ -34,19 +34,20 @@ input_checks  = Dict{Symbol,Any}(
 
 	:digits => (
 
+			braiding_time = (1,2),
+
 			nr_kPoints = (3,0),
+
+			kPoint_start = (1,2), 
 
 			preserved_symmetries = (),
 
-#			perturb_strength = (1,2),
-		
 			nr_perturb_strength = (2,0),
 
 			max_perturb_strength = (1,2),
 
 			nr_perturb_instances = (2,0),
 
-			kPoint_start = (1,2),
 
 		),
   
