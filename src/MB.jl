@@ -347,40 +347,51 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function get_wcc1_data(Hparams...; sectors=[+,-])
-
-	W1xy, psiH = WLO.wlo1_on_mesh(1:2, Hparams...) 
-
-	W1eig = [[WLO.Wannier_subspace_on_mesh(W1,s) for s in sectors] for W1 in W1xy]
-
-	return W1eig,psiH
-
-end 
-
-
-function get_wcc1((W1eig,psiH), d1::Int)::Matrix{Float64}
-
-	vcat(reshape.(last.(W1eig[d1]),1,:)...)
-
-end 
-
-function get_wcc1gap(data, d1::Int)::Float64
-
-	minimum(Utils.dist_periodic(eachrow(get_wcc1(data, d1))...,1))
-
-end 
+#function get_wcc1_data(args...; sectors=[+,-])
+#
+#	psiH = WLO.eigH_on_mesh(args...; halfspace=false)
+#
+#
+#	W1xy, psiH = WLO.wlo1_on_mesh(1:2, Hparams...) 
+#
+#	W1eig = [[WLO.Wannier_subspace_on_mesh(W1,s) for s in sectors] for W1 in W1xy]
+#
+#	return W1eig,psiH
+#
+#end 
+#
+#
+#function get_wcc1((W1eig,psiH), d1::Int)::Matrix{Float64}
+#
+#	vcat(reshape.(last.(W1eig[d1]),1,:)...)
+#
+#end 
 
 
-function get_wcc2((W1eig,psiH), d2::Int)::Matrix{Float64}
+#function get_wcc1gap(data)::Vector{Float64}
+#
+#	[get_wcc1gap(data, d1) for d1=1:2]
+#
+#end 
+#
+#
+#function get_wcc1gap(data, d1::Int)::Float64
+#
+#	minimum(Utils.dist_periodic(eachrow(get_wcc1(data, d1))...,1))
+#
+#end 
+#
 
-	w2s = [WLO.wlo2_on_mesh(d2, w1wf, psiH) for (w1wf,) in W1eig[3-d2]]
-
-	w2 = cat(w2s..., dims=(1,2))
-
-
-	return reshape(WLO.store_on_mesh(WLO.get_periodic_eigvals, w2), size(w2,1),:)
-
-end 
+#function get_wcc2((W1eig,psiH), d2::Int)::Matrix{Float64}
+#
+#	w2s = [WLO.wlo2_on_mesh(d2, w1wf, psiH) for (w1wf,) in W1eig[3-d2]]
+#
+#	w2 = cat(w2s..., dims=(1,2))
+#
+#
+#	return reshape(WLO.store_on_mesh(WLO.get_periodic_eigvals, w2), size(w2,1),:)
+#
+#end 
 
 
 
@@ -531,9 +542,7 @@ end
 
 function symmetrize(A::AbstractMatrix, args...)::Matrix
 
-	B = zeros(ComplexF64,size(A))
-
-	B .= A 
+	B = copy!(zeros(ComplexF64,size(A)),A)
 
 	symmetrize!(B, args...)
 
