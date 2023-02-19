@@ -11,6 +11,40 @@ include("Algebra.jl")
 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+# copied from Snake.Helpers.ObservableNames
+
+function f_get_target(key::Symbol, 
+											default_value::AbstractVector{<:AbstractString}=String[]
+											)::Function
+
+	function get_target(target::Nothing=nothing; kwargs...)::Vector{String}
+	
+		vcat(get(kwargs, key, default_value))
+
+	end 
+	
+	
+	function get_target(target::Union{AbstractVector{<:AbstractString},
+																		AbstractString};
+																kwargs...
+											)::Vector{String}
+	
+		intersect(get_target(;kwargs...), vcat(target))
+	
+	end 
+
+	return get_target 
+
+
+end 
+
+
 
 
 

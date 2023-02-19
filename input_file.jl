@@ -1,4 +1,4 @@
-
+import JLD, OrderedCollections 
 
 
 
@@ -17,17 +17,17 @@ input_checks  = Dict{Symbol,Any}(
 
 		braiding_time = [1/4],
 					
-		nr_kPoints = [20],
+		nr_kPoints = [20,50],
 
-		preserved_symmetries = ["None", "Mx", "Ct", "Mx+Ct"],
+		kPoint_start = [-1], 
+
+		preserved_symmetries = ["None", "Mx", "Ct", "Mx+Ct","My"],
 	
-		nr_perturb_strength = [3],
+		nr_perturb_strength = [10],
 		
-		max_perturb_strength = [0.4],
+		max_perturb_strength = [0.6],
 	
-		nr_perturb_instances = [2],
-
-		kPoint_start = [-1],
+		nr_perturb_instances = [3],
 
   		), 
 
@@ -51,7 +51,7 @@ input_checks  = Dict{Symbol,Any}(
 
 		),
   
-	:observables => ["D110"],
+	:observables => ["D110","D111","D48","D30","D123","D125","D127a","WannierGap"],
 
 	
 )

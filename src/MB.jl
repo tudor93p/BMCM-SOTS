@@ -1,7 +1,7 @@
 module MB 
 
 import ..WLO 
-import PyPlot 
+#import PyPlot 
 import myLibs: Groups, Utils
 
 
@@ -247,99 +247,99 @@ end
 
 
 
-function plot_Ws(theta::Real, filename::AbstractString)
-
-	PyPlot.ioff() 
-
-	fig,Ax = plot_Ws(theta)
-
-	fig.savefig(filename,format="png",dpi=300)
-
-	PyPlot.close()
-
-end 
-
-function plot_Wx_Wy(theta::Real, filename::AbstractString)
-
-	PyPlot.ioff() 
-
-	fig,Ax = plot_Wx_Wy(theta)
-
-	fig.savefig(filename,format="png",dpi=300)
-
-	PyPlot.close()
-
-end 
-
-function plot_Wx_Wy(theta::Real)
-
-	fig,Ax,K = init_fig_Ws(theta, [1,2]) 
-
-
-	plot_Wx_Wy(Ax, theta, K)
-	
-	for a in Ax 
-
-		a.legend(loc="upper right")
-
-		a.set_ylim(-.75,.75)
-
-	end 
-
-	fig.subplots_adjust(top=0.87,bottom=0.152,left=.09,right=0.98,
-											wspace=0.28)
-
-	return fig,Ax 
-
-end 
-
-
-
-function init_fig_Ws(theta::Real; nr_rc=[2,2], kwargs...)
-
-	figsize = (nr_rc[[2,1]]/maximum(nr_rc)) .* [1.2,1] * 6
-
-	fig,Ax = PyPlot.subplots(nr_rc...; figsize=figsize, kwargs...)
-
-
-	fig.suptitle(rpad(string("t = ", round(theta/2pi,digits=3)),9,'0') * " T")
-
-	fig.subplots_adjust(top=0.91,bottom=0.08,left=.09,right=0.98,
-										hspace=0.375,wspace=0.245)  
-
-	return fig, Ax, LinRange(-pi, pi, WLO.NR_kPOINTS*5)
-
-end 
-
-
-
-
-function plot_Ws(theta::Real)
-
-	fig, Ax, K = init_fig_Ws(theta) 
-
-	plot_Wx_Wy(Ax[1,:], theta, K)
-
-	plot_Wxy_Wyx(Ax[2,:], theta, K)
-
-
-	for a in Ax 
-
-		a.legend(loc="lower center")
-
-		a.set_ylim(-.7,.7)
-
-	end 
-
-
-	fig.subplots_adjust(top=0.91,bottom=0.08,left=.09,right=0.98,
-										hspace=0.375,wspace=0.245) 
-
-	return fig,Ax 
-
-end 
-
-
+#function plot_Ws(theta::Real, filename::AbstractString)
+#
+#	PyPlot.ioff() 
+#
+#	fig,Ax = plot_Ws(theta)
+#
+#	fig.savefig(filename,format="png",dpi=300)
+#
+#	PyPlot.close()
+#
+#end 
+#
+#function plot_Wx_Wy(theta::Real, filename::AbstractString)
+#
+#	PyPlot.ioff() 
+#
+#	fig,Ax = plot_Wx_Wy(theta)
+#
+#	fig.savefig(filename,format="png",dpi=300)
+#
+#	PyPlot.close()
+#
+#end 
+#
+#function plot_Wx_Wy(theta::Real)
+#
+#	fig,Ax,K = init_fig_Ws(theta, [1,2]) 
+#
+#
+#	plot_Wx_Wy(Ax, theta, K)
+#	
+#	for a in Ax 
+#
+#		a.legend(loc="upper right")
+#
+#		a.set_ylim(-.75,.75)
+#
+#	end 
+#
+#	fig.subplots_adjust(top=0.87,bottom=0.152,left=.09,right=0.98,
+#											wspace=0.28)
+#
+#	return fig,Ax 
+#
+#end 
+#
+#
+#
+#function init_fig_Ws(theta::Real; nr_rc=[2,2], kwargs...)
+#
+#	figsize = (nr_rc[[2,1]]/maximum(nr_rc)) .* [1.2,1] * 6
+#
+#	fig,Ax = PyPlot.subplots(nr_rc...; figsize=figsize, kwargs...)
+#
+#
+#	fig.suptitle(rpad(string("t = ", round(theta/2pi,digits=3)),9,'0') * " T")
+#
+#	fig.subplots_adjust(top=0.91,bottom=0.08,left=.09,right=0.98,
+#										hspace=0.375,wspace=0.245)  
+#
+#	return fig, Ax, LinRange(-pi, pi, WLO.NR_kPOINTS*5)
+#
+#end 
+#
+#
+#
+#
+#function plot_Ws(theta::Real)
+#
+#	fig, Ax, K = init_fig_Ws(theta) 
+#
+#	plot_Wx_Wy(Ax[1,:], theta, K)
+#
+#	plot_Wxy_Wyx(Ax[2,:], theta, K)
+#
+#
+#	for a in Ax 
+#
+#		a.legend(loc="lower center")
+#
+#		a.set_ylim(-.7,.7)
+#
+#	end 
+#
+#
+#	fig.subplots_adjust(top=0.91,bottom=0.08,left=.09,right=0.98,
+#										hspace=0.375,wspace=0.245) 
+#
+#	return fig,Ax 
+#
+#end 
+#
+#
 
 #===========================================================================#
 #
@@ -708,91 +708,91 @@ end
 
 
 
-
-
-function plot_y2stat(Y2Stat::AbstractArray{Float64,4},
-										 X::AbstractArray{<:Real},
-										 xaxis::Int;
-										 xlabel=nothing,
-										 suptitle=nothing,
-										 labels=nothing,
-										 kwargs...
-										 )
-
-	fig2,Ax2 = PyPlot.subplots(3,2; figsize=[1.2,1.5]*6, 
-														 sharex=true,sharey="row",
-														 kwargs...)
-
-	isnothing(suptitle) || fig2.suptitle(suptitle)
-
-	Ax2[1,1].set_ylabel("\$\\mu\$")
-	
-	Ax2[2,1].set_ylabel("\$\\sigma\$")
-
-	Ax2[3,1].set_ylabel("Wannier gap")
-
-
-	paxis = only(setdiff([1,4],xaxis))
-
-	paxis = Dict(4=>1,1=>3)[xaxis]
-	paxis2 = Dict(4=>1,1=>2)[xaxis]
-
-	
-	for (title,y2stat,ax) in zip(["Wxy","Wyx"],
-															 eachslice(Y2Stat,dims=3),
-															 eachcol(Ax2),
-															 )
-
-		for y in quantized_wcc2_values
-	
-			ax[1].plot(extrema(X),[y,y],c="gray",ls="--",lw=0.5, alpha=0.5)
-	
-		end 
-
-
-		for (y2s,lab) in zip(eachslice(y2stat,dims=paxis), 
-												 isnothing(labels) ? axes(y2stat,paxis) : labels)
-
-			for (a,Y) in zip(ax,eachslice(y2s,dims=paxis2))
-
-
-				a.plot(X, Y, label= isempty(lab) ? "None" : lab , alpha=0.7)
-
-			end 
-
-		end 
-	
-		ax[1].set_title(title)
-
-		isnothing(xlabel) || ax[end].set_xlabel(xlabel)
-
-#		if size(y2stat,paxis)>1 
 #
-#			ax[1].legend()
+#
+#function plot_y2stat(Y2Stat::AbstractArray{Float64,4},
+#										 X::AbstractArray{<:Real},
+#										 xaxis::Int;
+#										 xlabel=nothing,
+#										 suptitle=nothing,
+#										 labels=nothing,
+#										 kwargs...
+#										 )
+#
+#	fig2,Ax2 = PyPlot.subplots(3,2; figsize=[1.2,1.5]*6, 
+#														 sharex=true,sharey="row",
+#														 kwargs...)
+#
+#	isnothing(suptitle) || fig2.suptitle(suptitle)
+#
+#	Ax2[1,1].set_ylabel("\$\\mu\$")
+#	
+#	Ax2[2,1].set_ylabel("\$\\sigma\$")
+#
+#	Ax2[3,1].set_ylabel("Wannier gap")
+#
+#
+#	paxis = only(setdiff([1,4],xaxis))
+#
+#	paxis = Dict(4=>1,1=>3)[xaxis]
+#	paxis2 = Dict(4=>1,1=>2)[xaxis]
+#
+#	
+#	for (title,y2stat,ax) in zip(["Wxy","Wyx"],
+#															 eachslice(Y2Stat,dims=3),
+#															 eachcol(Ax2),
+#															 )
+#
+#		for y in quantized_wcc2_values
+#	
+#			ax[1].plot(extrema(X),[y,y],c="gray",ls="--",lw=0.5, alpha=0.5)
+#	
+#		end 
+#
+#
+#		for (y2s,lab) in zip(eachslice(y2stat,dims=paxis), 
+#												 isnothing(labels) ? axes(y2stat,paxis) : labels)
+#
+#			for (a,Y) in zip(ax,eachslice(y2s,dims=paxis2))
+#
+#
+#				a.plot(X, Y, label= isempty(lab) ? "None" : lab , alpha=0.7)
+#
+#			end 
 #
 #		end 
-
-	end  
-	
-		
-	Ax2[1,1].set_xlim(extrema(X))
-	Ax2[1,1].set_ylim(Utils.extend_limits(quantized_wcc2_values, 0.2))
-	
-	Ax2[2,1].set_ylim(0,0.04)
-
-	Ax2[3,1].set_ylim(0,0.08)
-	fig2.tight_layout() 
-
-
-	Ax2[1,1].legend()
-	Ax2[3,2].legend()
-
-	fig2.subplots_adjust(top=0.945, bottom=0.05, left=0.088, right=0.98, hspace=0.131, wspace=0.078)
-
-	return fig2,Ax2 
-
-
-end 
+#	
+#		ax[1].set_title(title)
+#
+#		isnothing(xlabel) || ax[end].set_xlabel(xlabel)
+#
+##		if size(y2stat,paxis)>1 
+##
+##			ax[1].legend()
+##
+##		end 
+#
+#	end  
+#	
+#		
+#	Ax2[1,1].set_xlim(extrema(X))
+#	Ax2[1,1].set_ylim(Utils.extend_limits(quantized_wcc2_values, 0.2))
+#	
+#	Ax2[2,1].set_ylim(0,0.04)
+#
+#	Ax2[3,1].set_ylim(0,0.08)
+#	fig2.tight_layout() 
+#
+#
+#	Ax2[1,1].legend()
+#	Ax2[3,2].legend()
+#
+#	fig2.subplots_adjust(top=0.945, bottom=0.05, left=0.088, right=0.98, hspace=0.131, wspace=0.078)
+#
+#	return fig2,Ax2 
+#
+#
+#end 
 
 
 

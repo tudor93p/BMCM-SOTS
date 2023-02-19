@@ -835,7 +835,7 @@ end
 
 function ind_minusk(i::Int, n::Int, k0::Real)::Int 
 
-	PeriodicFuns.bring_periodic_to_interval(Int(round(k0*(n-1)/pi))+2-i, 1, n-1, n-1)
+	Utils.bring_periodic_to_interval(Int(round(k0*(n-1)/pi))+2-i, 1, n-1, n-1)
 
 end 
 
@@ -1463,8 +1463,6 @@ function wcc2mesh_fromSubspaces1(dir2::Int,
 		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
 		#		dir1 = 3-dir2
 		
-		data_dir1[sector]::AbstractArray{<:Number,4}
-
 		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH) 
 
 		return store_on_mesh(get_periodic_eigvals, w2)
@@ -1727,7 +1725,7 @@ function Wannier_min_gap_mesh(nu_plus::AbstractArray{<:Real,N},
 	for i in CartesianIndices(axes(nu_plus)[1:N-2])
 		for j in CartesianIndices(axes(nu_minus)[1:N-2])
 		
-			out = min(out, PeriodicFuns.reduce_dist_periodic(min, view(nu_plus, i, :, :), view(nu_minus,j, :, :), 1))
+			out = min(out, Utils.reduce_dist_periodic(min, view(nu_plus, i, :, :), view(nu_minus,j, :, :), 1))
 
 		end
 	end 
@@ -1770,12 +1768,7 @@ function Wannier_min_gap(nu_plus::Tp,
 
 	for i=1:length(nu_plus)
 
-		out = min(out, 
-							PeriodicFuns.reduce_dist_periodic(min,
-																								get(nu_plus,i,nu_plus),
-																								nu_minus,
-																								1)
-							)
+		out = min(out, Utils.reduce_dist_periodic(min, get(nu_plus,i,nu_plus), nu_minus, 1))
 
 	end  
 

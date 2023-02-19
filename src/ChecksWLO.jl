@@ -2,14 +2,17 @@ module ChecksWLO
 ############################################################################# 
 
 
-import LinearAlgebra 
+import LinearAlgebra
+
+using OrderedCollections: OrderedDict 
 
 import myLibs: ReadWrite, Utils 
 
 
 import myLibs.Parameters:UODict 
 
-import ..FILE_STORE_METHOD, ..WLO, ..MB
+import ..FILE_STORE_METHOD, ..WLO, ..MB, ..Helpers
+
 
 
 #===========================================================================#
@@ -159,30 +162,47 @@ function psi_unocc(psi::AbstractArray{ComplexF64,4}
 
 end  
 
-function get_data(psiH::AbstractArray{ComplexF64,4})
+function get_data(psiH::AbstractArray{ComplexF64,4}, 
+									results::AbstractDict)
 
-	(get_data(psiH, 1), get_data(psiH,2))
+	(get_data(psiH, 1, results), get_data(psiH,2, results))
 
 end 
 
 
 function get_data(psiH::AbstractArray{ComplexF64,4}, dir1::Int,
+									results::AbstractDict
 									)
 
-	(get_data(psiH, true, dir1), get_data(psiH, false, dir1))
+	(get_data(psiH, true, dir1, results), get_data(psiH, false, dir1, results))
 
 end 
+
+obs_batch_1 = ["D110", "D111", "WannierGap"]
+obs_batch_2 = ["D30", "D48","D123", "D125", "D127a"]  
 
 function get_data(psiH::AbstractArray{ComplexF64,4}, 
 									occupied::Bool,
 									dir1::Int,
+									results::AbstractDict
 									)
+
+
+
 
 	psi = WLO.psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
 	eigW1 = WLO.Wannier_subspaces_on_mesh_loseW(WLO.wlo1_on_mesh(dir1, psi))
 
-	return (eigW1, WLO.wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
+	if any(in(keys(results)), obs_batch_2)
+
+		return (eigW1, WLO.wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
+
+	else 
+
+		return (eigW1, fill(zeros(0,0,0),0))
+
+	end
 
 end 
 
@@ -193,39 +213,231 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function init_results(L::Int)::Dict{String,Array}
+function fn_legend(obs::AbstractString)::String 
 
-	results = Dict{String,Array}()
+	islegend(obs) ? obs : obs*"_legend"
 
-	for eq in ("D123","D127a")
+end  
+function fn_nolegend(obs_leg::AbstractString)::String 
+
+	split(obs_leg,"_legend")[1]
+
+end  
+
+function islegend(obs::AbstractString)::Bool 
+
+	occursin("_legend",obs)
+
+end 
+
+
+function add_legend!(results::AbstractDict, obs::AbstractString,
+										 legend::AbstractVector{<:AbstractString}
+										 )::Nothing
+
+
+	setindex!(results, 
+						OrderedDict((leg=>ylabels(obs,leg) for leg=legend)...), 
+						fn_legend(obs))
+
+	return 
+
+end 
+
+
+function get_label(c::CartesianIndex, args...)::String
+
+	get_label(c.I, args...)
+
+end 
+
+function get_label(I::Tuple{Vararg{Int}}, legend::OrderedDict)::String
+
+	get_label(I, values(legend))
+
+end 
+
+
+function get_label(I::Tuple{Vararg{Int}}, legend::Union{<:AbstractVector{<:AbstractVector},
+																												<:Base.ValueIterator})::String
+
+	#	[string(leg,": \$",ylab[i],"\$") for (i,(leg,ylab)) in zip(c.I,pairs(legend))]
+
+	isempty(I) && return ""
+
+	return "\$"*join(map(Base.splat(getindex), zip(legend, I)),",")*"\$"
+
+end 
+
+
+
+function xxlabel()::Vector{String}
+
+	["x","xlabel"]
+
+end  
+
+function xxlabel(data::AbstractDict)::Tuple{<:AbstractVector,
+																						<:AbstractString}
+
+	Tuple(getindex(data,k) for k=xxlabel())
+
+end 
+
+
+isxxlabel = in(xxlabel())
+
+function isauxfile(obs::AbstractString)::Bool 
+
+	for f in (isxxlabel, islegend)
+
+		f(obs) && return true 
+
+	end 
+
+	return false 
+
+end 
+
+
+function obs_CI(Y::AbstractArray{<:Real,N}, 
+								obs_i::Int, ax::AbstractVector{Int}=2:N 
+							 )::CartesianIndex where N
+		
+	CartesianIndices(axes(Y)[ax])[min(end,obs_i)]
+
+end 
+
+
+function get_data_and_lab(Y::AbstractArray, 
+													legend::OrderedDict,
+													obs_i::Int)::Tuple{<:AbstractVector,
+																						 <:AbstractString}
+
+	c = obs_CI(Y, obs_i)
+
+	return view(Y, :, c), get_label(c, legend)
+
+end  
+
+
+function get_data_and_lab(data::AbstractDict,
+													obs::AbstractString,
+													obs_i::Int)::Tuple{<:AbstractVector,
+																						 <:AbstractString}
+
+	get_data_and_lab(data[fn_nolegend(obs)], data[fn_legend(obs)], obs_i)
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function init_results(strengths::AbstractVector{<:Real},
+											obs::AbstractVector{<:AbstractString}
+										 )::Dict{String,Any}
+
+
+	if any(in(obs), obs_batch_2)
+
+		union!(obs, obs_batch_1, obs_batch_2)
+
+	elseif any(in(obs), obs_batch_1)
+
+		union!(obs, obs_batch_1)
+
+	end 
+
+	results = Dict{String,Any}("x" => strengths,
+														 "xlabel"=>"Perturbation strength"
+															)
+
+	L = length(strengths)
+
+	for eq in ("D123","D127a",)
+
+		in(eq,obs) || continue 
 
 		results[eq] = zeros(L,2,2,2)
 
-		results[eq*"_legend"] = ["dir1","sector","stat"]
+		add_legend!(results, eq, ["dir1","sector","stat"])
 
 	end 
 
 
-	for eq in ("D110","D111","D125")
+	for eq in ("D110","D111","D125",) 
+
+		in(eq,obs) || continue 
 
 		results[eq] = zeros(L,2,2)
-		results[eq*"_legend"] = ["dir1", "stat"]  
+
+		add_legend!(results, eq, ["dir1", "stat"])
 
 	end 
 
-	for eq in ("WannierGap","D30","D48")
+	for eq in ("D30","D48",) 
+
+		in(eq,obs) || continue 
 		
 		results[eq] = zeros(L,2)
 
-		results[eq*"_legend"] = ["stat"]
+		add_legend!(results, eq, ["stat"])
 
 	end 
 
-	results["WannierGap_legend"] = ["dir1"]
+	for eq in ("WannierGap",)
+
+		in(eq,obs) || continue 
+		
+		results[eq] = zeros(L,2)
+
+		add_legend!(results, eq, ["dir1"])
+
+	end 
 
 	return results
 
 end 
+
+
+
+function ylabels(obs::AbstractString, legend::AbstractString
+								)::Vector{String}
+
+	legend=="dir1" && return ["x", "y"]
+	
+	legend=="stat" && return ["\\mu","\\sigma"]
+
+	if legend=="sector" 
+
+		obs=="D123" && return ["+", "-"]
+
+#		obs=="D127a" && return ["\\\\text{occup}","\\\\text{unocc}"]
+		obs=="D127a" && return ["\\mathrm{occup}","\\mathrm{unocc}"]
+#
+# tex command \text{...} not understood in plots 
+#
+
+	end  
+
+	error("Wrong input")
+
+end 
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
 
 function set_results_two!(results::AbstractDict,
 													nk::Int, k0::Real,
@@ -240,7 +452,6 @@ function set_results_two!(results::AbstractDict,
 
 	return 
 
-
 end 
 
 function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
@@ -253,74 +464,95 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 																			<:AbstractVector{<:AbstractArray},
 																			<:AbstractVector{<:AbstractArray}
 																			},
-													)
-
-#function set_results_one!(results::AbstractDict,
-#													trial::Int,i_ps::Int,dir1::Int,
-#													eigW1_occup::AbstractVector{<:AbstractArray},
-#													nus2pm::AbstractVector{<:AbstractArray},
-#													eigW1_unocc::AbstractVector{<:AbstractArray},
-#													eta2pm::AbstractVector{<:AbstractArray}
-#													)
-#
+													)::Nothing
 
 #	WannierGap 					
-	gap = min(WLO.WannierGap_fromSubspaces(eigW1_occup),
-						WLO.WannierGap_fromSubspaces(eigW1_unocc))
+#
+	if haskey(results,"WannierGap")
+
+		gap = min(WLO.WannierGap_fromSubspaces(eigW1_occup),
+							WLO.WannierGap_fromSubspaces(eigW1_unocc))
+	
+	
+		WLO.run_m1!(results["WannierGap"], trial, gap, i_ps, dir1)
+
+	end 
+
+
+
+	# -------------------------------------------- #
+
+	if any((haskey(results,k) for k in ("D110","D111","D127a","D125")))
+
+
+		p1occup = WLO.polariz_fromSubspaces!(eigW1_occup)
+		p1unocc = WLO.polariz_fromSubspaces!(eigW1_unocc)
+	
+	# eigW1[2] are overwritten
+
+		if haskey(results,"D110")
+	
+			#	D110: p1occup-p1unocc ==0
+				WLO.run_m1!(results["D110"],trial,
+										WLO.wcc_stat_axpy(-1,p1occup,p1unocc),
+										i_ps,dir1,:)
+			
+		end 
 		
-	WLO.run_m1!(results["WannierGap"], trial, gap, i_ps, dir1)
+		if haskey(results,"D111")
 
-	
-	p1occup = WLO.polariz_fromSubspaces!(eigW1_occup)
-	p1unocc = WLO.polariz_fromSubspaces!(eigW1_unocc)
-
-# eigW1[2] are overwritten
-
-#	D110: p1occup-p1unocc ==0
-	WLO.run_m1!(results["D110"],trial,
-							WLO.wcc_stat_axpy(-1,p1occup,p1unocc),
-							i_ps,dir1,:)
+		#	D111: p1occup+p1unocc ==0
+			WLO.run_m1!(results["D111"],trial,
+									WLO.wcc_stat_axpy(1,p1occup,p1unocc),
+									i_ps,dir1,:)
+		
+		end 	
 	
 	
-
-#	D111: p1occup+p1unocc ==0
-	WLO.run_m1!(results["D111"],trial,
-							WLO.wcc_stat_axpy(1,p1occup,p1unocc),
-							i_ps,dir1,:)
-
-
-
-
+		if haskey(results,"D127a")|haskey(results,"D125")		
 	
+			p1occup_ = sum(nus2pm)
+			p1unocc_ = sum(eta2pm) 
+		
+			if haskey(results,"D127a")
+	
+			#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
+				WLO.run_m1!(results["D127a"], trial, 
+										WLO.wcc_stat_axpy!(-1,p1occup_,p1occup), 
+									 i_ps,dir1,1,:) 
+			
+			# p1occup has been overwritten
+			
+				WLO.run_m1!(results["D127a"], trial, 
+										WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc), 
+									 i_ps,dir1,2,:) 
+			
+			#	p1unocc has been overwritten  
+	
+			end 
+	
+			if haskey(results,"D125")
+	
+			#	D125: total polarization zero 
+				WLO.run_m1!(results["D125"], trial,
+										WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_),
+									 i_ps,dir1,:)
+			
+			#	p1unocc_ has been overwritten
+			end 	
 
-	p1occup_ = sum(nus2pm)
-	p1unocc_ = sum(eta2pm) 
+		end 
+
+	end 
+
+	# -------------------------------------------- #
 
 
-#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
-	WLO.run_m1!(results["D127a"], trial, 
-							WLO.wcc_stat_axpy!(-1,p1occup_,p1occup), 
-						 i_ps,dir1,1,:) 
-
-# p1occup has been overwritten
-
-	WLO.run_m1!(results["D127a"], trial, 
-							WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc), 
-						 i_ps,dir1,2,:) 
-
-#	p1unocc has been overwritten  
-
-#	D125: total polarization zero 
-	WLO.run_m1!(results["D125"], trial,
-							WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_),
-						 i_ps,dir1,:)
-
-#	p1unocc_ has been overwritten
-
+	# -------------------------------------------- #
 	for sector in 1:2 # plus and minus 
 
 #	D123: nu2pm == eta2pm 
-		WLO.run_m1!(results["D123"], trial,
+		haskey(results,"D123") && WLO.run_m1!(results["D123"], trial,
 							 WLO.wcc_stat_axpy!(-1, nus2pm[sector], eta2pm[sector]), 
 							 i_ps, dir1, sector, :) 
 
@@ -330,7 +562,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 
 
-	if dir1==1 
+	if dir1==1 && haskey(results,"D30")
 #		D30 for (d1,d2)==(1,2), one Wannier band per sector
 
 		nu2_minus_mkx = view(nus2pm[2], 1,
@@ -341,7 +573,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 							 WLO.wcc_stat_axpy!(-1,nus2pm[1],nu2_minus_mkx),
 							 i_ps,:)
 
-	elseif dir1==2
+	elseif dir1==2 && haskey(results,"D48")
 #	D48 for (d1,d2)==(2,1)
 #		
 		WLO.run_m1!(results["D48"], trial,
@@ -356,6 +588,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	return 
 
 end 
+
 
 function get_perturb(
 										 symms::AbstractString, 
@@ -378,9 +611,31 @@ end
 
 
 
+function Compute(P::UODict; get_fname=nothing, target=nothing,
+								 kwargs...)::Dict  
 
-function Compute(P::UODict; get_fname::Function, target=nothing,
-								 kwargs...)::Dict 
+	Compute_(P, target, get_fname; kwargs...)
+
+end   
+
+
+function Compute_(P::UODict, target, get_fname::Function;
+									kwargs...)::Dict{String,Any}
+
+	obs = get_target(target; kwargs...) 
+	
+	results = Compute_(P, obs; kwargs...)
+
+	ReadWrite.Write_PhysObs(get_fname(P), FILE_STORE_METHOD, results)
+
+	return isnothing(target) ? results : Utils.dict_keepkeys(results, obs) 
+
+end 
+
+
+
+function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
+										kwargs...)::Dict{String,Any}
 
 	theta = braiding_theta(P)
 	nk = nr_kPoints(P)
@@ -390,33 +645,29 @@ function Compute(P::UODict; get_fname::Function, target=nothing,
 
 	strengths, trials = perturb_strengths_trials(P)
 
-	results = init_results(length(strengths))
 
+	results = init_results(strengths, get_target(target; kwargs...))
+
+#	return Dict{String,Any}(k=>v for (k,v)=pairs(results) if isauxfile(k)) 
+
+
+	all(isauxfile, keys(results)) && return results
 
 	for (j,perturb0) in enumerate(trials) # don't combine for loops! Order imp.
 
 		for (i_ps,ps) in enumerate(strengths) 
 
-			data = get_data(get_psiH(theta, nk, k0, symms, perturb0, ps))
+			data = get_data(get_psiH(theta, nk, k0, symms, perturb0, ps), results)
 
 			set_results_two!(results, nk, k0, j, i_ps, data)
 
 		end 
 	end 
 
+	return results
 
+end 
 
-
-
-	ReadWrite.Write_PhysObs(get_fname(P), FILE_STORE_METHOD, results)
-
-	isnothing(target) && return results 
-
-	return Utils.dict_keepkeys(results, 
-														 vcat(([t,t*"_legend"] for t in vcat(target))...)
-														 )
-
-end  
 
 
 
@@ -431,42 +682,52 @@ end
 #---------------------------------------------------------------------------#
 
 
-function FoundFiles(P; observables=nothing, target=nothing,
-										get_fname::Function, kwargs...
-									 )::Bool
+prep_obs(::Nothing=nothing)::Vector{String} = String[]
 
-	# kwargs for get_target
+function prep_obs(obs::AbstractString)::Vector{String} 
+	
+	vcat(fn_nolegend(obs),fn_legend(obs),xxlabel())
 
-	FoundFiles0(get_fname(P),
-							vcat(isnothing(observables) ? String[] : observables,
-									 isnothing(target) ? String[] : target),
-							)
+end 
+
+function prep_obs(obs::AbstractVector{<:AbstractString})::Vector{String} 
+
+	mapreduce(prep_obs, vcat, obs; init=prep_obs())
+
+end 
+
+function prep_obs(args...)::Vector{String} 
+	
+	mapreduce(prep_obs, vcat, args; init=prep_obs())
 
 end 
 
 
 
+get_target = prep_obs ∘ Helpers.f_get_target(:observables)	   
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
-function FoundFiles0(Obs_fname::Function)::Function 
 
-	function FFO(observables::Union{AbstractString, 
-																	AbstractVector{<:AbstractString}})::Bool
 
-		FoundFiles0(Obs_fname, observables)
 
-	end 
+function FoundFiles(P; target=nothing, get_fname::Function, kwargs...)::Bool
+
+	FoundFiles0(get_fname(P), get_target(target; kwargs...))
 
 end 
 
 
-function FoundFiles0(Obs_fname::Function, observables::Union{AbstractString, 
-																									AbstractVector{<:AbstractString}})::Bool
 
-	ReadWrite.FoundFiles_PhysObs(Obs_fname, 
-															 vcat(observables),
-															 FILE_STORE_METHOD)
+function FoundFiles0(Obs_fname::Function, 
+										 observables::AbstractVector{<:AbstractString})::Bool
 
+	!isempty(observables) && ReadWrite.FoundFiles_PhysObs(Obs_fname, observables, FILE_STORE_METHOD)
 
 end
 
@@ -474,11 +735,9 @@ end
 
 
 
-function Read(P::UODict; target=nothing,
-							get_fname::Function, kwargs...
-						 )::Dict 
+function Read(P::UODict; target=nothing, get_fname::Function, kwargs...)::Dict 
 
-	Read0(get_fname(P))
+	Read0(get_fname(P), get_target(target; kwargs...))
 
 end
 	
@@ -486,52 +745,39 @@ end
 
 
 function Read0(Obs_fname::Function, 
-												 ::Nothing=nothing,
-												 ::Nothing=nothing)::Dict{String,Any}
-
-	files_available = [split(fn,".")[1] for fn in cd(readdir, Obs_fname())]
-
-	return ReadWrite.Read_PhysObs(Obs_fname, files_available, FILE_STORE_METHOD)
-
-end	
-
-
-function Read0(Obs_fname::Function, 
-												 observables::Union{AbstractString, 
-																						<:AbstractVector{<:AbstractString}},
-												 target::Union{AbstractString,
-																			 <:AbstractVector{<:AbstractString}},
+							 observables::AbstractVector{<:AbstractString}
 												 )::Dict{String,Any}
 
-	Read0(Obs_fname, intersect(vcat(observables), vcat(target)))
+	if isempty(observables)
+		
+		obs_found = [split(fn,".")[1] for fn in cd(readdir, Obs_fname())]
 
-end  
+		return ReadWrite.Read_PhysObs(Obs_fname, obs_found, FILE_STORE_METHOD)
 
-function Read0(Obs_fname::Function, ::Nothing,
-												 observables::Union{AbstractString, 
-																						<:AbstractVector{<:AbstractString}},
-												 )::Dict{String,Any}
+	else 
 
-	Read0(Obs_fname, observables)
+		return ReadWrite.Read_PhysObs(Obs_fname, observables, FILE_STORE_METHOD)
+
+	end 
 
 end 
 
 
-function Read0(Obs_fname::Function,
-												 observables::Union{AbstractString, 
-																						<:AbstractVector{<:AbstractString}},
-												 ::Nothing=nothing,
-												 )::Dict{String,Any}
-
-	isempty(observables) && return Dict{String,Any}()
-
-	files_available = [split(fn,".")[1] for fn in cd(readdir, Obs_fname())]
-
-	filter!(f->any(t->occursin(t,f), vcat(observables)), files_available)
-
-	return ReadWrite.Read_PhysObs(Obs_fname, files_available, FILE_STORE_METHOD)
-
-end 
+#function Read0(Obs_fname::Function,
+#												 observables::Union{AbstractString, 
+#																						<:AbstractVector{<:AbstractString}},
+#												 ::Nothing=nothing,
+#												 )::Dict{String,Any}
+#
+#	isempty(observables) && return Dict{String,Any}()
+#
+#	files_available = [split(fn,".")[1] for fn in cd(readdir, Obs_fname())]
+#
+#	filter!(f->any(t->occursin(t,f), vcat(observables)), files_available)
+#
+#	return ReadWrite.Read_PhysObs(Obs_fname, files_available, FILE_STORE_METHOD)
+#
+#end 
 
 
 
