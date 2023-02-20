@@ -1239,7 +1239,7 @@ end
 #---------------------------------------------------------------------------#
 
 function psiH_on_mesh(n::Int, k0::Real, Hdata...; kwargs...
-											)::Array
+											)::Array{ComplexF64,4}
 
 	kij = get_kij(n,k0)  
 

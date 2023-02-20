@@ -2,7 +2,9 @@ module ChecksWLO
 ############################################################################# 
 
 
-import LinearAlgebra
+using Distributed 
+
+import LinearAlgebra, Combinatorics 
 
 using OrderedCollections: OrderedDict 
 
@@ -102,12 +104,14 @@ end
 function perturb_strengths_trials(P::UODict
 																 )::Tuple{Vector{Float64}, 
 																					Vector{Matrix{ComplexF64}} }
-	
-	all_symms_preserved(P) && return ([0.0], [zeros(ComplexF64,4,4)])
-	
+
+	strengths = perturb_strengths(P)
+
+	all_symms_preserved(P) && return (strengths, [zeros(ComplexF64,4,4)])
+
 	randpert = rand(ComplexF64,4,4,nr_perturb_instances(P))
 
-	return (perturb_strengths(P), collect.(eachslice(randpert,dims=3)))
+	return (strengths, collect.(eachslice(randpert,dims=3)))
 
 end 
 
@@ -130,22 +134,21 @@ braiding_theta(P::UODict)::Float64 = braiding_theta(P[:braiding_time])
 #
 #---------------------------------------------------------------------------#
 
-function get_psiH(theta::Real, 
-												 n::Int, k0::Real,
-										 symms::AbstractString, 
-										 args...
-												 )
+function get_psiH(theta::Real, n::Int, k0::Real)::Array{ComplexF64,4}
 
-	if all_symms_preserved(symms)
+	WLO.psiH_on_mesh(n, k0, MB.H,  MB.bsss_cycle(theta))
 
-			WLO.psiH_on_mesh(n, k0, MB.H,  MB.bsss_cycle(theta))
-			
-	else 
+end 
 
-		WLO.psiH_on_mesh(n, k0, MB.perturbedH,  MB.bsss_cycle(theta), 
+function get_psiH(theta::Real, n::Int, k0::Real,
+										 symms::AbstractString, args...
+											)::Array{ComplexF64,4}
+
+	all_symms_preserved(symms) && return get_psiH(theta, n, k0)
+
+	return WLO.psiH_on_mesh(n, k0, MB.perturbedH,  MB.bsss_cycle(theta), 
 										 get_perturb(symms, args...))
 
-	end 
 
 end 
  
@@ -245,6 +248,21 @@ function add_legend!(results::AbstractDict, obs::AbstractString,
 end 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
 function get_label(c::CartesianIndex, args...)::String
 
 	get_label(c.I, args...)
@@ -253,21 +271,155 @@ end
 
 function get_label(I::Tuple{Vararg{Int}}, legend::OrderedDict)::String
 
-	get_label(I, values(legend))
+	get_label(I, collect(values(legend)))
 
 end 
 
 
-function get_label(I::Tuple{Vararg{Int}}, legend::Union{<:AbstractVector{<:AbstractVector},
-																												<:Base.ValueIterator})::String
+function get_label(I::Tuple{Vararg{Int}}, 
+									 legend::AbstractVector{<:AbstractVector})::String
 
 	#	[string(leg,": \$",ylab[i],"\$") for (i,(leg,ylab)) in zip(c.I,pairs(legend))]
 
-	isempty(I) && return ""
-
-	return "\$"*join(map(Base.splat(getindex), zip(legend, I)),",")*"\$"
+	#	return "\$"*join(map(Base.splat(getindex), zip(legend, I)),",")*"\$" 
+	
+	isempty(I) ? "" : "\$"*join(getindex.(legend, I),",")*"\$" 
 
 end 
+
+function obs_CI(Y::AbstractArray{<:Real,N}, 
+								obs_i::Int, ax::AbstractVector{Int}=2:N 
+							 )::CartesianIndex where N
+		
+	CartesianIndices(axes(Y)[ax])[min(end,obs_i)]
+
+end 
+
+
+function extract_data_and_lab(data::AbstractDict, obs::AbstractString,
+													args...; kwargs...)::Tuple
+
+	extract_data_and_lab(data[fn_nolegend(obs)], data[fn_legend(obs)], 
+											 args...; kwargs...)
+
+end 
+
+
+function extract_data_and_lab(Y::AbstractArray{<:Number},
+															legend::OrderedDict,
+															obs_i::Int;
+															kwargs...
+															)::Tuple{Vector{<:Number}, String } 
+
+	extract_data_and_lab(Y, collect(values(legend)), obs_i; kwargs...)
+
+end 
+
+
+function extract_data_and_lab(Y::AbstractArray{<:Number},
+															axvars::AbstractVector{<:AbstractVector{<:AbstractString}},
+															obs_i::Int; 
+															transf_data::Function=copy
+															)::Tuple{Vector{<:Number}, String } 
+	
+
+	c = obs_CI(Y, obs_i)
+
+	return transf_data(view(Y, :, c)), get_label(c, axvars)
+
+end  
+
+function extract_data_and_lab(Y::AbstractArray{<:Number},
+															legend::OrderedDict,
+															obs_gr::Union{AbstractString,
+																								<:AbstractVector{<:AbstractString}
+																								},
+															args...;
+															kwargs...
+															)::Tuple{Vector{Vector{<:Number}},
+																					Vector{String},
+																					String,
+																					} 
+
+	extract_data_and_lab(Y, 
+											 (collect(keys(legend)), collect(values(legend))),
+											 obs_gr,
+											 args...;
+											 kwargs...)
+
+end 
+
+
+
+function extract_data_and_lab(Y::AbstractArray{<:Number},
+															legend::Tuple,
+															obs_group::AbstractString,
+															args...; kwargs...
+															)::Tuple{Vector{Vector{<:Number}},
+																					Vector{String},
+																					String,
+																					} 
+
+
+	extract_data_and_lab(Y, legend, split_groups(obs_group), args...; kwargs...)
+
+end 
+
+
+function extract_data_and_lab(Y::AbstractArray{<:Number,N},
+														 (axnames,axvars)::Tuple{
+												 <:AbstractVector{<:AbstractString},
+												 <:AbstractVector{<:AbstractVector{<:AbstractString}}
+												 },
+															obs_groups::AbstractVector{<:AbstractString},
+															obs_i::Int;
+															transf_data::Function=copy!,
+															out_type::DataType=Float64,
+															)::Tuple{Vector{Vector{<:Number}},
+																					Vector{String},
+																					String,
+																					} where N 
+
+
+	I = Vector{Union{Base.OneTo{Int},Int}}(undef, N-1) 
+
+	fullax = map(in(obs_groups), axnames)
+	partax = findall(!,fullax)  
+
+	c = obs_CI(Y, obs_i, partax .+ 1)
+	
+	I[fullax] .= axes(Y)[(2:N)[fullax]]
+	I[partax] .= c.I
+
+	fixedlabel = get_label(c, axvars[partax]) 
+
+	nr_curves = mapreduce(length,*,I)
+
+	chlabels = Vector{String}(undef,nr_curves)
+
+	ys = [Vector{out_type}(undef,size(Y,1)) for i=1:nr_curves] 
+
+	for (n,i) in enumerate(Iterators.product(I...))
+
+		chlabels[n] = get_label(i[fullax], axvars[fullax])  
+
+		transf_data(ys[n], view(Y,:,i...))
+
+	end 
+
+	return ys, chlabels, fixedlabel
+
+end 
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
 
 
 
@@ -300,41 +452,23 @@ function isauxfile(obs::AbstractString)::Bool
 end 
 
 
-function obs_CI(Y::AbstractArray{<:Real,N}, 
-								obs_i::Int, ax::AbstractVector{Int}=2:N 
-							 )::CartesianIndex where N
-		
-	CartesianIndices(axes(Y)[ax])[min(end,obs_i)]
-
-end 
-
-
-function get_data_and_lab(Y::AbstractArray, 
-													legend::OrderedDict,
-													obs_i::Int)::Tuple{<:AbstractVector,
-																						 <:AbstractString}
-
-	c = obs_CI(Y, obs_i)
-
-	return view(Y, :, c), get_label(c, legend)
-
-end  
-
-
-function get_data_and_lab(data::AbstractDict,
-													obs::AbstractString,
-													obs_i::Int)::Tuple{<:AbstractVector,
-																						 <:AbstractString}
-
-	get_data_and_lab(data[fn_nolegend(obs)], data[fn_legend(obs)], obs_i)
-
-end 
 
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
+
+join_groups =  Base.Fix2(join," ")
+split_groups = Base.Fix2(split," ")
+
+function combs_groups(g::AbstractVector{<:AbstractString
+																			 }=["dir1","sector","stat"]
+										 )::Vector{String}
+
+	map(join_groups, Combinatorics.powerset(g,1))
+
+end 
 
 
 function init_results(strengths::AbstractVector{<:Real},
@@ -369,7 +503,7 @@ function init_results(strengths::AbstractVector{<:Real},
 	end 
 
 
-	for eq in ("D110","D111","D125",) 
+	for eq in ("D110","D111","D125","D30","D48")
 
 		in(eq,obs) || continue 
 
@@ -379,15 +513,15 @@ function init_results(strengths::AbstractVector{<:Real},
 
 	end 
 
-	for eq in ("D30","D48",) 
-
-		in(eq,obs) || continue 
-		
-		results[eq] = zeros(L,2)
-
-		add_legend!(results, eq, ["stat"])
-
-	end 
+#	for eq in ("D30","D48",) 
+#
+#		in(eq,obs) || continue 
+#		
+#		results[eq] = zeros(L,2)
+#
+#		add_legend!(results, eq, ["stat"])
+#
+#	end 
 
 	for eq in ("WannierGap",)
 
@@ -484,7 +618,6 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 	if any((haskey(results,k) for k in ("D110","D111","D127a","D125")))
 
-
 		p1occup = WLO.polariz_fromSubspaces!(eigW1_occup)
 		p1unocc = WLO.polariz_fromSubspaces!(eigW1_unocc)
 	
@@ -562,26 +695,43 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 
 
-	if dir1==1 && haskey(results,"D30")
 #		D30 for (d1,d2)==(1,2), one Wannier band per sector
 
-		nu2_minus_mkx = view(nus2pm[2], 1,
-												 WLO.ind_minusk.(axes(nus2pm[2],2),nk,k0),
-												 :)
+	if haskey(results,"D30")
 
-		WLO.run_m1!(results["D30"], trial,
-							 WLO.wcc_stat_axpy!(-1,nus2pm[1],nu2_minus_mkx),
-							 i_ps,:)
+#		if dir1==1 
+#			nu2_minus_mkx = view(nus2pm[2], 1,
+#													 WLO.ind_minusk.(axes(nus2pm[2],2),nk,k0),
+#													 :)
+#		elseif dir1==2
+#
+#			nu2_minus_mky = view(nus2pm[2], 1,
+#													 :,
+#													 WLO.ind_minusk.(axes(nus2pm[2],3),nk,k0),
+#													 )
+#	
+#
+#		end 
 
-	elseif dir1==2 && haskey(results,"D48")
-#	D48 for (d1,d2)==(2,1)
-#		
-		WLO.run_m1!(results["D48"], trial,
-							 WLO.wcc_stat_axpy!(-1,nus2pm...),
-							 i_ps,:)
+			nu2_minus_mk = selectdim(nus2pm[2],dir1+1,
+								WLO.ind_minusk.(axes(nus2pm[2],dir1+1),nk,k0)
+								)
 
+			WLO.run_m1!(results["D30"], trial,
+								 WLO.wcc_stat_axpy(-1,nus2pm[1],nu2_minus_mk),
+								 i_ps,dir1,:)
 
-	end #if 
+	end 
+
+#	D48 for dir1==2. Calc also dir1==1
+		
+	if haskey(results,"D48")
+
+			WLO.run_m1!(results["D48"], trial,
+								 WLO.wcc_stat_axpy!(-1,nus2pm...),
+								 i_ps,dir1,:)
+
+	end 
 	
  # nus2pm[2] has been overwritten
 
@@ -653,15 +803,58 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	all(isauxfile, keys(results)) && return results
 
-	for (j,perturb0) in enumerate(trials) # don't combine for loops! Order imp.
 
-		for (i_ps,ps) in enumerate(strengths) 
+	if all_symms_preserved(P) # ------ no perturbation --------- #
 
-			data = get_data(get_psiH(theta, nk, k0, symms, perturb0, ps), results)
+		set_results_two!(results, nk, k0, 1, 1, 
+										 get_data(get_psiH(theta, nk, k0), results))
 
-			set_results_two!(results, nk, k0, j, i_ps, data)
+		for (k,v) in pairs(results)
+
+			isauxfile(k) && continue
+		
+			results[k] .= selectdim(v,1,1:1)
 
 		end 
+
+		return results
+
+	end 	
+
+	# ------------- with increasing perturbation -------------- #
+
+			if nprocs()>3 #-------#
+
+				data_all = pmap(Iterators.product(trials,strengths)) do pert
+
+					get_data(get_psiH(theta, nk, k0, symms, pert...), results)
+
+				end 
+
+				for (I,d) in zip(Iterators.product(axes(trials,1),axes(strengths,1)),
+												 data_all 
+												 )
+
+					set_results_two!(results, nk, k0, I..., d)
+
+				end  
+
+
+			else  #--------#
+
+
+				for (j,perturb0) in enumerate(trials) # don't parallelize j-loop! 
+	
+					for (i_ps,ps) in enumerate(strengths) 
+			
+						data = get_data(get_psiH(theta, nk, k0, symms, perturb0, ps), results)
+			
+						set_results_two!(results, nk, k0, j, i_ps, data)
+			
+					end  
+	
+				end # ---------#  
+
 	end 
 
 	return results

@@ -1,17 +1,26 @@
 module BMCMSOTS
 #############################################################################
 
-#const PATH_SNAKE = if gethostname()=="tudor-HP" 
-#	
-#				"/media/tudor/Tudor/Work/2020_Snake-states/SnakeStates"
-#
-#									else 
-#
-#				"/net/horon/scratch/pahomit/SnakeStates"
-#
-#									end 
+const MBPATH = if gethostname()=="tudor-HP" 
+	
+		"/media/tudor/Tudor/Work/2018_Higher-Order-Topology/BMCMSOTS"
 
-const MBPATH = "/media/tudor/Tudor/Work/2018_Higher-Order-Topology/BMCMSOTS"
+									else 
+
+		"/net/horon/scratch/pahomit/BMCMSOTS"
+
+									end  
+
+const PATH_SNAKE = if gethostname()=="tudor-HP" 
+	
+				"/media/tudor/Tudor/Work/2020_Snake-states/SnakeStates"
+
+									else 
+
+				"/net/horon/scratch/pahomit/SnakeStates"
+
+									end 
+
 
 const DATAROOT = "$MBPATH/Data" 
 

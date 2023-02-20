@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "f7fa1705cd92c17b7280701b6847ceb875812195"
+project_hash = "287fe51522fdda2b32cfd0901c2a15731ccae4c5"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -1119,11 +1119,11 @@ version = "1.6.38+0"
 
 [[deps.myLibs]]
 deps = ["Arpack", "Combinatorics", "ConcaveHull", "Dates", "DelimitedFiles", "Dierckx", "Distributed", "FFTW", "FileIO", "Graphs", "JLD", "LazySets", "LinearAlgebra", "MetaGraphs", "Optim", "OrderedCollections", "PolynomialRoots", "PyCall", "PyPlot", "QHull", "QuadGK", "Random", "Revise", "SparseArrays", "Test", "TikzGraphs", "TikzPictures"]
-git-tree-sha1 = "2c709d1fc981ef1b7f49b9bebb597e650174d9b4"
+git-tree-sha1 = "62324639531eae5f1ac42f9c9fc16ec792616113"
 repo-rev = "main"
 repo-url = "https://github.com/tudor93p/myLibs.git#main"
 uuid = "0cc41259-d48e-4a81-8a6d-ec7e330e4bca"
-version = "0.1.1"
+version = "0.1.2"
 
 [[deps.myPlots]]
 deps = ["BenchmarkTools", "Constants", "FFTW", "LinearAlgebra", "OrderedCollections", "PyCall", "PyPlot", "Revise", "Test", "myLibs"]
