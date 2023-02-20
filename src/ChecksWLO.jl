@@ -627,7 +627,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	
 			#	D110: p1occup-p1unocc ==0
 				WLO.run_m1!(results["D110"],trial,
-										WLO.wcc_stat_axpy(-1,p1occup,p1unocc),
+										abs.(WLO.wcc_stat_axpy(-1,p1occup,p1unocc)),
 										i_ps,dir1,:)
 			
 		end 
@@ -636,7 +636,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 		#	D111: p1occup+p1unocc ==0
 			WLO.run_m1!(results["D111"],trial,
-									WLO.wcc_stat_axpy(1,p1occup,p1unocc),
+									abs.(WLO.wcc_stat_axpy(1,p1occup,p1unocc)),
 									i_ps,dir1,:)
 		
 		end 	
@@ -651,13 +651,13 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	
 			#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
 				WLO.run_m1!(results["D127a"], trial, 
-										WLO.wcc_stat_axpy!(-1,p1occup_,p1occup), 
+										abs.(WLO.wcc_stat_axpy!(-1,p1occup_,p1occup)), 
 									 i_ps,dir1,1,:) 
 			
 			# p1occup has been overwritten
 			
 				WLO.run_m1!(results["D127a"], trial, 
-										WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc), 
+										abs.(WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc)), 
 									 i_ps,dir1,2,:) 
 			
 			#	p1unocc has been overwritten  
@@ -668,7 +668,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	
 			#	D125: total polarization zero 
 				WLO.run_m1!(results["D125"], trial,
-										WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_),
+										abs.(WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_)),
 									 i_ps,dir1,:)
 			
 			#	p1unocc_ has been overwritten
@@ -686,7 +686,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 #	D123: nu2pm == eta2pm 
 		haskey(results,"D123") && WLO.run_m1!(results["D123"], trial,
-							 WLO.wcc_stat_axpy!(-1, nus2pm[sector], eta2pm[sector]), 
+				abs.(WLO.wcc_stat_axpy!(-1, nus2pm[sector], eta2pm[sector])), 
 							 i_ps, dir1, sector, :) 
 
 #	eta2pm has been overwritten
@@ -718,7 +718,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 								)
 
 			WLO.run_m1!(results["D30"], trial,
-								 WLO.wcc_stat_axpy(-1,nus2pm[1],nu2_minus_mk),
+									abs.(WLO.wcc_stat_axpy(-1,nus2pm[1],nu2_minus_mk)),
 								 i_ps,dir1,:)
 
 	end 
@@ -728,7 +728,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	if haskey(results,"D48")
 
 			WLO.run_m1!(results["D48"], trial,
-								 WLO.wcc_stat_axpy!(-1,nus2pm...),
+									abs.(WLO.wcc_stat_axpy!(-1,nus2pm...)),
 								 i_ps,dir1,:)
 
 	end 
@@ -803,6 +803,8 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	all(isauxfile, keys(results)) && return results
 
+
+	println("abs")
 
 	if all_symms_preserved(P) # ------ no perturbation --------- #
 

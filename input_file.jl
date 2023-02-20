@@ -17,11 +17,11 @@ input_checks  = Dict{Symbol,Any}(
 
 		braiding_time = [1/4],
 					
-		nr_kPoints = 10:10:100,
+		nr_kPoints = 10:20:210,
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = ["None", "All", "Mx", "Ct", "Mx+Ct","My", "My+Ct"],
+		preserved_symmetries = ["None", "Mx", "Ct", "Mx+Ct","My", "My+Ct"],# "All"],
 	
 		nr_perturb_strength = [21],
 		
