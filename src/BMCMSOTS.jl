@@ -7,7 +7,7 @@ const MBPATH = if gethostname()=="tudor-HP"
 
 									else 
 
-		"/net/horon/scratch/pahomit/BMCMSOTS"
+		"/net/horon/scratch/pahomit/BMCM-SOTS"
 
 									end  
 
