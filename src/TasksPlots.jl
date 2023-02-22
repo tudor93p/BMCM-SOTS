@@ -10,7 +10,8 @@ module TasksPlots
 
 
 
-import myLibs: Utils, ComputeTasks
+import myLibs: Utils, ComputeTasks, SignalProcessing 
+
 using myLibs.ComputeTasks: CompTask   
 
 import myPlots
@@ -28,41 +29,74 @@ using ..Helpers.hParameters: Calculation
 #
 #---------------------------------------------------------------------------#
 
-function apply_log10abs(src::AbstractVector{<:Real}
-												)::Vector{Float64}
+function apply_log10abs(src::AbstractVector{<:Real})::Vector{Float64}
 
 	apply_log10abs!(Vector{Float64}(undef, length(src)), src)
 
 end 
 
-
-
-
 function apply_log10abs!(dst::AbstractVector{Float64},
 											src::AbstractVector{<:Real}
 											)::AbstractVector{Float64}
 
-	m::Float64 = -35 
+	m::Float64 = -18
 
-	for (j,s) in enumerate(src)
+	nz = !Utils.fSame(0, 10^m)
 
-		setindex!(dst, log10(abs(s)), j)
 
-		if isfinite(dst[j]) 
-			
-			dst[j]<m && @warn "Update the minimum: value $(dst[j]) encountered"
+	i = Union{Nothing,Int}[0,0]
 
-		else 
+	i[1] = findfirst(nz, src)
 
-			setindex!(dst, m, j)
+	isnothing(i[1]) && return fill!(dst, m) 
 
-		end 
+
+	fill!(view(dst,firstindex(dst):i[1]), log10(abs(src[i[1]])))
+
+	while !isnothing(setindex!(i, findnext(nz, src, i[1]+1), 2)[2])
+
+		map!(SignalProcessing.LinearInterp1D(dst[i[1]], log10(abs(src[i[2]])), 
+																				 i[1], i[2]),
+				 view(dst, i[1]+1:i[2]), i[1]+1:i[2])
+
+		i[1] = i[2] 
 
 	end 
+
+
+	fill!(view(dst, i[1]+1:lastindex(dst)), dst[i[1]])
+
+
+	m1 = minimum(dst)
+	
+	m1<m && @warn "Update the minimum: value $m1 encountered"
 
 	return dst 
 
 end  
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function init_sliders_obs(observables::AbstractVector{<:AbstractString}
+												 )::Vector
+													
+	[ ("observables", observables), 
+	 ("obs_index", 8), 
+	 ]
+
+end 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
 
 function get_ylim(::Nothing, ::Nothing, ydata::AbstractArray, args...
 									)::Vector{Float64}
@@ -110,6 +144,96 @@ end
 
 #===========================================================================#
 #
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function f_extract_data_and_lab(P::AbstractDict; kwargs...)::Function
+
+	function apply_rightaway(data::AbstractDict, args... 
+													 )::Tuple{Tuple,Tuple}
+
+		(ChecksWLO.xxlabel(data),
+		 ChecksWLO.extract_data_and_lab(data, P["obs"], P["obs_group"], P["obs_i"];
+																		kwargs...)
+		 )
+
+	end 
+
+end 
+
+
+function plotdict_checkzero(
+												 (x,xlabel)::Tuple{<:AbstractVector,<:AbstractString},
+												 (ys,chlabels,fixedlab
+													)::Tuple{<:AbstractVector{<:AbstractVector},
+																	 <:AbstractVector{<:String},
+																	 <:AbstractString},
+												 P::AbstractDict=Dict();
+												 transf_lab::AbstractString="",
+												 kwargs...
+												 )::Dict{String,Any} 
+
+	Dict{String,Any}(
+
+		"xs"=> [x for y=ys],
+
+		"ys" => ys, 
+
+		"xlim" => extrema(x),
+
+		"ylim" => get_ylim(P, ys),
+
+		"labels" => chlabels,
+
+		"ylabel" => myPlots.join_label(transf_lab*P["obs"], fixedlab),
+
+		"xlabel" => xlabel,
+
+		)
+
+end  
+
+
+function plot_check_zero(P::AbstractDict, 
+												 task::CompTask; 
+												 kwargs...)::Dict{String,Any} 
+
+	F = f_extract_data_and_lab(P; kwargs...)
+
+	data = F(task.get_data(P; fromPlot=true, mute=false, target=P["obs"]))
+
+	return plotdict_checkzero(data..., P; kwargs...)
+
+end 
+
+function plot_check_zero_multi(P::AbstractDict, 
+															 task::CompTask, 
+															 out_dict::AbstractDict; 
+															 kwargs...)::Dict{String,Any} 
+
+	F = f_extract_data_and_lab(P; kwargs...)
+
+	data = task.get_data(P; fromPlot=true, target=P["obs"], apply_rightaway=F)
+	
+	curves = vcat((d[2][1] for d in data)...)
+
+	chlabs = vcat((myPlots.join_label.(d[2][2], [string(y)]) for (d,y)=zip(data,out_dict["y"]))...)
+
+	fixedlab = myPlots.join_label(data[1][2][3], out_dict["ylabel"])
+
+
+	return plotdict_checkzero(data[1][1],
+														(curves,chlabs,fixedlab),
+														P; 
+														kwargs...)
+end  
+
+
+
+#===========================================================================#
+#
 function CheckZero(init_dict::AbstractDict;
 											observables::AbstractVector{<:AbstractString},
 											kwargs...)::PlotTask
@@ -120,57 +244,88 @@ function CheckZero(init_dict::AbstractDict;
 															ChecksWLO, init_dict; 
 															observables=observables, kwargs...))
 
-
 	function plot(P::AbstractDict)::Dict{String,Any} 
 		
-		data = task.get_data(P; fromPlot=true, mute=false, target=P["obs"])
+		plot_check_zero(P, task; 
+										transf_lab="\$\\log_{10}\$",
+										transf_data=apply_log10abs!
+										)
 
-#		y1, lab1 = ChecksWLO.extract_data_and_lab(data, obs, P["obs_i"];
-#																							transf_data=apply_log10abs)
+	end
 
-
-		ys, chlabels, fixedlab = ChecksWLO.extract_data_and_lab(data, P["obs"], P["obs_group"], P["obs_i"]; transf_data=apply_log10abs!)
-
-
-		fixedlab = myPlots.join_label("\$\\log_{10}\$"*P["obs"],
-																	(isempty(fixedlab) ? () : (fixedlab,))...)
-
-
-		x, xlabel = ChecksWLO.xxlabel(data)
-
-
-
-		return Dict{String,Any}(
-
-			"xs"=> [x for y=ys],
-
-			"ys" => ys, 
-
-			"xlim" => extrema(x),
-
-			"ylim" => get_ylim(P, ys),
-
-			"labels" => chlabels,
-
-			"ylabel" => fixedlab, 
-
-			"xlabel" => xlabel,
-
-			)
-
-	end  
-
-	
 	return PlotTask(task, 
-									[ ("observables", observables), 
-									 ("obs_index", 8), 
-									 ("obs_group", ChecksWLO.combs_groups()),
-									 ("ylim",)
-									 ],
+									[init_sliders_obs(observables);
+									 [("obs_group", ChecksWLO.combs_groups()),	("ylim",)]], 
 									"Curves_yofx", plot)
 
 end 
 
+
+
+#===========================================================================#
+#
+function WannierGap(init_dict::AbstractDict;
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	obs = "WannierGap"
+
+	observables_ = filter(==(obs), observables)
+
+	task = CompTask(Calculation(obs, ChecksWLO, init_dict; 
+															observables=observables_,
+															kwargs...))
+
+	function plot(P::AbstractDict)::Dict{String,Any} 
+
+		out = plot_check_zero(merge(P, Dict("obs"=>obs)), task)
+		
+		return setindex!(out, [0,0.07], "ylim")
+
+	end
+
+	return PlotTask(task, 
+									[init_sliders_obs(observables_);
+									 ("obs_group", ChecksWLO.combs_groups())
+									 ], "Curves_yofx", plot)
+
+end 
+
+
+
+#===========================================================================#
+#
+function WannierGap_atY(init_dict::AbstractDict;
+											 Y::Symbol,
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	obs = "WannierGap"
+	
+	observables_ = filter(==(obs), observables)
+
+	C = Calculation("$obs for several $Y", ChecksWLO, init_dict; 
+									observables=observables_, kwargs...)
+
+	task, out_dict, = ComputeTasks.init_multitask(C, [Y=>1], [1=>""])
+
+	P0 = Dict("obs"=>obs, "obs_group"=>"-")
+
+	function plot(P::AbstractDict)::Dict{String,Any} 
+	
+		out = plot_check_zero_multi(merge(P, P0), task, out_dict)
+
+		return setindex!(out, [0,0.07], "ylim")
+		
+	end
+
+	return PlotTask(task, init_sliders_obs(observables_), "Curves_yofx", plot)
+
+end 
 
 
 #===========================================================================#
@@ -182,74 +337,26 @@ function CheckZero_atY(init_dict::AbstractDict;
 #
 #---------------------------------------------------------------------------#
 
-	C = Calculation("Check zeros for several $Y",
-									ChecksWLO, init_dict; observables=observables, kwargs...)
+	C = Calculation("Check zeros for several $Y", ChecksWLO, init_dict; 
+									observables=observables, kwargs...)
 
 	task, out_dict, = ComputeTasks.init_multitask(C, [Y=>1], [1=>""])
 
-
-	@show out_dict 
-
-
+	P0 = Dict("obs_group"=>"-") 
 
 	function plot(P::AbstractDict)::Dict{String,Any} 
-
-
-		function apply_rightaway(data::AbstractDict, good_P
-														 )
-#		y1, lab1 = ChecksWLO.extract_data_and_lab(data, obs, P["obs_i"];
-#																							transf_data=apply_log10abs)
-			(ChecksWLO.xxlabel(data),
-			 ChecksWLO.extract_data_and_lab(data, P["obs"], P["obs_group"], P["obs_i"]; transf_data=apply_log10abs!)
-			 )
-
-		end 
-
-
-		data = task.get_data(P; fromPlot=true, target=P["obs"], apply_rightaway=apply_rightaway)
 		
-		
-		curves = vcat((d[2][1] for d in data)...)
+		plot_check_zero_multi(merge(P, P0), task, out_dict;
+										transf_lab="\$\\log_{10}\$",
+										transf_data=apply_log10abs!
+										)
 
-		chlabs = vcat((myPlots.join_label.(d[2][2], [string(y)]) for (d,y)=zip(data,out_dict["y"]))...)
+	end
 
-		x,xlabel = data[1][1] 
-
-		fixedlab = myPlots.join_label("\$\\log_{10}\$"*P["obs"],
-							(isempty(data[1][2][3]) ? () : (data[1][2][3],))...,
-											 out_dict["ylabel"])
-
-
-
-
-		return Dict{String,Any}(
-
-			"xs"=> [x for y=curves],
-
-			"ys" => curves,
-
-			"xlim" => extrema(x),
-
-			"ylim" => get_ylim(P, curves),
-
-			"labels" => chlabs,
-
-			"ylabel" => fixedlab, 
-
-			"xlabel" => xlabel,
-
-			)
-
-	end  
-
-	
 	return PlotTask(task, 
-									[ ("observables", observables), 
-									 ("obs_index", 8), 
-									 ("obs_group", ChecksWLO.combs_groups()),
-									 ("ylim",)
-									 ],
-									"Curves_yofx", plot)
+									[init_sliders_obs(observables); ("ylim",)], 
+									"Curves_yofx", 
+									plot)
 
 end 
 

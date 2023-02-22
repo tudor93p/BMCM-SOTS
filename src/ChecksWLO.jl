@@ -319,7 +319,8 @@ end
 function extract_data_and_lab(Y::AbstractArray{<:Number},
 															axvars::AbstractVector{<:AbstractVector{<:AbstractString}},
 															obs_i::Int; 
-															transf_data::Function=copy
+															transf_data::Function=copy,
+															kwargs...
 															)::Tuple{Vector{<:Number}, String } 
 	
 
@@ -375,6 +376,7 @@ function extract_data_and_lab(Y::AbstractArray{<:Number,N},
 															obs_i::Int;
 															transf_data::Function=copy!,
 															out_type::DataType=Float64,
+															kwargs...
 															)::Tuple{Vector{Vector{<:Number}},
 																					Vector{String},
 																					String,
@@ -492,7 +494,7 @@ function init_results(strengths::AbstractVector{<:Real},
 
 	L = length(strengths)
 
-	for eq in ("D123","D127a",)
+	for eq in ("D123","D127a","D48")
 
 		in(eq,obs) || continue 
 
@@ -503,7 +505,7 @@ function init_results(strengths::AbstractVector{<:Real},
 	end 
 
 
-	for eq in ("D110","D111","D125","D30","D48")
+	for eq in ("D110","D111","D125","D30",)#"D48")
 
 		in(eq,obs) || continue 
 
@@ -548,13 +550,11 @@ function ylabels(obs::AbstractString, legend::AbstractString
 
 	if legend=="sector" 
 
-		obs=="D123" && return ["+", "-"]
+		obs in ("D123","D48")  && return ["+", "-"]
 
-#		obs=="D127a" && return ["\\\\text{occup}","\\\\text{unocc}"]
 		obs=="D127a" && return ["\\mathrm{occup}","\\mathrm{unocc}"]
-#
+
 # tex command \text{...} not understood in plots 
-#
 
 	end  
 
@@ -727,13 +727,26 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 		
 	if haskey(results,"D48")
 
+#			WLO.run_m1!(results["D48"], trial,
+#									abs.(WLO.wcc_stat_axpy!(-1,nus2pm...)),
+#								 i_ps,dir1,:)
+# nus2pm[2] has been overwritten
+################## !!!!!!!!!!!!!!!!!!!!!! incorrectly implemented  
+# desired: separate comparison to zero 
+#
+	for sector in 1:2 
+
 			WLO.run_m1!(results["D48"], trial,
-									abs.(WLO.wcc_stat_axpy!(-1,nus2pm...)),
-								 i_ps,dir1,:)
+									abs.(WLO.wcc_stat!(nus2pm[sector])),
+									i_ps, dir1, sector,:)
+
+# nus2pm overwritten 
 
 	end 
+
+#
+	end 
 	
- # nus2pm[2] has been overwritten
 
 	return 
 
@@ -804,13 +817,15 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	all(isauxfile, keys(results)) && return results
 
 
-	println("abs")
 
 	if all_symms_preserved(P) # ------ no perturbation --------- #
 
 		set_results_two!(results, nk, k0, 1, 1, 
 										 get_data(get_psiH(theta, nk, k0), results))
 
+# get data: both directions, occup and unocc --- 4 separate calculations 
+# parallelize here as well.
+#
 		for (k,v) in pairs(results)
 
 			isauxfile(k) && continue
@@ -825,37 +840,37 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------------- with increasing perturbation -------------- #
 
-			if nprocs()>3 #-------#
+	if nprocs()>3 #-------#
 
-				data_all = pmap(Iterators.product(trials,strengths)) do pert
+		data_all = pmap(Iterators.product(trials,strengths)) do pert
 
-					get_data(get_psiH(theta, nk, k0, symms, pert...), results)
+			get_data(get_psiH(theta, nk, k0, symms, pert...), results)
 
-				end 
+		end 
 
-				for (I,d) in zip(Iterators.product(axes(trials,1),axes(strengths,1)),
-												 data_all 
-												 )
+		for (I,d) in zip(Iterators.product(axes(trials,1),axes(strengths,1)),
+										 data_all 
+										 )
 
-					set_results_two!(results, nk, k0, I..., d)
+			set_results_two!(results, nk, k0, I..., d)
 
-				end  
-
-
-			else  #--------#
+		end  
 
 
-				for (j,perturb0) in enumerate(trials) # don't parallelize j-loop! 
+	else  #--------#
+
+
+		for (j,perturb0) in enumerate(trials) # don't parallelize j-loop! 
 	
-					for (i_ps,ps) in enumerate(strengths) 
-			
-						data = get_data(get_psiH(theta, nk, k0, symms, perturb0, ps), results)
-			
-						set_results_two!(results, nk, k0, j, i_ps, data)
-			
-					end  
+			for (i_ps,ps) in enumerate(strengths) 
 	
-				end # ---------#  
+				data = get_data(get_psiH(theta, nk, k0, symms, perturb0, ps), results)
+	
+				set_results_two!(results, nk, k0, j, i_ps, data)
+	
+			end  
+	
+		end # ---------#  
 
 	end 
 

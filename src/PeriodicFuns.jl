@@ -9,14 +9,13 @@ import myLibs:Utils
 #
 #---------------------------------------------------------------------------#
 
-
-function closest_periodic_a(a::Real,
+#
+function closest_periodic_a2(a::Real,
 													b::Real,
 													T::Real,
 													nmax::Int=1,
 													)::Float64 
 
-#	a + T*argmin((n::Int)::Float64->abs(a + n*T - b), -nmax:nmax)
 	a_::Float64 = copy(a)
 
 	for n in -nmax:nmax
@@ -31,9 +30,11 @@ function closest_periodic_a(a::Real,
 
 	return a_
 
-end  
+end   
 
-function closest_periodic_a(a::Real,
+closest_periodic_b2(a,B,T) =B[argmin(Utils.dist_periodic(a,B,T))]
+
+function closest_periodic_a2(a::Real,
 													B::AbstractArray{<:Real},
 													T::Real,
 													nmax::Int=1
@@ -66,14 +67,10 @@ function closest_periodic_a(a::Real,
 end 
 
 
-function closest_periodic_b(a::Real,
-														B::AbstractArray{<:Real},
-														args...
-													)::Float64
 
-	B[argmin(Utils.dist_periodic(a, B, args...))]
 
-end 
+
+
 #===========================================================================#
 #
 #

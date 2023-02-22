@@ -21,7 +21,7 @@ input_checks  = Dict{Symbol,Any}(
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = ["None", "Mx", "Ct", "Mx+Ct","My", "My+Ct"],# "All"],
+		preserved_symmetries = ["None", "Mx", "My", "Ct", "Mx+Ct", "My+Ct", "All"],
 	
 		nr_perturb_strength = [21],
 		

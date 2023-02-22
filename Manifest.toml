@@ -40,9 +40,9 @@ version = "3.5.1+1"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra", "Requires", "SnoopPrecompile", "SparseArrays", "SuiteSparse"]
-git-tree-sha1 = "1da9f7b4f41abece283e0fbeb7ed406e7905dcdd"
+git-tree-sha1 = "4d9946e51e24f5e509779e3e2c06281a733914c2"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.0.0"
+version = "7.1.0"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -170,11 +170,11 @@ version = "1.8.0"
 
 [[deps.Constants]]
 deps = ["Revise", "myLibs"]
-git-tree-sha1 = "4edc342800c21bd48d7350b27181b7797a1720f0"
+git-tree-sha1 = "ed7c014e8127fa71237baf74c879fccc6f3cec71"
 repo-rev = "main"
 repo-url = "/media/tudor/Tudor/Work/2020_Snake-states/SnakeStates/Constants"
 uuid = "26e1ccdb-dc7d-4967-a216-0e9bd72dc499"
-version = "0.1.1"
+version = "0.1.2"
 
 [[deps.ConstructionBase]]
 deps = ["LinearAlgebra"]
@@ -615,9 +615,9 @@ version = "2.12.0+0"
 
 [[deps.LogExpFunctions]]
 deps = ["ChainRulesCore", "ChangesOfVariables", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
-git-tree-sha1 = "071602a0be5af779066df0d7ef4e14945a010818"
+git-tree-sha1 = "0a1b7c2863e44523180fdb3146534e265a91870b"
 uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
-version = "0.3.22"
+version = "0.3.23"
 
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
@@ -682,9 +682,9 @@ version = "2022.2.1"
 
 [[deps.MutableArithmetics]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
-git-tree-sha1 = "552fcfccfa01120a24311f33b94fd683606ce3bd"
+git-tree-sha1 = "3295d296288ab1a0a2528feb424b854418acff57"
 uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
-version = "1.2.2"
+version = "1.2.3"
 
 [[deps.NLSolversBase]]
 deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
@@ -1118,8 +1118,8 @@ uuid = "b53b4c65-9356-5827-b1ea-8c7a1a84506f"
 version = "1.6.38+0"
 
 [[deps.myLibs]]
-deps = ["Arpack", "Combinatorics", "ConcaveHull", "Dates", "DelimitedFiles", "Dierckx", "Distributed", "FFTW", "FileIO", "Graphs", "JLD", "LazySets", "LinearAlgebra", "MetaGraphs", "Optim", "OrderedCollections", "PolynomialRoots", "PyCall", "PyPlot", "QHull", "QuadGK", "Random", "Revise", "SparseArrays", "Test", "TikzGraphs", "TikzPictures"]
-git-tree-sha1 = "62324639531eae5f1ac42f9c9fc16ec792616113"
+deps = ["Arpack", "BenchmarkTools", "Combinatorics", "ConcaveHull", "Dates", "DelimitedFiles", "Dierckx", "Distributed", "FFTW", "FileIO", "Graphs", "JLD", "LazySets", "LinearAlgebra", "MetaGraphs", "Optim", "OrderedCollections", "PolynomialRoots", "PyCall", "PyPlot", "QHull", "QuadGK", "Random", "Revise", "SparseArrays", "Test", "TikzGraphs", "TikzPictures"]
+git-tree-sha1 = "4ae591daa66173ce5b5992cf89ce9b9df7e15bfa"
 repo-rev = "main"
 repo-url = "https://github.com/tudor93p/myLibs.git#main"
 uuid = "0cc41259-d48e-4a81-8a6d-ec7e330e4bca"
@@ -1127,11 +1127,11 @@ version = "0.1.2"
 
 [[deps.myPlots]]
 deps = ["BenchmarkTools", "Constants", "FFTW", "LinearAlgebra", "OrderedCollections", "PyCall", "PyPlot", "Revise", "Test", "myLibs"]
-git-tree-sha1 = "e1101d07cc6a0e0a9fa405105ae0483f47353c6f"
+git-tree-sha1 = "fbdff13f58fe2742a72717d047c505db265986f7"
 repo-rev = "main"
 repo-url = "/media/tudor/Tudor/Work/2020_Snake-states/SnakeStates/myPlots"
 uuid = "ab28f933-13dd-4a82-b110-d2be63b453ac"
-version = "0.1.1"
+version = "0.1.2"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]

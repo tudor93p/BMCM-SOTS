@@ -179,13 +179,13 @@ function wcc_stat!(storage::AbstractVector{Float64},
 
 	init_run_ms!(storage) 
 
-	setindex!(X, PeriodicFuns.closest_periodic_a(X[1], quantized_values, 1), 1)
+	setindex!(X, Utils.closest_periodic_shifted_a(X[1], quantized_values, 1), 1)
 
 	run_m!(storage, X[1])
 	
 	for i = 2:lastindex(X)
 
-		setindex!(X, PeriodicFuns.closest_periodic_a(X[i], X[i-1], 1), i)
+		setindex!(X, Utils.closest_periodic_shifted_a(X[i], X[i-1], 1), i)
 
 		run_m!(storage, X[i])
 
@@ -193,11 +193,11 @@ function wcc_stat!(storage::AbstractVector{Float64},
 
 
 	setindex!(S, 
-						PeriodicFuns.closest_periodic_a(run_mean(storage), quantized_values, 1), 
+						Utils.closest_periodic_shifited_a(run_mean(storage), quantized_values, 1), 
 						1)
 
 	setindex!(S, 
-						Statistics.stdm(X, PeriodicFuns.closest_periodic_b(S[1], quantized_values, 1)),
+						Statistics.stdm(X, Utils.closest_periodic_b(S[1], quantized_values, 1)),
 						2)
 
 
@@ -221,7 +221,7 @@ end
 
 	
 function wcc_stat!(X::AbstractArray{<:Real,N},
-									 quantized_values::AbstractVector{<:Real};
+									 quantized_values::AbstractVector{<:Real}=[0];
 									dim::Int=1 
 								 )::Array{Float64,N} where N
 
@@ -263,11 +263,10 @@ end
 function wcc_stat_axpy!(a::Real,
 											 X::AbstractArray{<:Real},
 											 Y::AbstractArray{<:Real},
-											 quantized_values::AbstractVector{<:Real}=[0];
+											 args...;
 											 kwargs...)::Vector{Float64}
 
-	wcc_stat!(LinearAlgebra.axpy!(a,view(X,:),view(Y,:)), 
-						quantized_values; kwargs...)
+	wcc_stat!(LinearAlgebra.axpy!(a,view(X,:),view(Y,:)), args...; kwargs...)
 
 end 		
 

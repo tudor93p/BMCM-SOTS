@@ -599,8 +599,6 @@ function symmetrize!(A::AbstractMatrix, opers::AbstractString)::Nothing
 
 	isempty(sopers) && return 
 
-#	symmetrize!(A, ∘((getproperty(@__MODULE__, sop) for sop in sopers)...))
-
 	for op in sopers 
 		
 		symmetrize!(A, op)
@@ -621,7 +619,7 @@ end
 
 
 
-function HamHasSymm(op::Function, fHamilt::Function=H, args...;
+function HamHasSymm(op::Function, fHamilt::Function, args...;
 										nr_samples::Int64=10, atol::Float64=1e-8,
 									 )::Bool 
 
