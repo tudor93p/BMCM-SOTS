@@ -193,7 +193,7 @@ function wcc_stat!(storage::AbstractVector{Float64},
 
 
 	setindex!(S, 
-						Utils.closest_periodic_shifited_a(run_mean(storage), quantized_values, 1), 
+						Utils.closest_periodic_shifted_a(run_mean(storage), quantized_values, 1), 
 						1)
 
 	setindex!(S, 
@@ -548,13 +548,19 @@ end
 #
 #end   
 
+function eigH!(storage, ij::NTuple{2,Int}, kij::Function, 
+							 perturb::AbstractArray{ComplexF64,4},
+							 Hdata...; kwargs...)::Nothing 
 
-function eigH!(storage,
-														k::AbstractVector, 
-														H::Function, data...;
+	eigH!(storage, kij(ij), Hdata..., select_mesh_point(perturb, ij);
+				kwargs...)
+
+end  
+
+function eigH!(storage, k::AbstractVector{<:Real}, H::Function, Hdata...;
 														kwargs...)::Nothing 
 
-	eigH!!(storage, H(k, data...); kwargs...)
+	eigH!!(storage, H(k, Hdata...); kwargs...)
 
 end  
 
@@ -785,17 +791,40 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function check_start_int(n::Int, k0::Real)
+function check_kMirror_possible(n::Int, k0::Real)::Int 
+
+	@assert n>1 
 
 	m0 = k0*(n-1)/pi 
 
-	if !isapprox(m0,Int(round(m0)),atol=1e-10)
+	m1 = Int(round(m0))
 
-		@warn "Not all k-s will have mirror images in the mesh"
+	if !isapprox(m0,m1,atol=1e-10)
+
+		error("Not all k-s will have mirror images in the mesh")
 
 	end  
 
+	return m1 
+
 end 
+
+function uniqueInds_kMirror(n::Int, k0::Real)::Vector{Int}
+
+	m = check_kMirror_possible(n, k0)
+
+#m even => origin contained 
+#m odd => origin not contained 
+
+#	start = div(m,2) + isodd(m)
+#out = Utils.reduce_index.(start+1:start+nr, n-1)
+
+	out = range(start=div(m,2)+1+isodd(m),length=div(n,2)+iseven(m)*isodd(n))
+
+	return sort!(Utils.reduce_index.(out,n-1))
+
+end 
+
 
 function check_nr_kPoints(n::Int)
 
@@ -804,39 +833,74 @@ function check_nr_kPoints(n::Int)
 end 
 
 
+		
 function get_kij(n::Int, k0::Real)::Function 
 
-	check_nr_kPoints(n)
+	dk = 2pi/(n-1)
 
-	check_start_int(n, k0)
-
-
-	get_kij_((i,j)::NTuple{2,Int})::Vector{Float64} = get_kij_(i,j)
-
-	function get_kij_(i::Int, j::Int)::Vector{Float64}
+	function get_kij_(inds::Tuple{Vararg{Int,N}})::Vector{Float64} where N
 	
-		@assert 1 <= i < n
-		@assert 1 <= j < n
+		k = fill(2pi+k0+dk, N)
 		
-		k = [Float64(i-1), Float64(j-1)]
-		
-		k .*= -2pi/(n-1) 
-	
-		k .+= 2pi + k0
-	
-		return k
-	
-	end  
+		for i=1:N 
 
+			@assert 1 <= inds[i] < n
+
+			k[i] -= dk*inds[i] 
+
+		end 
+
+		return k 
+
+	end 
+
+	get_kij_(inds::Int...)::Vector{Float64} = get_kij_(inds)
+	
 	return get_kij_
 
-end 
+end  
+
+
+#function get_ik(n::Int, k0::Real)::Function 
+#
+#	check_nr_kPoints(n)
+#
+#	check_kMirror_possible(n, k0)
+#
+#
+#	return function get_ik_(k::Real)::Int 
+#	
+#		i = (k0-k)/2pi*(n-1) + 1 
+#
+#		@assert Int(round(i))≈i
+#	
+#		return reduce_index(Int(round(i)),n-1)
+#
+#	end  
+#
+#end  
+
 
 function ind_minusk(i::Int, n::Int, k0::Real)::Int 
 
-	Utils.bring_periodic_to_interval(Int(round(k0*(n-1)/pi))+2-i, 1, n-1, n-1)
+	Utils.reduce_index(Int(round(k0*(n-1)/pi))+2-i, n-1)
 
 end 
+
+function ind_minusk(n::Int, k0::Real)::Function 
+
+	i0 = check_kMirror_possible(n,k0) + 2 
+
+	return function ind_minusk_(i::Int)::Int 
+
+		Utils.reduce_index(i0-i, n-1)
+
+	end 
+
+end 
+
+
+
 
 
 
@@ -855,13 +919,20 @@ function select_mesh_point(data::AbstractArray{T,M},
 	selectdim(selectdim(data,M,j),M-1,i)
 
 end  
+function select_mesh_point(data::AbstractArray{T,M},
+													 (i,j)::NTuple{2,Int}
+													 )::AbstractArray{T,M-2} where {T<:Number,M}
+
+	select_mesh_point(data, i, j)
+
+end 
+
 function select_mesh_point(data::Union{<:AbstractArray{<:AbstractArray},
 																			 <:Tuple{Vararg{<:AbstractArray}}},
-													 i::Int,
-													 j::Int,
+													 args...
 													 )::AbstractArray{<:AbstractArray}
 	
-	[select_mesh_point(d,i,j) for d in data]
+	[select_mesh_point(d,args...) for d in data]
 
 end 
 
@@ -898,6 +969,9 @@ function get_one_wrapper(get_one::Function,
 
 end 
 
+
+
+
 function get_one_wrapper!(storage::AbstractArray,
 													get_one!::Function,
 													ij_to_arg::Function,
@@ -907,6 +981,22 @@ function get_one_wrapper!(storage::AbstractArray,
 													kwargs...)
 
 	get_one!(storage, ij_to_arg(i,j), data...; kwargs...)
+
+end 
+
+
+function get_one_wrapper!(storage::AbstractArray,
+													get_one!::Function,
+												 data::Union{<:AbstractArray{<:Number},
+																		 <:AbstractArray{<:AbstractArray},
+																		 <:Tuple{Vararg{<:AbstractArray}}},
+												 i::Int, 
+												 j::Int,
+												 data_...;
+												 kwargs...
+												)
+
+	get_one!(storage, select_mesh_point(data, i, j), data_...; kwargs...)
 
 end 
 
@@ -938,19 +1028,19 @@ end
 
 
 function store_on_mesh(get_one::Function, 
-												arg2::AbstractArray{<:Number},
+												source::AbstractArray{<:Number},
 											 data...
 												)
 
 
-	store_on_mesh(get_one, nr_kPoints_from_mesh(arg2), arg2, data...)
+	store_on_mesh(get_one, nr_kPoints_from_mesh(source), source, data...)
 
 end   
 
 
 function store_on_mesh(get_one::Function, 
 											 n::Int,
-												arg2::Union{Function, 
+												source::Union{Function, 
 																		AbstractArray{<:Number},
 																		NTuple{N, <:AbstractArray} where N,
 																		},
@@ -958,42 +1048,42 @@ function store_on_mesh(get_one::Function,
 											 kwargs...
 												)
 
-	storage = init_storage(get_one_wrapper(get_one, arg2, 1,1, data...; 
+	dest = init_storage(get_one_wrapper(get_one, source, 1,1, data...; 
 																				 kwargs...), n) 
 
 
-	store_on_mesh!(get_one, n, arg2, storage, data...; kwargs...)
+	store_on_mesh!(get_one, n, source, dest, data...; kwargs...)
 
-	return storage
+	return dest
 
 end  
 
 
 function store_on_mesh!(get_one::Function, 
-												arg2::Union{Function, AbstractArray{<:Number},
+												source::Union{Function, AbstractArray{<:Number},
 																		NTuple{N, <:AbstractArray} where N,
 																		},
-												storage::AbstractArray,
+												dest::AbstractArray,
 												data...
 												)::Nothing  
 
-	store_on_mesh!(get_one, nr_kPoints_from_mesh(storage), 
-								 arg2, storage, data...)
+	store_on_mesh!(get_one, nr_kPoints_from_mesh(dest), 
+								 source, dest, data...)
 
 end 
 
 function store_on_mesh!(get_one::Function, 
 												n::Int,
-												arg2::Union{Function, AbstractArray{<:Number},
+												source::Union{Function, AbstractArray{<:Number},
 																		NTuple{N, <:AbstractArray} where N,
 																		},
-												storage::AbstractArray,
+												dest::AbstractArray,
 												data...
 												)::Nothing 
 
 	for j=1:n-1, i=1:n-1
 
-		store_on_mesh_one!(get_one, arg2, i, j, storage, data...)
+		store_on_mesh_one!(get_one, source, i, j, dest, data...)
 
 	end 
 
@@ -1002,50 +1092,60 @@ function store_on_mesh!(get_one::Function,
 end 
 
 function store_on_mesh!!(get_one!::Function, 
-												arg2::Union{Function, AbstractArray{<:Number},
+												source::Union{Function, AbstractArray{<:Number},
 																		NTuple{N, <:AbstractArray} where N,
 																		},
-												storage::AbstractArray,
+												dest::AbstractArray=source,
 												data...; kwargs...
 												)::Nothing  
 
 	store_on_mesh!!(get_one!,
-									nr_kPoints_from_mesh(storage),
-									arg2,
-									storage, 
+									nr_kPoints_from_mesh(dest),
+									source,
+									dest, 
 									data...; kwargs...)
 
 end 
 
+function store_on_mesh!!(get_one!::Function, n::Int, args...; 
+												 kwargs...)::Nothing 
+
+	store_on_mesh!!(get_one!, (1:n-1,1:n-1), args...; kwargs...)
+
+end 
+
 function store_on_mesh!!(get_one!::Function, 
-												 n::Int,
-												arg2::Union{Function, AbstractArray{<:Number},
+												 inds::Tuple{<:AbstractVector{Int},
+																		 <:AbstractVector{Int}},
+												source::Union{Function, AbstractArray{<:Number},
 																		NTuple{N, <:AbstractArray} where N,
 																		},
-												storage::AbstractArray,
+												dest::AbstractArray,
 												data...; kwargs...
 												)::Nothing 
 
+	for j=inds[2], i=inds[1]
 
-	for j=1:n-1, i=1:n-1
-
-		store_on_mesh_one!!(get_one!, arg2, i, j, storage, data...; kwargs...)
+		store_on_mesh_one!!(get_one!, source, i, j, dest, data...; kwargs...)
 
 	end 
 
 	return 
 
-end 
+end  
+
+
+
 
 
 
 function store_on_mesh_one!!(
 														 get_one!::Function, 
-												arg2::Union{Function, AbstractArray{<:Number},
+												source::Union{Function, AbstractArray{<:Number},
 																		NTuple{M, <:AbstractArray} where M,
 																		},
 														i::Int, j::Int,
-														storage::Union{<:AbstractArray{<:Number,N},
+														dest::Union{<:AbstractArray{<:Number,N},
 																					 <:AbstractVector{<:AbstractArray}
 																					 },
 														
@@ -1053,9 +1153,9 @@ function store_on_mesh_one!!(
 												)::Nothing where N
 	
 	get_one_wrapper!(
-									 select_mesh_point(storage, i, j),
+									 select_mesh_point(dest, i, j),
 									 get_one!, 
-									 arg2, i, j, data...; kwargs...)
+									 source, i, j, data...; kwargs...)
 
 	return 
 
@@ -1063,16 +1163,16 @@ end
 
 
 function store_on_mesh_one!(get_one::Function, 
-												arg2::Union{Function, AbstractArray{<:Number},
+												source::Union{Function, AbstractArray{<:Number},
 																		NTuple{M, <:AbstractArray} where M,
 																		},
 														i::Int, j::Int,
-												storage::AbstractArray{<:Number},
+												dest::AbstractArray{<:Number},
 												data...; kwargs...
 												)::Nothing 
 	
-	copy!(select_mesh_point(storage, i, j),
-				get_one_wrapper(get_one, arg2, i, j, data...; kwargs...)
+	copy!(select_mesh_point(dest, i, j),
+				get_one_wrapper(get_one, source, i, j, data...; kwargs...)
 				)
 
 	return 
@@ -1082,16 +1182,16 @@ end
 
 
 function store_on_mesh_one!(get_one::Function, 
-												arg2::Union{Function, AbstractArray{<:Number}},
+												source::Union{Function, AbstractArray{<:Number}},
 														i::Int, j::Int,
-														storage::AbstractVector{<:AbstractArray},
+														dest::AbstractVector{<:AbstractArray},
 												data...; kwargs...
 												)::Nothing 
 
-	for (k,item) in enumerate(get_one_wrapper(get_one, arg2, i, j, data...;
+	for (k,item) in enumerate(get_one_wrapper(get_one, source, i, j, data...;
 																					 kwargs...))
 
-		copy!(select_mesh_point(storage[k], i, j), item)
+		copy!(select_mesh_point(dest[k], i, j), item)
 
 	end 
 
@@ -1237,7 +1337,24 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function psiH_on_mesh(n::Int, k0::Real, Hdata...; kwargs...
+function psiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
+											)::Array{ComplexF64,4}
+
+	kij = get_kij(n,k0)  
+
+	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; 
+													 kwargs...)
+
+	store_on_mesh!!(eigH!, kij, Bloch_WFs, H, Hdata...; kwargs...)
+
+	return Bloch_WFs 
+
+end 
+
+
+function psiH_on_mesh(n::Int, k0::Real, 
+											perturb::AbstractArray{ComplexF64,4},
+											Hdata...; kwargs...
 											)::Array{ComplexF64,4}
 
 	kij = get_kij(n,k0)  
@@ -1245,21 +1362,7 @@ function psiH_on_mesh(n::Int, k0::Real, Hdata...; kwargs...
 	Bloch_WFs = init_storage(init_eigH(kij, Hdata...; kwargs...)[1], n; 
 													 kwargs...)
 
-	store_on_mesh!!(eigH!, kij, Bloch_WFs, Hdata...; kwargs...)
-
-#	for j=1:n-1, i=1:n-1
-#
-#		psi1 = select_mesh_point(Bloch_WFs, i, j) 
-#
-#		psi2 = LinearAlgebra.eigvecs(Hdata[1](kij(i,j), Hdata[2:end]...))
-#
-#		for row in eachrow(abs.(overlap(psi1,psi2)))
-#
-#			@assert sort(row) ≈ [0,0,0,1]
-#
-#		end 
-#
-#	end    
+	store_on_mesh!!(eigH!, tuple, Bloch_WFs, kij, perturb, Hdata...; kwargs...)
 
 	return Bloch_WFs 
 

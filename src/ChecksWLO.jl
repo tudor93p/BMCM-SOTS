@@ -4,7 +4,7 @@ module ChecksWLO
 
 using Distributed 
 
-import LinearAlgebra, Combinatorics 
+import LinearAlgebra, Combinatorics, Random 
 
 using OrderedCollections: OrderedDict 
 
@@ -14,8 +14,7 @@ import myLibs: ReadWrite, Utils
 import myLibs.Parameters:UODict 
 
 import ..FILE_STORE_METHOD, ..WLO, ..MB, ..Helpers
-
-
+import ..Helpers: Symmetries
 
 #===========================================================================#
 #
@@ -61,6 +60,8 @@ end
 
 function perturb_strengths(P::UODict)::Vector{Float64}
 
+	# the first must be zero 
+
 	LinRange(0,P[:max_perturb_strength],P[:nr_perturb_strength])
 
 end  
@@ -101,19 +102,132 @@ function all_symms_preserved(s::AbstractString)::Bool
 
 end 
 
-function perturb_strengths_trials(P::UODict
-																 )::Tuple{Vector{Float64}, 
-																					Vector{Matrix{ComplexF64}} }
 
-	strengths = perturb_strengths(P)
 
-	all_symms_preserved(P) && return (strengths, [zeros(ComplexF64,4,4)])
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
-	randpert = rand(ComplexF64,4,4,nr_perturb_instances(P))
 
-	return (strengths, collect.(eachslice(randpert,dims=3)))
+
+
+function has_symm_on_mesh_one(ij::NTuple{2,Int},
+															A::AbstractArray{ComplexF64,4},
+															op::Function,
+															fij::Function
+															)::BitVector  
+
+	[Symmetries.has_symm(op, 
+											WLO.select_mesh_point(A, ij), 
+											WLO.select_mesh_point(A, fij(ij))
+											)]
+							
+end 
+
+function has_symm_on_mesh(
+														 A::AbstractArray{ComplexF64,4},
+														 opers_::AbstractString,
+														 n::Int, k0::Real,
+														 )::Array{Bool}
+
+	mapreduce(.|, MB.sepSymmString(opers_)) do op 
+
+		WLO.store_on_mesh(has_symm_on_mesh_one, n, tuple, A, 
+									MB.getOpFun(op),
+									MB.getOp_fij(op,n,k0),
+									)
+
+	end 
+
+end  
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4}, 
+																	 args...)::Nothing
+
+	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
+
+	symmetrize_on_mesh!(pert, args...)
+
+	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
 
 end 
+
+function get_perturb_on_mesh(
+											P::UODict,
+										 n::Int, k0::Real,
+										 seed::Int...
+										 )::Vector{Array{ComplexF64,4}} 
+	
+	get_perturb_on_mesh(preserved_symmetries(P),
+											n, k0, 
+											nr_perturb_instances(P),
+											seed...)
+
+end 
+
+function get_perturb_on_mesh(
+										 symms::AbstractString, 
+										 n::Int, k0::Real,
+										 nr_pert::Int,
+										 seed::Int=3268
+										 )::Vector{Array{ComplexF64,4}}
+
+	all_symms_preserved(symms) && return [zeros(ComplexF64,4,4,n-1,n-1)]
+
+	Random.seed!(seed) 
+
+	randperts = [rand(ComplexF64,4,4,n-1,n-1) for i=1:nr_pert]
+
+	for i=1:nr_pert 
+
+		i>1 && @assert !isapprox(randperts[1][1], randperts[i][1], atol=1e-8) 
+
+		symmetrize_and_normalize!(randperts[i], symms, n, k0) 
+
+	end 
+
+	return randperts 
+ 
+end 
+
+
+
+#function perturb_trials_seed(P::UODict
+#																 )::Tuple{Vector{Float64}, 
+#																					Vector{Array{ComplexF64,4}} 
+##																					Vector{Matrix{ComplexF64}} 
+#																					}
+#
+#
+#	strengths = perturb_strengths(P)
+#
+#	n = nr_kPoints(P) 
+#
+#
+#
+##	randpert = rand(ComplexF64,4,4,nr_perturb_instances(P))
+#
+#	Random.seed!(326877)
+#
+#
+#
+#
+#
+#	return (strengths, randpert)
+#
+##	return (strengths, collect.(eachslice(randpert,dims=3)))
+#
+#end 
 
 
 #===========================================================================#
@@ -140,17 +254,29 @@ function get_psiH(theta::Real, n::Int, k0::Real)::Array{ComplexF64,4}
 
 end 
 
-function get_psiH(theta::Real, n::Int, k0::Real,
-										 symms::AbstractString, args...
+function get_psiH(theta::Real, n::Int, k0::Real, 
+									perturb0::AbstractArray{ComplexF64,4},
+									strength::Real,
 											)::Array{ComplexF64,4}
 
-	all_symms_preserved(symms) && return get_psiH(theta, n, k0)
-
-	return WLO.psiH_on_mesh(n, k0, MB.perturbedH,  MB.bsss_cycle(theta), 
-										 get_perturb(symms, args...))
-
+	iszero(strength) && return get_psiH(theta, n, k0)
+	
+	return WLO.psiH_on_mesh(n, k0, perturb0, 
+													MB.H,  MB.bsss_cycle(theta), 
+													strength,
+													)
 
 end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
  
 function psi_occup(psi::AbstractArray{ComplexF64,4}
 									)::AbstractArray{ComplexF64,4}
@@ -736,9 +862,10 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 #
 	for sector in 1:2 
 
+
 			WLO.run_m1!(results["D48"], trial,
-									abs.(WLO.wcc_stat!(nus2pm[sector])),
-									i_ps, dir1, sector,:)
+									abs.(WLO.wcc_stat!(view(nus2pm[sector],:))),
+									i_ps, dir1, sector, : )
 
 # nus2pm overwritten 
 
@@ -753,26 +880,77 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 end 
 
 
-function get_perturb(
-										 symms::AbstractString, 
-										 seed::AbstractMatrix{ComplexF64},
-										 ps::Real,
-										 )::Matrix{ComplexF64}
-
-	all_symms_preserved(symms) && return zeros(ComplexF64, size(seed)...)
-
-	LinearAlgebra.normalize!(MB.symmetrize(seed+seed', symms)) .*= ps 
-
-end 
-
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
 
+function symmetrize_on_mesh_one!(Aij::AbstractMatrix{ComplexF64},
+									opij::NTuple{2,Int}, 
+									seed::AbstractArray{<:Number,4},
+									op::Function; kwargs...)::Nothing
+
+	Symmetries.symmetrize!!(Aij, WLO.select_mesh_point(seed, opij), op)
+
+end 
 
 
+function symmetrize_on_mesh(seed::AbstractArray{ComplexF64,4},
+														args...; kwargs...
+														 )::Array{ComplexF64,4}
+
+	A = copy(seed)
+
+	symmetrize_on_mesh!(A, args...; kwargs...)
+
+	return A
+
+end  
+
+
+function symmetrize_on_mesh!(
+														 A::AbstractArray{ComplexF64,4},
+														 opers::AbstractString,
+														 n::Int, k0::Real,
+														 )::Nothing 
+
+	for op in MB.sepSymmString(opers)
+
+		WLO.store_on_mesh!!(symmetrize_on_mesh_one!,
+									MB.getOp_uniqueInds(op,n,k0),
+									MB.getOp_fij(op,n,k0),
+									A, A, 
+									MB.getOpFun(op),
+									) 
+	end 
+
+end  
+
+
+
+
+
+
+#function get_perturb(
+#										 symms::AbstractString, 
+#										 seed::AbstractMatrix{ComplexF64},
+#										 ps::Real,
+#										 )::Matrix{ComplexF64}
+#
+#	all_symms_preserved(symms) && return zeros(ComplexF64, size(seed)...)
+#
+#	LinearAlgebra.normalize!(MB.symmetrize(seed+seed', symms)) .*= ps 
+#
+#end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 function Compute(P::UODict; get_fname=nothing, target=nothing,
 								 kwargs...)::Dict  
@@ -806,10 +984,16 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	symms = preserved_symmetries(P)
 
 
-	strengths, trials = perturb_strengths_trials(P)
+	strengths = perturb_strengths(P)
+
+	zero_strength, rest_strengths = Base.Iterators.peel(strengths)
+	s1, s2e = Base.Iterators.peel(eachindex(strengths))
+
+	@assert iszero(zero_strength)
 
 
 	results = init_results(strengths, get_target(target; kwargs...))
+
 
 #	return Dict{String,Any}(k=>v for (k,v)=pairs(results) if isauxfile(k)) 
 
@@ -818,19 +1002,27 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 
 
-	if all_symms_preserved(P) # ------ no perturbation --------- #
+	# ------ no perturbation --------- #
 
-		set_results_two!(results, nk, k0, 1, 1, 
+	set_results_two!(results, nk, k0, 1, s1, 
 										 get_data(get_psiH(theta, nk, k0), results))
 
 # get data: both directions, occup and unocc --- 4 separate calculations 
 # parallelize here as well.
-#
+
+
+
+	if all_symms_preserved(P) 
+
 		for (k,v) in pairs(results)
 
 			isauxfile(k) && continue
-		
-			results[k] .= selectdim(v,1,1:1)
+	
+			for s in s2e 
+
+				copy!(selectdim(results[k],1,s), selectdim(v,1,s1))
+
+			end 
 
 		end 
 
@@ -838,19 +1030,20 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	end 	
 
-	# ------------- with increasing perturbation -------------- #
+	# ------------- with perturbation -------------- # 
 
-	if nprocs()>3 #-------#
+	trials = get_perturb_on_mesh(P, nk, k0, 3268) # seed ensures 
 
-		data_all = pmap(Iterators.product(trials,strengths)) do pert
+	
+	if nprocs()>3 #---- parallel evaluation ---#
 
-			get_data(get_psiH(theta, nk, k0, symms, pert...), results)
+		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
+
+			get_data(get_psiH(theta, nk, k0, pert...), results)
 
 		end 
 
-		for (I,d) in zip(Iterators.product(axes(trials,1),axes(strengths,1)),
-										 data_all 
-										 )
+		for (I,d) in zip(Iterators.product(eachindex(trials),s2e), data_all)
 
 			set_results_two!(results, nk, k0, I..., d)
 
@@ -859,14 +1052,13 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	else  #--------#
 
-
-		for (j,perturb0) in enumerate(trials) # don't parallelize j-loop! 
+		for (j,perturb0) in enumerate(trials) # don't parallelize this j-loop! 
 	
-			for (i_ps,ps) in enumerate(strengths) 
+			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				data = get_data(get_psiH(theta, nk, k0, symms, perturb0, ps), results)
+				data = get_data(get_psiH(theta, nk, k0, perturb0, ps), results)
 	
-				set_results_two!(results, nk, k0, j, i_ps, data)
+				set_results_two!(results, nk, k0, j, i, data)
 	
 			end  
 	

@@ -1,6 +1,9 @@
-module MB 
+module MB  
+
+import LinearAlgebra
 
 import ..WLO 
+import ..Helpers:Symmetries 
 #import PyPlot 
 import myLibs: Groups, Utils
 
@@ -42,7 +45,8 @@ function complex_b((bx,by),sigma)
 end 
 
 function H(k::AbstractVector{<:Real},
-					 bs::AbstractVector{<:Real}
+					 bs::AbstractVector{<:Real},
+					 aux::Real=0
 					 )::Matrix{ComplexF64}
 
 
@@ -67,19 +71,25 @@ function H(k::AbstractVector{<:Real},
 end 
 
 
-function perturbedH(k::AbstractVector{<:Real},
+function H(k::AbstractVector{<:Real},
 					 bs::AbstractVector{<:Real},
 					 perturb::AbstractMatrix{<:Number},
 					 )::Matrix{ComplexF64}
-
-	out = H(k, bs) 
-
-	out .+= perturb 
-
-	return out 
+	
+	H(k, bs) .+= perturb 
 
 end  
 
+
+function H(k::AbstractVector{<:Real},
+					 bs::AbstractVector{<:Real},
+					 pstrength::Real,
+					 perturb0::AbstractMatrix{<:Number},
+					 )::Matrix{ComplexF64}
+
+	LinearAlgebra.axpy!(pstrength, perturb0, H(k,bs))
+
+end  
 
 
 function get_s_param_from_b(b::Real,bp::Real)::Float64 
@@ -399,6 +409,9 @@ end
 #
 #
 #
+#---------------------------------------------------------------------------#
+
+
 
 
 
@@ -411,27 +424,46 @@ TtRepr = kron(Groups.PauliMatrix(0),Groups.PauliMatrix(1))
 TR2yRepr = kron(Groups.PauliMatrix(0),Groups.PauliMatrix(0))
 TR2xRepr = kron(Groups.PauliMatrix(3),Groups.PauliMatrix(3))
 
+fij_identity(k::NTuple{2,Int}, ::Function)::NTuple{2,Int} = k 
 
 
 
 function operMx(h::AbstractMatrix)::Matrix
 
-	MxRepr*h*MxRepr
+	Symmetries.UdAV(MxRepr,h)
 
 end 
+
+#function operMx((i,j)::T, n::Int, rev::Function)::Union{T,Nothing
+#																							 } where T<:NTuple{2,Int}
+#
+#	i<=div(n,2)
+#
+#	(rev(i),j)
+#
+#end 
+
 
 
 function operMx(k::AbstractVector)::Vector
 
-	k .*[-1,1]
+	Symmetries.mirror(k, 1)
 
 end 
+
+function fij_operMx(k::NTuple{2,Int}, ind_minusk::Function
+									 )::NTuple{2,Int} 
+	
+	Symmetries.mirror(k, 1, ind_minusk)
+
+end 
+
 
 
 function operMx((V,U)::Tuple{AbstractMatrix,AbstractMatrix},
 								)::Matrix 
 
-	V'*MxRepr*U 
+	Symmetries.UdAV(V,MxRepr,U)
 
 end 
 
@@ -439,23 +471,31 @@ end
 function operCt((V,U)::Tuple{AbstractMatrix,AbstractMatrix},
 								)::Matrix 
 
-	V'*CtRepr*U 
+	Symmetries(V,CtRepr,U)
 
 end 
 
-
+fij_operCt = fij_identity
 
 
 function operMy(h::AbstractMatrix)::Matrix
 
-	MyRepr*h*MyRepr
+	Symmetries.UdAV(MyRepr,h)
 
 end 
 
 
 function operMy(k::AbstractVector)::Vector
 
-	k.*[1,-1]
+	Symmetries.mirror(k, 2)
+
+end 
+
+
+function fij_operMy(k::NTuple{2,Int}, ind_minusk::Function
+									 )::NTuple{2,Int} 
+	
+	Symmetries.mirror(k, 2, ind_minusk)
 
 end 
 
@@ -464,7 +504,7 @@ end
 
 function operCt(h::AbstractMatrix)::Matrix
 
-	-CtRepr*h*CtRepr
+	-Symmetries.UdAV(CtRepr,h)
 
 end 
 
@@ -475,30 +515,34 @@ function operCt(k::AbstractVector)::Vector
 
 end 
 
+
+
 function operP(h::AbstractMatrix)::Matrix
 
-	-PRepr*conj(h)*PRepr
+	Symmetries(PRepr,-conj(h))
 
 end 
+
+fij_operP = Symmetries.inversion 
 
 
 function operP(k::AbstractVector)::Vector
 
-	-k
+	Symmetries.inversion(k)
 
-end 
+end  
+
 
 function operTC2y(h::AbstractMatrix)::Matrix
 
-	TR2yRepr*conj(h)*TR2yRepr 
+	Symmetries.UdAV(TR2yRepr,conj(h))
 
 end 
-
 
 
 function operTC2x(h::AbstractMatrix)::Matrix
 
-	TR2xRepr*conj(h)*TR2xRepr 
+	Symmetries.UdAV(TR2xRepr, conj(h))
 
 end 
 
@@ -506,26 +550,48 @@ end
 
 function operTC2y(k::AbstractVector)::Vector
 
-	k .* [1,-1]
+	out = Symmetries.inversion!(Symmetries.rotationC2(k,2))
+	@assert out ==k .* [1,-1]
+	return out 
+
+end  
+
+
+function fij_operTC2y(k::NTuple{2,Int}, ind_minusk::Function)::NTuple{2,Int}  
+
+	Symmetries.inversion(Symmetries.rotationC2(k,2,ind_minusk), ind_minusk)
 
 end 
+
+function fij_operTC2x(k::NTuple{2,Int}, ind_minusk::Function)::NTuple{2,Int}  
+
+	Symmetries.inversion(Symmetries.rotationC2(k,1,ind_minusk), ind_minusk)
+
+end 
+
+
 function operTC2x(k::AbstractVector)::Vector
 
-	k .* [-1,1]
+	out = Symmetries.inversion!(Symmetries.rotationC2(k,1))
+	@assert out ==k .* [-1,1]
+	return out 
 
 end 
 
 
 function operTt(h::AbstractMatrix)::Matrix
 
-	TtRepr*conj(h)*TtRepr 
+	Symmetries.UdAV(TtRepr, conj(h))
 
 end 
 
 
-function operTt(k::AbstractVector)::Vector
+fij_operTt = Symmetries.inversion 
 
-	-k 
+
+function operTt(k::AbstractVector)::Vector
+	
+	Symmetries.inversion(k)
 
 end 
 
@@ -540,50 +606,124 @@ end
 #---------------------------------------------------------------------------#
 
 
-function symmetrize(A::AbstractMatrix, args...)::Matrix
-
-	B = copy!(zeros(ComplexF64,size(A)),A)
-
-	symmetrize!(B, args...)
-
-	return B 
-
-end 
 
 
 
-function symmetrize!(A::AbstractMatrix, op::Function)::Nothing
 
-	A .+= op(A)  
+function symmetrize!(A::AbstractMatrix, 
+										 op::Union{<:AbstractString, Symbol}, args...)::Nothing
 
-	return
+	Symmetries.symmetrize!(A, getOpFun(op), args...)
 
 end  
 
-function symmetrize!(A::AbstractMatrix, op::Symbol)::Nothing
-
-	symmetrize!(A, getOpFun(op))
-
-end  
-
-function sepSymmString(opers_::AbstractString)::Vector{Symbol}
+function sepSymmString(opers_::AbstractString, 
+											 prefix::AbstractString="")::Vector{String}
 
 	opers  = filter(!isempty, split(opers_,"+"))
 	
-	(isempty(opers) ||	in("None",opers)) && return Symbol[]
+	(isempty(opers) ||	in("None",opers)) && return String[]
 
-	return Symbol.("oper" .* opers)
+	return [parse_operstring(op, prefix) for op in opers]
+
+end  
+
+
+
+
+function parse_operstring(op::AbstractString, 
+											 prefix::AbstractString="")::String
+
+	@assert !isempty(op) && !occursin("+",op)
+
+	op[1:min(4,end)]=="oper" ? prefix * op : prefix * "oper" * op 
 	
 end  
 
 
 
-function getOpFun(op::AbstractString)::Function 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
-	getOpFun(only(sepSymmString(op)))
+
+#catch e e isa UndefVarError || throw(e) 
+
+
+function getOp_fij(op::AbstractString)::Function 
+	
+	fij1 = getOpFun(op, "fij_")
+
+	function fij(n::Int, k0::Real)::Function 
+		
+		ind_minusk = WLO.ind_minusk(n, k0)
+
+#	function fij(ind_minusk::Function)::Function 
+
+		fij_(k::Vararg{Int,2})::NTuple{2,Int} = fij_(k) 
+
+		fij_(k::NTuple{2,Int})::NTuple{2,Int} = fij1(k, ind_minusk)
+
+	end 
+
+	return fij 
+	
+end 
+
+getOp_fij(op::AbstractString, args...)::Function = getOp_fij(op)(args...)
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+# dealing only with binary symmetries --- divide in halfspace 
+# returns the indices {I} such that {I, f(I)} covers the entire space
+
+
+function getOp_uniqueInds(op::AbstractString)::Function   
+
+	f11 = getOpFun(op, "fij_")((1,1),-)
+
+	return function uniqueInds_oper(n::Int, k0::Real
+																	)::Tuple{<:AbstractVector{Int}, 
+																					 <:AbstractVector{Int}
+																					}
+		ui0 = Base.OneTo(n-1)
+
+		all(==(1),f11) && return (ui0, ui0)
+
+		all(==(-1),f11) && return (WLO.uniqueInds_kMirror(n,k0), ui0)
+
+		return Tuple(f==-1 ? WLO.uniqueInds_kMirror(n,k0) : ui0 for f=f11)
+
+	end  
+
+	
+end 
+
+
+
+function getOp_uniqueInds(op::AbstractString, n::Int, k0::Real
+													 )::Tuple{<:AbstractVector{Int},
+																		<:AbstractVector{Int}}
+	
+	getOp_uniqueInds(op)(n, k0)
 
 end 
 
+
+
+function getOpFun(op::AbstractString, args...)::Function 
+
+	getOpFun(Symbol(parse_operstring(op, args...)))
+
+end 
 
 
 function getOpFun(op::Symbol)::Function 
@@ -593,19 +733,22 @@ function getOpFun(op::Symbol)::Function
 end 
 
 
-function symmetrize!(A::AbstractMatrix, opers::AbstractString)::Nothing
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
-	sopers = sepSymmString(opers)
 
-	isempty(sopers) && return 
 
-	for op in sopers 
+function symmetrize!(A::AbstractMatrix, opers::AbstractString,
+										args...)::Nothing
+
+	for op in sepSymmString(opers)
 		
-		symmetrize!(A, op)
+		symmetrize!(A, op, args...)
 
 	end 
-
-	return 
 
 end 
 	
@@ -620,23 +763,25 @@ end
 
 
 function HamHasSymm(op::Function, fHamilt::Function, args...;
-										nr_samples::Int64=10, atol::Float64=1e-8,
+										nr_samples::Int64=10, kwargs...
 									 )::Bool 
 
 	all(eachcol(rand(2,nr_samples)*2pi)) do k 
 
-		h1 = fHamilt(op(k), args...)
-
-		h2 = op(fHamilt(k, args...))
-
-		return isapprox(h1,h2,atol=atol)
+		Symmetries.has_symm(fHamilt(op(k), args...), op, 
+												fHamilt(k, args...);
+												kwargs...)
 
 	end 
 
-
 end 
 
+function has_symm(op::Union{AbstractString,Symbol},
+									args...; kwargs...)::Bool
 
+	Symmetries.has_symm(getOpFun(op), args...; kwargs...)
+
+end 
 
 
 

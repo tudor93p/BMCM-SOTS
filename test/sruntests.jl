@@ -5,9 +5,9 @@ import BMCMSOTS
 
 for fn in [
 
-#"checks", 
+"checks", 
 
-"periodic_funs",
+#"periodic_funs",
 
 
 

@@ -8,7 +8,7 @@ include("PeriodicFuns.jl")
 
 include("Algebra.jl")
 
-
+include("Symmetries.jl")
 
 
 #===========================================================================#
