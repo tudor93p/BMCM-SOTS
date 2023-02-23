@@ -18,7 +18,7 @@ input_checks  = Dict{Symbol,Any}(
 		braiding_time = [1/4],
 					
 		#nr_kPoints = 10:20:210,
-		nr_kPoints = 10:20:50,
+		nr_kPoints = 10:20:70,
 
 		kPoint_start = [-1], 
 

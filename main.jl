@@ -9,7 +9,16 @@ task = init(BMCMSOTS,:CheckZero)
 
 
 ComputeTasks.missing_data(task)
-ComputeTasks.get_data_one(task, mute=false)
-ComputeTasks.get_data_all(task, mute=false)
+ComputeTasks.get_data_one(task, mute=false) 
 
-#import myPlots; myPlots.plot(task)
+
+
+println("Preparations finished. Proceed to calculations? y/n") 
+
+
+if occursin("y",lowercase(readline(stdin))) 
+
+	ComputeTasks.get_data_all(task, mute=false) 
+
+end 
+
