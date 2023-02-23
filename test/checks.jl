@@ -20,7 +20,6 @@ import BMCMSOTS.Helpers:Symmetries
 		return true 
 
 	end 
-	@show symm_list 
 
 	L = 12
 	for p =1:L, q=1:L
@@ -218,7 +217,7 @@ p = ComputeTasks.get_first_paramcomb(task0)
 
 #	@show target 
 
-#	y = task0.get_data(P; target=target, mute=true)[target] 
+data2 = task0.get_data(P; force_comp=true, mute=false)
 
 	P = task0.get_plotparams(p)
 

@@ -291,21 +291,39 @@ function psi_unocc(psi::AbstractArray{ComplexF64,4}
 
 end  
 
+
+function get_data_args(psiH::AbstractArray{<:Number,4},
+											 results::AbstractDict
+											 )::Vector{Tuple{Array,Bool,Int,Vector}}
+
+	r = collect(keys(results))
+
+	return [(psiH, true, 1, r), (psiH, false, 1, r), 
+					(psiH, true, 2, r), (psiH, false, 2, r),
+					]
+
+end  
+
+get_data_iter = Base.Fix2(Base.Iterators.partition, 2) 
+
+
 function get_data(psiH::AbstractArray{ComplexF64,4}, 
-									results::AbstractDict)
+									results::AbstractDict;
+									parallel::Bool=false
+									)::Vector
 
-	(get_data(psiH, 1, results), get_data(psiH,2, results))
-
-end 
-
-
-function get_data(psiH::AbstractArray{ComplexF64,4}, dir1::Int,
-									results::AbstractDict
-									)
-
-	(get_data(psiH, true, dir1, results), get_data(psiH, false, dir1, results))
+	(parallel ? pmap : map)(Base.splat(get_data), get_data_args(psiH, results))
 
 end 
+
+
+#function get_data(psiH::AbstractArray{ComplexF64,4}, dir1::Int,
+#									results::AbstractDict
+#									)
+#
+#	(get_data(psiH, true, dir1, results), get_data(psiH, false, dir1, results))
+#
+#end 
 
 obs_batch_1 = ["D110", "D111", "WannierGap"]
 obs_batch_2 = ["D30", "D48","D123", "D125", "D127a"]  
@@ -313,17 +331,14 @@ obs_batch_2 = ["D30", "D48","D123", "D125", "D127a"]
 function get_data(psiH::AbstractArray{ComplexF64,4}, 
 									occupied::Bool,
 									dir1::Int,
-									results::AbstractDict
+									results::Vector{String},
 									)
-
-
-
 
 	psi = WLO.psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
 	eigW1 = WLO.Wannier_subspaces_on_mesh_loseW(WLO.wlo1_on_mesh(dir1, psi))
 
-	if any(in(keys(results)), obs_batch_2)
+	if any(in(results), obs_batch_2)
 
 		return (eigW1, WLO.wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
 
@@ -701,18 +716,17 @@ end
 
 function set_results_two!(results::AbstractDict,
 													nk::Int, k0::Real,
-													trial::Int,i_ps::Int,
+													trial::Int, i_ps::Int,
 													data)::Nothing
 
-	for (dir1,d) in enumerate(data)
+	for (dir1,d) in enumerate(get_data_iter(data))
 					
-		set_results_one!(results, nk, k0, trial, i_ps, dir1, d...)
+		set_results_one!(results, nk, k0, trial, i_ps, dir1, d...) 
 
 	end 
 
-	return 
+end  
 
-end 
 
 function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 													trial::Int,i_ps::Int,dir1::Int,
@@ -727,7 +741,6 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 													)::Nothing
 
 #	WannierGap 					
-#
 	if haskey(results,"WannierGap")
 
 		gap = min(WLO.WannierGap_fromSubspaces(eigW1_occup),
@@ -982,7 +995,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
-
+	parallel=nprocs()>=4
 
 	strengths = perturb_strengths(P)
 
@@ -1004,12 +1017,9 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------ no perturbation --------- #
 
-	set_results_two!(results, nk, k0, 1, s1, 
-										 get_data(get_psiH(theta, nk, k0), results))
-
-# get data: both directions, occup and unocc --- 4 separate calculations 
-# parallelize here as well.
-
+	set_results_two!(results, nk, k0, 1, s1,  
+										 get_data(get_psiH(theta, nk, k0), results;
+															parallel=parallel))
 
 
 	if all_symms_preserved(P) 
@@ -1035,13 +1045,14 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	trials = get_perturb_on_mesh(P, nk, k0, 3268) # seed ensures 
 
 	
-	if nprocs()>3 #---- parallel evaluation ---#
+	if parallel #---- parallel evaluation ---#
 
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
 			get_data(get_psiH(theta, nk, k0, pert...), results)
 
-		end 
+		end # get_data contains 4 jobs  
+
 
 		for (I,d) in zip(Iterators.product(eachindex(trials),s2e), data_all)
 

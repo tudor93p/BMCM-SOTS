@@ -1119,7 +1119,7 @@ version = "1.6.38+0"
 
 [[deps.myLibs]]
 deps = ["Arpack", "BenchmarkTools", "Combinatorics", "ConcaveHull", "Dates", "DelimitedFiles", "Dierckx", "Distributed", "FFTW", "FileIO", "Graphs", "JLD", "LazySets", "LinearAlgebra", "MetaGraphs", "Optim", "OrderedCollections", "PolynomialRoots", "PyCall", "PyPlot", "QHull", "QuadGK", "Random", "Revise", "SparseArrays", "Test", "TikzGraphs", "TikzPictures"]
-git-tree-sha1 = "75a3f371639a2de5f77fcfe3b2c5c050dc58f4e1"
+git-tree-sha1 = "554bfa2823ea774377bbb8df10d9db7127a3e759"
 repo-rev = "main"
 repo-url = "https://github.com/tudor93p/myLibs.git#main"
 uuid = "0cc41259-d48e-4a81-8a6d-ec7e330e4bca"
