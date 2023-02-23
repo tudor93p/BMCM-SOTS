@@ -17,26 +17,17 @@ input_checks  = Dict{Symbol,Any}(
 
 		braiding_time = [1/4],
 					
-		#nr_kPoints = 10:20:210,
 		nr_kPoints = 10:20:70,
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = ["None"; 
-														join.(Combinatorics.powerset(["Mx", "Ct", "TC2y", "Tt"],1,2),"+");
-														"All"],
+		preserved_symmetries = ["None"; join.(Combinatorics.powerset(["Mx", "Ct", "TC2y", "Tt"],1,2),"+"); "All"],  
 
-#		preserved_symmetries = ["None", "Mx", "My", "Ct", "Mx+Ct", "My+Ct", "All"],
-	
-		nr_perturb_strength = [10],
-#		nr_perturb_strength = [21],
+		nr_perturb_strength = [25],
 		
-		max_perturb_strength = [0.6],
-#		max_perturb_strength = [0.8],
+		max_perturb_strength = [0.8],
 		
-	
-		nr_perturb_instances = [3],
-#		nr_perturb_instances = [10],
+		nr_perturb_instances = [8],
 
   		), 
 
