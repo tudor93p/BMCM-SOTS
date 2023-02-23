@@ -13,7 +13,8 @@ ComputeTasks.get_data_one(task, mute=false)
 
 
 
-println("Preparations finished. Proceed to calculations? y/n") 
+@info "Preparations finished. Proceed to calculations? y/n" 
+
 
 
 if occursin("y",lowercase(readline(stdin))) 

@@ -210,11 +210,11 @@ function wcc_stat!(storage::AbstractVector{Float64},
 end 
 
 function wcc_stat(X::AbstractArray{<:Real,N},
-									 quantized_values::AbstractVector{<:Real};
+									 quantized_values::AbstractVector{<:Real}...;
 									 kwargs...
 								 )::Array{Float64,N} where N
 
-	wcc_stat!(copy(X), quantized_values; kwargs...)
+	wcc_stat!(copy(X), quantized_values...; kwargs...)
 
 end 
 

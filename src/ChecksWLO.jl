@@ -790,13 +790,13 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	
 			#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
 				WLO.run_m1!(results["D127a"], trial, 
-										abs.(WLO.wcc_stat_axpy!(-1,p1occup_,p1occup)), 
+										abs.(WLO.wcc_stat_axpy!(-1,p1occup_,p1occup,[0,0.5])), 
 									 i_ps,dir1,1,:) 
 			
 			# p1occup has been overwritten
 			
 				WLO.run_m1!(results["D127a"], trial, 
-										abs.(WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc)), 
+										abs.(WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc,[0,0.5])), 
 									 i_ps,dir1,2,:) 
 			
 			#	p1unocc has been overwritten  
@@ -807,7 +807,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	
 			#	D125: total polarization zero 
 				WLO.run_m1!(results["D125"], trial,
-										abs.(WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_)),
+										abs.(WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_,[0,0.5])),
 									 i_ps,dir1,:)
 			
 			#	p1unocc_ has been overwritten
@@ -877,7 +877,8 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 
 			WLO.run_m1!(results["D48"], trial,
-									abs.(WLO.wcc_stat!(view(nus2pm[sector],:))),
+									abs.(WLO.wcc_stat!(view(nus2pm[sector],:),
+																		 [0,0.5])),
 									i_ps, dir1, sector, : )
 
 # nus2pm overwritten 
