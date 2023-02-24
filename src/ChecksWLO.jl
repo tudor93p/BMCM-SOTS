@@ -8,7 +8,7 @@ import LinearAlgebra, Combinatorics, Random
 
 using OrderedCollections: OrderedDict 
 
-import myLibs: ReadWrite, Utils 
+import myLibs: ReadWrite, Utils, SignalProcessing
 
 
 import myLibs.Parameters:UODict 
@@ -601,7 +601,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 							WLO.WannierGap_fromSubspaces(eigW1_unocc))
 	
 	
-		WLO.run_m1!(results["WannierGap"], trial, gap, i_ps, dir1)
+		SignalProcessing.run_m1!(results["WannierGap"], trial, gap, i_ps, dir1)
 
 	end 
 
@@ -619,7 +619,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 		if haskey(results,"D110")
 	
 			#	D110: p1occup-p1unocc ==0
-				WLO.run_m1!(results["D110"],trial,
+				SignalProcessing.run_m1!(results["D110"],trial,
 										abs.(WLO.wcc_stat_axpy(-1,p1occup,p1unocc)),
 										i_ps,dir1,:)
 			
@@ -628,7 +628,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 		if haskey(results,"D111")
 
 		#	D111: p1occup+p1unocc ==0
-			WLO.run_m1!(results["D111"],trial,
+			SignalProcessing.run_m1!(results["D111"],trial,
 									abs.(WLO.wcc_stat_axpy(1,p1occup,p1unocc)),
 									i_ps,dir1,:)
 		
@@ -643,13 +643,13 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 			if haskey(results,"D127a")
 	
 			#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
-				WLO.run_m1!(results["D127a"], trial, 
+				SignalProcessing.run_m1!(results["D127a"], trial, 
 										abs.(WLO.wcc_stat_axpy!(-1,p1occup_,p1occup,[0,0.5])), 
 									 i_ps,dir1,1,:) 
 			
 			# p1occup has been overwritten
 			
-				WLO.run_m1!(results["D127a"], trial, 
+				SignalProcessing.run_m1!(results["D127a"], trial, 
 										abs.(WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc,[0,0.5])), 
 									 i_ps,dir1,2,:) 
 			
@@ -660,7 +660,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 			if haskey(results,"D125")
 	
 			#	D125: total polarization zero 
-				WLO.run_m1!(results["D125"], trial,
+				SignalProcessing.run_m1!(results["D125"], trial,
 										abs.(WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_,[0,0.5])),
 									 i_ps,dir1,:)
 			
@@ -678,7 +678,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	for sector in 1:2 # plus and minus 
 
 #	D123: nu2pm == eta2pm 
-		haskey(results,"D123") && WLO.run_m1!(results["D123"], trial,
+		haskey(results,"D123") && SignalProcessing.run_m1!(results["D123"], trial,
 				abs.(WLO.wcc_stat_axpy!(-1, nus2pm[sector], eta2pm[sector])), 
 							 i_ps, dir1, sector, :) 
 
@@ -710,7 +710,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 								WLO.ind_minusk.(axes(nus2pm[2],dir1+1),nk,k0)
 								)
 
-			WLO.run_m1!(results["D30"], trial,
+			SignalProcessing.run_m1!(results["D30"], trial,
 									abs.(WLO.wcc_stat_axpy(-1,nus2pm[1],nu2_minus_mk)),
 								 i_ps,dir1,:)
 
@@ -720,7 +720,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 		
 	if haskey(results,"D48")
 
-#			WLO.run_m1!(results["D48"], trial,
+#			SignalProcessing.run_m1!(results["D48"], trial,
 #									abs.(WLO.wcc_stat_axpy!(-1,nus2pm...)),
 #								 i_ps,dir1,:)
 # nus2pm[2] has been overwritten
@@ -730,7 +730,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 	for sector in 1:2 
 
 
-			WLO.run_m1!(results["D48"], trial,
+			SignalProcessing.run_m1!(results["D48"], trial,
 									abs.(WLO.wcc_stat!(view(nus2pm[sector],:),
 																		 [0,0.5])),
 									i_ps, dir1, sector, : )

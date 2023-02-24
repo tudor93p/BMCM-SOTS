@@ -229,13 +229,15 @@ end
 
 
 function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4}, 
-																	 args...)::Nothing
+																	 args...)::AbstractArray{ComplexF64,4}
 
 	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
 
 	symmetrize_on_mesh!(pert, args...)
 
 	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
+
+	return pert 
 
 end 
 
@@ -246,13 +248,8 @@ function get_perturb_on_mesh_(
 										 n::Int, k0::Real,
 										 )::Array{ComplexF64,4}
 
+	symmetrize_and_normalize!(rand(ComplexF64,4,4,n-1,n-1), symms, n, k0) 
 
-	randpert = rand(ComplexF64,4,4,n-1,n-1)
-
-	symmetrize_and_normalize!(randperts, symms, n, k0) 
-
-	return randpert 
- 
 end   
 
 function get_perturb_on_mesh_(
@@ -279,7 +276,7 @@ end
 
 function get_perturb_on_mesh(
 											P::UODict, args...
-										 )::Vector{Array{ComplexF64,4}} 
+										 )::Array{ComplexF64,4}
 
 
 	get_perturb_on_mesh(preserved_symmetries(P), 
@@ -342,19 +339,16 @@ end
 
 function check_nu_k_dep(nu::AbstractMatrix{<:Real},
 												d::Int;
-												atol::Float64=1e-8
+												atol::Float64=1e-10
 												)
-#		nu(i,j) should depend only on (i,j)[dir2], indep of (i,j)[dir1]
-#		nu(i,j)==nu(
-#		should depend only on (i,j)[dir2], indep of (i,j)[dir1]
-# dir1=1, dir2=2: nu_x(k_y)==nu_x(j)    indep of kx==i
-#nu[i,j]==nu[1,j] for all i 
 
 	for i=2:size(nu,d) 
 	
 		isapprox(selectdim(nu,d,i), selectdim(nu,d,1); atol=atol) && continue 
 	
-		@warn "nux depends on kx | nuy depends on ky?"
+		@warn "nux depends on kx | nuy depends on ky?" 
+	
+		@show LinearAlgebra.norm(selectdim(nu,d,i)-selectdim(nu,d,1))
 
 		break 
 	
