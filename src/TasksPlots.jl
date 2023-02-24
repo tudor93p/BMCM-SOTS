@@ -86,9 +86,8 @@ end
 function init_sliders_obs(observables::AbstractVector{<:AbstractString}
 												 )::Vector
 													
-	[ ("observables", observables), 
-	 ("obs_index", 8), 
-	 ]
+	[ ("observables", observables), ("obs_index", 8), ]
+
 
 end 
 #===========================================================================#
@@ -240,9 +239,13 @@ function CheckZero(init_dict::AbstractDict;
 #
 #---------------------------------------------------------------------------#
 
+
+	observables_ = intersect(observables, ChecksWLO.calc_observables)
+
+
 	task = CompTask(Calculation("Check zeros",
 															ChecksWLO, init_dict; 
-															observables=observables, kwargs...))
+															observables=observables_, kwargs...))
 
 	function plot(P::AbstractDict)::Dict{String,Any} 
 		
@@ -254,7 +257,7 @@ function CheckZero(init_dict::AbstractDict;
 	end
 
 	return PlotTask(task, 
-									[init_sliders_obs(observables);
+									[init_sliders_obs(observables_);
 									 [("obs_group", ChecksWLO.combs_groups()),	("ylim",)]], 
 									"Curves_yofx", plot)
 
@@ -337,8 +340,10 @@ function CheckZero_atY(init_dict::AbstractDict;
 #
 #---------------------------------------------------------------------------#
 
+	observables_ = intersect(observables, ChecksWLO.calc_observables) 
+
 	C = Calculation("Check zeros for several $Y", ChecksWLO, init_dict; 
-									observables=observables, kwargs...)
+									observables=observables_, kwargs...)
 
 	task, out_dict, = ComputeTasks.init_multitask(C, [Y=>1], [1=>""])
 
@@ -354,7 +359,7 @@ function CheckZero_atY(init_dict::AbstractDict;
 	end
 
 	return PlotTask(task, 
-									[init_sliders_obs(observables); ("ylim",)], 
+									[init_sliders_obs(observables_); ("ylim",)], 
 									"Curves_yofx", 
 									plot)
 

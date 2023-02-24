@@ -3,19 +3,13 @@ module WLO
 
 import LinearAlgebra, Statistics 
 
-import myLibs:Utils 
+import myLibs:Utils,SignalProcessing 
 
 import ..Helpers: PeriodicFuns 
 
 
 
 
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
 
 #===========================================================================#
 #
@@ -23,142 +17,12 @@ import ..Helpers: PeriodicFuns
 #
 #---------------------------------------------------------------------------#
 
-# algo: https://www.johndcook.com/blog/standard_deviation/
-# 1962 Welford  
-# #
-# used in: SnakeStates/src/DeviceWithLeads/src/TasksPlots.jl
-# and in: Luxemburg/check_WLO/WLO/src/WLO.jl 
-# 
-# to be moved to myLibs!
+
+#===========================================================================#
 #
-
-function init_run_ms()::Vector{Float64}
-
-	zeros(4)
-
-end 
-
-function init_run_m()::Vector{Float64}
-
-	zeros(2)
-
-end 
-
-function init_run_ms!(storage::AbstractVector{Float64})::Nothing 
-
-	storage .= 0 
-
-	return 
-
-end  
-
-function run_m1!(storage::AbstractArray{<:Number}, 
-								 k::Real, xk::Number,
-								 inds...)::Nothing 
-
-	storage[inds...] += (xk-storage[inds...])/k 
-
-	return 
-
-end 
-
-function run_m1!(storage::AbstractArray{<:Number}, 
-								 k::Real, xk::AbstractArray,
-								 inds...)::Nothing 
-
-	LinearAlgebra.axpby!(1/k, xk, 1-1/k, view(storage, inds...))
-
-	return 
-
-end 
-
-
-function run_m!(storage::AbstractVector{Float64}, xk::Real)::Nothing
-
-	storage[1] += 1
-
-#	storage[2] += (xk-storage[2])/storage[1]
-
-	run_m1!(storage, storage[1], xk, 2)
-
-end 
-
-
-function run_ms!(storage::AbstractVector{Float64}, xk::Real)::Nothing
-
-	# storage[1]: k-1 
-	
-	storage[1] += 1
-
-	# storage[1]: k
-
-	#	storage[2] and storage[3]: M(k-1)
-
-	storage[3] += (xk-storage[3])/storage[1]
-
-	# storage[3]: M(k) 
-
-	#	storage[4] S(k-1) 
-	
-	storage[4] += (xk-storage[2])*(xk-storage[3])
-
-	# storage[4]: S(k) 
-	
-	storage[2] = storage[3] 
-
-	# storage[2]: M(k)
-	
-	return 
-
-end 
-
-function run_var(storage::AbstractVector{Float64})::Float64 
-
-	storage[1]>1 ? storage[4]/(storage[1]-1) : 0.0
-
-end 
-
-
-function run_mean(storage::AbstractVector{Float64})::Float64 
-
-	storage[2] 
-
-end 
-
-function run_sigma(storage::AbstractVector{Float64})::Float64 
-	
-	sqrt(run_var(storage))
-
-end  
-
-
-function run_ms!(storage::AbstractVector{Float64},
-								 X::AbstractVector{<:Real})::Nothing 
-
-	for x in X 
-
-		run_ms!(storage, x) 
-
-	end  
-
-end  
-
-
-function run_ms(X::AbstractVector{<:Real})::Vector{Float64}
-
-	storage = init_run_ms()
-
-	run_ms!(storage, X)
-
-	return storage
-
-end 
-
-
-
-
-
-
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -177,33 +41,29 @@ function wcc_stat!(storage::AbstractVector{Float64},
 
 
 
-	init_run_ms!(storage) 
+	SignalProcessing.init_run_ms!(storage) 
 
 	setindex!(X, Utils.closest_periodic_shifted_a(X[1], quantized_values, 1), 1)
 
-	run_m!(storage, X[1])
+	SignalProcessing.run_m!(storage, X[1])
 	
 	for i = 2:lastindex(X)
 
 		setindex!(X, Utils.closest_periodic_shifted_a(X[i], X[i-1], 1), i)
 
-		run_m!(storage, X[i])
+		SignalProcessing.run_m!(storage, X[i])
 
 	end 
 
 
 	setindex!(S, 
-						Utils.closest_periodic_shifted_a(run_mean(storage), quantized_values, 1), 
+						Utils.closest_periodic_shifted_a(SignalProcessing.run_mean(storage), quantized_values, 1), 
 						1)
 
 	setindex!(S, 
 						Statistics.stdm(X, Utils.closest_periodic_b(S[1], quantized_values, 1)),
 						2)
 
-
-#	setindex!(S, run_mean(storage), 1)
-
-#	setindex!(S, run_sigma(storage), 2)
 
 	return 
 
@@ -227,7 +87,7 @@ function wcc_stat!(X::AbstractArray{<:Real,N},
 
 	# take vectors along axis 'dim' and iterate the other axes 
 
-	storage = init_run_m()  # same for all sets of WCCs 
+	storage = SignalProcessing.init_run_m()  # same for all sets of WCCs 
 
 
 	S = zeros((size(X)[1:dim-1]..., 2, size(X)[dim+1:N]...))
@@ -446,13 +306,13 @@ end
 #
 #---------------------------------------------------------------------------#
 
-
-function occupied_subspace(k::AbstractVector, H::Function, data...;
-													 kwargs...)#::Tuple{Matrix,Vector}
-
-	occupied_subspace(H(k, data...); kwargs...)
-
-end  
+#
+#function occupied_subspace(k::AbstractVector, H::Function, data...;
+#													 kwargs...)#::Tuple{Matrix,Vector}
+#
+#	occupied_subspace(H(k, data...); kwargs...)
+#
+#end  
 function eigH(k::AbstractVector, H::Function, data...;
 													 kwargs...)#::Tuple{Matrix,Vector}
 
@@ -499,17 +359,17 @@ function init_eigH(H::AbstractMatrix{T};
 end 
 
 
-function occupied_subspace(M::AbstractMatrix{T}, args...; kwargs...
-														) where T<:Number 
-#														)::Matrix{T} where T<:Number 
-
-	u = init_occup(M)
-
-	occupied_subspace!(u, M, args...; kwargs...)
-
-	return u 
-
-end   
+#function occupied_subspace(M::AbstractMatrix{T}, args...; kwargs...
+#														) where T<:Number 
+##														)::Matrix{T} where T<:Number 
+#
+#	u = init_occup(M)
+#
+#	occupied_subspace!(u, M, args...; kwargs...)
+#
+#	return u 
+#
+#end   
 
 function eigH(M::AbstractMatrix{T}, args...; kwargs...
 														) where T<:Number 
@@ -524,17 +384,17 @@ function eigH(M::AbstractMatrix{T}, args...; kwargs...
 end  
 
 
-function unoccupied_subspace(args...; occupied::Bool=false, kwargs...) 
-
-	occupied_subspace(args...; occupied=false, kwargs...)
-
-end 
-
-function unoccupied_subspace!(args...; occupied::Bool=false, kwargs...) 
-
-	occupied_subspace!(args...; occupied=false, kwargs...)
-
-end 
+#function unoccupied_subspace(args...; occupied::Bool=false, kwargs...) 
+#
+#	occupied_subspace(args...; occupied=false, kwargs...)
+#
+#end 
+#
+#function unoccupied_subspace!(args...; occupied::Bool=false, kwargs...) 
+#
+#	occupied_subspace!(args...; occupied=false, kwargs...)
+#
+#end 
 
 #function unoccupied_subspace(M::AbstractMatrix{T}, args...; kwargs...
 #														) where T<:Number 
@@ -585,30 +445,30 @@ end
 
 
 
-function occupied_subspace!(u,
-														k::AbstractVector, 
-														H::Function, data...;
-														kwargs...)::Nothing 
-
-	occupied_subspace!(u, H(k, data...); kwargs...)
-
-end  
-
-
-
-function occupied_subspace!(u,
-														H::AbstractMatrix;
-														kwargs...
-														)::Nothing 
-
-	eig = LinearAlgebra.eigen(H)
-
-	occupied_subspace!(u, eig.vectors, eig.values; kwargs...)
-end  
-
-
-
-
+#function occupied_subspace!(u,
+#														k::AbstractVector, 
+#														H::Function, data...;
+#														kwargs...)::Nothing 
+#
+#	occupied_subspace!(u, H(k, data...); kwargs...)
+#
+#end  
+#
+#
+#
+#function occupied_subspace!(u,
+#														H::AbstractMatrix;
+#														kwargs...
+#														)::Nothing 
+#
+#	eig = LinearAlgebra.eigen(H)
+#
+#	occupied_subspace!(u, eig.vectors, eig.values; kwargs...)
+#end  
+#
+#
+#
+#
 
 												
 
@@ -695,36 +555,36 @@ end
 
 
 
-function occupied_subspace!(uv::AbstractVector{<:AbstractArray},
-														psi::AbstractMatrix,
-														E::AbstractVector{<:Real};
-														kwargs...
-														)::Nothing 
-
-	u,v = uv  
-
-	i = partialsortperm(E, 1:div(length(E),2); kwargs...)
-
-	setindex!(u, selectdim(psi, 2, i), :, :)
-
-	setindex!(v, view(E, i), :)
-
-
-	return 
-
-end 
-
-function occupied_subspace!(
-														u::AbstractMatrix,
-														psi::AbstractMatrix,
-														E::AbstractVector{<:Real};
-														kwargs...
-														)::Nothing 
-
-	occupied_subspace!([u,zeros(size(u,2))], psi, E; kwargs...)
-
-end 
-
+#function occupied_subspace!(uv::AbstractVector{<:AbstractArray},
+#														psi::AbstractMatrix,
+#														E::AbstractVector{<:Real};
+#														kwargs...
+#														)::Nothing 
+#
+#	u,v = uv  
+#
+#	i = partialsortperm(E, 1:div(length(E),2); kwargs...)
+#
+#	setindex!(u, selectdim(psi, 2, i), :, :)
+#
+#	setindex!(v, view(E, i), :)
+#
+#
+#	return 
+#
+#end 
+#
+#function occupied_subspace!(
+#														u::AbstractMatrix,
+#														psi::AbstractMatrix,
+#														E::AbstractVector{<:Real};
+#														kwargs...
+#														)::Nothing 
+#
+#	occupied_subspace!([u,zeros(size(u,2))], psi, E; kwargs...)
+#
+#end 
+#
 
 
 
@@ -1770,7 +1630,6 @@ function nuPlusMinus_fromSubspaces((wf_plus,
 									 )::Tuple{<:AbstractArray{<:Real,3},
 														<:AbstractArray{<:Real,3}}
 
-
 	(nu_plus,nu_minus)
 	
 end 
@@ -2034,6 +1893,39 @@ end
 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+function get_wlo_data_mesh(psiH::AbstractArray{ComplexF64,4}, 
+									occupied::Bool,
+									dir1::Int,
+									get_wlo2::Bool 
+									)::Tuple
+
+	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
+
+	eigW1 = Wannier_subspaces_on_mesh_loseW(wlo1_on_mesh(dir1, psi))
+
+	if get_wlo2 
+
+		return (eigW1, wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
+
+	else 
+
+		return (eigW1, fill(zeros(0,0,0),0))
+
+	end
+
+end 
+
+
+
+
 
 
 
@@ -2231,6 +2123,109 @@ function wlo2_pm_evals(k::Union{AbstractVector,Real},
 			 )
 
 end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -26,8 +26,10 @@ input_checks  = Dict{Symbol,Any}(
 		nr_perturb_strength = [25],
 		
 		max_perturb_strength = [0.8],
-		
+
 		nr_perturb_instances = [8],
+
+		perturb_strength = 0:0.2:0.8,
 
   		), 
 
@@ -47,11 +49,14 @@ input_checks  = Dict{Symbol,Any}(
 			max_perturb_strength = (1,2),
 
 			nr_perturb_instances = (2,0),
+			
+			perturb_strength = (1,2),
 
 
 		),
   
-	:observables => ["D110","D111","D48","D30","D123","D125","D127a","WannierGap"],
+	:observables => ["D110","D111","D48","D30","D123","D125","D127a",
+									 "WannierGap","WannierBands1","WannierBands2"],
 
 	
 )

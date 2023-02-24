@@ -7,6 +7,7 @@ import ..Helpers:Symmetries
 #import PyPlot 
 import myLibs: Groups, Utils
 
+import myLibs.Parameters: UODict
 
 #import DelimitedFiles 
 
@@ -118,6 +119,50 @@ function bsss_cycle(theta::Real)::Vector{Float64}
 	return out
 
 end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+braiding_time(P::UODict)::Float64 = P[:braiding_time]  
+braiding_theta(t::Real)::Float64  = t*2pi 
+braiding_theta(P::UODict)::Float64 = braiding_theta(braiding_time(P))
+
+
+
+function get_psiH(MBtime::Real, n::Int, k0::Real)::Array{ComplexF64,4}
+
+	WLO.psiH_on_mesh(n, k0, H,  bsss_cycle(braiding_theta(MBtime)))
+
+end 
+
+function get_psiH(MBtime::Real, n::Int, k0::Real, 
+									perturb0::AbstractArray{ComplexF64,4},
+									strength::Real,
+											)::Array{ComplexF64,4}
+
+	iszero(strength) && return get_psiH(MBtime, n, k0)
+	
+	return WLO.psiH_on_mesh(n, k0, perturb0, 
+													H,  bsss_cycle(braiding_theta(MBtime)),
+													strength,
+													)
+
+end 
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
 
 
 function get_Wx_Wy(th::Real,K::AbstractVector{<:Real}

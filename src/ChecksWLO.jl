@@ -16,6 +16,10 @@ import myLibs.Parameters:UODict
 import ..FILE_STORE_METHOD, ..WLO, ..MB, ..Helpers
 import ..Helpers: Symmetries
 
+
+import ..MB: braiding_time
+import ..CalcWLO: nr_kPoints, kPoint_start, preserved_symmetries, all_symms_preserved, get_perturb_on_mesh_
+
 #===========================================================================#
 #
 #
@@ -48,8 +52,11 @@ function usedkeys(P::UODict)::Vector{Symbol}
 
 end 
 
+obs_batch_1 = ["D110", "D111", "WannierGap"]
+obs_batch_2 = ["D30", "D48","D123", "D125", "D127a"]  
 
 
+calc_observables = vcat(obs_batch_1, obs_batch_2)
 
 #===========================================================================#
 #
@@ -72,35 +79,6 @@ function nr_perturb_instances(P::UODict)::Int
 
 end  
 
-function nr_kPoints(P::UODict)::Int 
-
-	P[:nr_kPoints]
-
-end  
-
-function kPoint_start(P::UODict)::Float64
-
-	pi*P[:kPoint_start]
-
-end 
-
-function preserved_symmetries(P::UODict)::String 
-
-	P[:preserved_symmetries]
-
-end 
-
-
-function all_symms_preserved(P::UODict)::Bool
-
-	all_symms_preserved(preserved_symmetries(P))
-
-end 
-function all_symms_preserved(s::AbstractString)::Bool
-
-	s=="All"
-
-end 
 
 
 
@@ -151,25 +129,12 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4}, 
-																	 args...)::Nothing
-
-	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
-
-	symmetrize_on_mesh!(pert, args...)
-
-	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
-
-end 
-
-function get_perturb_on_mesh(
-											P::UODict,
-										 n::Int, k0::Real,
-										 seed::Int...
-										 )::Vector{Array{ComplexF64,4}} 
+function get_perturb_on_mesh(P::UODict, seed::Int...
+														 )::Vector{Array{ComplexF64,4}} 
 	
-	get_perturb_on_mesh(preserved_symmetries(P),
-											n, k0, 
+	get_perturb_on_mesh(preserved_symmetries(P), 
+											nr_kPoints(P),
+											kPoint_start(P),
 											nr_perturb_instances(P),
 											seed...)
 
@@ -182,17 +147,18 @@ function get_perturb_on_mesh(
 										 seed::Int=3268
 										 )::Vector{Array{ComplexF64,4}}
 
-	all_symms_preserved(symms) && return [zeros(ComplexF64,4,4,n-1,n-1)]
 
-	Random.seed!(seed) 
+	all_symms_preserved(symms) && return [zeros(ComplexF64,4,4,n-1,n-1)] 
 
-	randperts = [rand(ComplexF64,4,4,n-1,n-1) for i=1:nr_pert]
+	Random.seed!(seed)  
+
+
+	randperts = [get_perturb_on_mesh_(symms,n,k0) for i=1:nr_pert] 
+
 
 	for i=1:nr_pert 
 
 		i>1 && @assert !isapprox(randperts[1][1], randperts[i][1], atol=1e-8) 
-
-		symmetrize_and_normalize!(randperts[i], symms, n, k0) 
 
 	end 
 
@@ -202,101 +168,17 @@ end
 
 
 
-#function perturb_trials_seed(P::UODict
-#																 )::Tuple{Vector{Float64}, 
-#																					Vector{Array{ComplexF64,4}} 
-##																					Vector{Matrix{ComplexF64}} 
-#																					}
-#
-#
-#	strengths = perturb_strengths(P)
-#
-#	n = nr_kPoints(P) 
-#
-#
-#
-##	randpert = rand(ComplexF64,4,4,nr_perturb_instances(P))
-#
-#	Random.seed!(326877)
-#
-#
-#
-#
-#
-#	return (strengths, randpert)
-#
-##	return (strengths, collect.(eachslice(randpert,dims=3)))
-#
-#end 
-
-
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
-
-braiding_theta(t::Real)::Float64  = t*2pi 
-
-braiding_theta(P::UODict)::Float64 = braiding_theta(P[:braiding_time])
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-function get_psiH(theta::Real, n::Int, k0::Real)::Array{ComplexF64,4}
-
-	WLO.psiH_on_mesh(n, k0, MB.H,  MB.bsss_cycle(theta))
-
-end 
-
-function get_psiH(theta::Real, n::Int, k0::Real, 
-									perturb0::AbstractArray{ComplexF64,4},
-									strength::Real,
-											)::Array{ComplexF64,4}
-
-	iszero(strength) && return get_psiH(theta, n, k0)
-	
-	return WLO.psiH_on_mesh(n, k0, perturb0, 
-													MB.H,  MB.bsss_cycle(theta), 
-													strength,
-													)
-
-end 
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
- 
-function psi_occup(psi::AbstractArray{ComplexF64,4}
-									)::AbstractArray{ComplexF64,4}
-
-	WLO.psi_sorted_energy(psi; halfspace=true, occupied=true)  
-
-end 
-function psi_unocc(psi::AbstractArray{ComplexF64,4}
-									)::AbstractArray{ComplexF64,4}
-
-	WLO.psi_sorted_energy(psi; halfspace=true, occupied=false)
-
-end  
-
 
 function get_data_args(psiH::AbstractArray{<:Number,4},
 											 results::AbstractDict
-											 )::Vector{Tuple{Array,Bool,Int,Vector}}
+											 )::Vector{Tuple{Array,Bool,Int,Bool}}
 
-	r = collect(keys(results))
+	r = any(in(keys(results)), obs_batch_2)
 
 	return [(psiH, true, 1, r), (psiH, false, 1, r), 
 					(psiH, true, 2, r), (psiH, false, 2, r),
@@ -312,43 +194,15 @@ function get_data(psiH::AbstractArray{ComplexF64,4},
 									parallel::Bool=false
 									)::Vector
 
-	(parallel ? pmap : map)(Base.splat(get_data), get_data_args(psiH, results))
+	(parallel ? pmap : map)(Base.splat(WLO.get_wlo_data_mesh), 
+													get_data_args(psiH, results))
 
 end 
 
 
-#function get_data(psiH::AbstractArray{ComplexF64,4}, dir1::Int,
-#									results::AbstractDict
-#									)
-#
-#	(get_data(psiH, true, dir1, results), get_data(psiH, false, dir1, results))
-#
-#end 
 
-obs_batch_1 = ["D110", "D111", "WannierGap"]
-obs_batch_2 = ["D30", "D48","D123", "D125", "D127a"]  
 
-function get_data(psiH::AbstractArray{ComplexF64,4}, 
-									occupied::Bool,
-									dir1::Int,
-									results::Vector{String},
-									)
 
-	psi = WLO.psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
-
-	eigW1 = WLO.Wannier_subspaces_on_mesh_loseW(WLO.wlo1_on_mesh(dir1, psi))
-
-	if any(in(results), obs_batch_2)
-
-		return (eigW1, WLO.wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
-
-	else 
-
-		return (eigW1, fill(zeros(0,0,0),0))
-
-	end
-
-end 
 
 
 #===========================================================================#
@@ -731,12 +585,12 @@ end
 function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 													trial::Int,i_ps::Int,dir1::Int,
 													(eigW1_occup,nus2pm)::Tuple{
-																			<:AbstractVector{<:AbstractArray},
-																			<:AbstractVector{<:AbstractArray}
+																<:AbstractVector{<:AbstractArray},
+																<:AbstractVector{<:AbstractArray{<:Real,3}}
 																			},
 													(eigW1_unocc,eta2pm)::Tuple{
-																			<:AbstractVector{<:AbstractArray},
-																			<:AbstractVector{<:AbstractArray}
+																<:AbstractVector{<:AbstractArray},
+																<:AbstractVector{<:AbstractArray{<:Real,3}}
 																			},
 													)::Nothing
 
@@ -900,72 +754,6 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function symmetrize_on_mesh_one!(Aij::AbstractMatrix{ComplexF64},
-									opij::NTuple{2,Int}, 
-									seed::AbstractArray{<:Number,4},
-									op::Function; kwargs...)::Nothing
-
-	Symmetries.symmetrize!!(Aij, WLO.select_mesh_point(seed, opij), op)
-
-end 
-
-
-function symmetrize_on_mesh(seed::AbstractArray{ComplexF64,4},
-														args...; kwargs...
-														 )::Array{ComplexF64,4}
-
-	A = copy(seed)
-
-	symmetrize_on_mesh!(A, args...; kwargs...)
-
-	return A
-
-end  
-
-
-function symmetrize_on_mesh!(
-														 A::AbstractArray{ComplexF64,4},
-														 opers::AbstractString,
-														 n::Int, k0::Real,
-														 )::Nothing 
-
-	for op in MB.sepSymmString(opers)
-
-		WLO.store_on_mesh!!(symmetrize_on_mesh_one!,
-									MB.getOp_uniqueInds(op,n,k0),
-									MB.getOp_fij(op,n,k0),
-									A, A, 
-									MB.getOpFun(op),
-									) 
-	end 
-
-end  
-
-
-
-
-
-
-#function get_perturb(
-#										 symms::AbstractString, 
-#										 seed::AbstractMatrix{ComplexF64},
-#										 ps::Real,
-#										 )::Matrix{ComplexF64}
-#
-#	all_symms_preserved(symms) && return zeros(ComplexF64, size(seed)...)
-#
-#	LinearAlgebra.normalize!(MB.symmetrize(seed+seed', symms)) .*= ps 
-#
-#end 
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
 function Compute(P::UODict; get_fname=nothing, target=nothing,
 								 kwargs...)::Dict  
 
@@ -992,7 +780,7 @@ end
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
 										kwargs...)::Dict{String,Any}
 
-	theta = braiding_theta(P)
+	MBtime = braiding_time(P)
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
@@ -1019,7 +807,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	# ------ no perturbation --------- #
 
 	set_results_two!(results, nk, k0, 1, s1,  
-										 get_data(get_psiH(theta, nk, k0), results;
+										 get_data(MB.get_psiH(MBtime, nk, k0), results;
 															parallel=parallel))
 
 
@@ -1043,14 +831,14 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------------- with perturbation -------------- # 
 
-	trials = get_perturb_on_mesh(P, nk, k0, 3268) # seed ensures 
+	trials = get_perturb_on_mesh(P, 3268) # seed ensures results recovered
 
 	
 	if parallel #---- parallel evaluation ---#
 
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
-			get_data(get_psiH(theta, nk, k0, pert...), results)
+			get_data(MB.get_psiH(MBtime, nk, k0, pert...), results)
 
 		end # get_data contains 4 jobs  
 
@@ -1068,7 +856,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				data = get_data(get_psiH(theta, nk, k0, perturb0, ps), results)
+				data = get_data(MB.get_psiH(MBtime, nk, k0, perturb0, ps), results)
 	
 				set_results_two!(results, nk, k0, j, i, data)
 	
@@ -1100,7 +888,9 @@ prep_obs(::Nothing=nothing)::Vector{String} = String[]
 
 function prep_obs(obs::AbstractString)::Vector{String} 
 	
-	vcat(fn_nolegend(obs),fn_legend(obs),xxlabel())
+	fn_nolegend(obs) in calc_observables || return prep_obs() 
+
+	return vcat(fn_nolegend(obs),fn_legend(obs),xxlabel())
 
 end 
 
@@ -1176,22 +966,6 @@ function Read0(Obs_fname::Function,
 
 end 
 
-
-#function Read0(Obs_fname::Function,
-#												 observables::Union{AbstractString, 
-#																						<:AbstractVector{<:AbstractString}},
-#												 ::Nothing=nothing,
-#												 )::Dict{String,Any}
-#
-#	isempty(observables) && return Dict{String,Any}()
-#
-#	files_available = [split(fn,".")[1] for fn in cd(readdir, Obs_fname())]
-#
-#	filter!(f->any(t->occursin(t,f), vcat(observables)), files_available)
-#
-#	return ReadWrite.Read_PhysObs(Obs_fname, files_available, FILE_STORE_METHOD)
-#
-#end 
 
 
 

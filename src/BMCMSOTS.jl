@@ -40,11 +40,14 @@ const FILE_STORE_METHOD = "jld"
 
 include("Helpers.jl")
 
+include("WLO.jl") 
 
-include("WLO.jl")
 
 include("MB.jl")
 
+
+
+include("CalcWLO.jl")
 
 include("ChecksWLO.jl")
 

@@ -15,8 +15,8 @@ tasks = [
 	 ]
 
 
-ComputeTasks.missing_data(tasks[1]) 
+@assert ComputeTasks.missing_data(tasks[1])==0
 
-ComputeTasks.get_data_one(tasks[1], mute=false) 
+#ComputeTasks.get_data_one(tasks[1], mute=false) 
 
 myPlots.plot(tasks)
