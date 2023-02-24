@@ -223,8 +223,10 @@ function fn_nolegend(obs_leg::AbstractString)::String
 end  
 
 function islegend(obs::AbstractString)::Bool 
+	
+	s = "_legend" 
 
-	occursin("_legend",obs)
+	return length(obs)>length(s) && obs[end-length(s)+1:end]==s 
 
 end 
 
@@ -754,6 +756,39 @@ end
 #
 #---------------------------------------------------------------------------#
 
+
+prep_obs(::Nothing=nothing)::Vector{String} = String[]
+
+function prep_obs(obs::AbstractString)::Vector{String} 
+	
+	fn_nolegend(obs) in calc_observables || return prep_obs() 
+
+	return vcat(fn_nolegend(obs),fn_legend(obs),xxlabel())
+
+end 
+
+function prep_obs(obs::AbstractVector{<:AbstractString})::Vector{String} 
+
+	mapreduce(prep_obs, vcat, obs; init=prep_obs())
+
+end 
+
+function prep_obs(args...)::Vector{String} 
+	
+	mapreduce(prep_obs, vcat, args; init=prep_obs())
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+get_target = prep_obs ∘ Helpers.f_get_target(:observables)	   
+
 function Compute(P::UODict; get_fname=nothing, target=nothing,
 								 kwargs...)::Dict  
 
@@ -874,41 +909,8 @@ end
 
 
 
-#===========================================================================#
-#
-# adapted from 
-# /media/tudor/Tudor/Work/2020_Snake-states/SnakeStates/Helpers/GF.jl
-#
-# Minimally edited: prep_obs -> vcat 
-#
-#---------------------------------------------------------------------------#
 
 
-prep_obs(::Nothing=nothing)::Vector{String} = String[]
-
-function prep_obs(obs::AbstractString)::Vector{String} 
-	
-	fn_nolegend(obs) in calc_observables || return prep_obs() 
-
-	return vcat(fn_nolegend(obs),fn_legend(obs),xxlabel())
-
-end 
-
-function prep_obs(obs::AbstractVector{<:AbstractString})::Vector{String} 
-
-	mapreduce(prep_obs, vcat, obs; init=prep_obs())
-
-end 
-
-function prep_obs(args...)::Vector{String} 
-	
-	mapreduce(prep_obs, vcat, args; init=prep_obs())
-
-end 
-
-
-
-get_target = prep_obs ∘ Helpers.f_get_target(:observables)	   
 
 #===========================================================================#
 #
@@ -920,7 +922,8 @@ get_target = prep_obs ∘ Helpers.f_get_target(:observables)
 
 
 
-function FoundFiles(P; target=nothing, get_fname::Function, kwargs...)::Bool
+function FoundFiles(P::UODict; 
+										target=nothing, get_fname::Function, kwargs...)::Bool
 
 	FoundFiles0(get_fname(P), get_target(target; kwargs...))
 

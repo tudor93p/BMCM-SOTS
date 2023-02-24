@@ -17,7 +17,7 @@ using myLibs.ComputeTasks: CompTask
 import myPlots
 using myPlots: PlotTask 
 
-import ..ChecksWLO, ..Helpers 
+import ..ChecksWLO, ..Helpers, ..CalcWLO
 
 using ..Helpers.hParameters: Calculation  
 
@@ -140,7 +140,6 @@ function get_ylim(P::AbstractDict, args...)::Vector{Float64}
 end 
 
 
-
 #===========================================================================#
 #
 #
@@ -154,7 +153,9 @@ function f_extract_data_and_lab(P::AbstractDict; kwargs...)::Function
 													 )::Tuple{Tuple,Tuple}
 
 		(ChecksWLO.xxlabel(data),
-		 ChecksWLO.extract_data_and_lab(data, P["obs"], P["obs_group"], P["obs_i"];
+		 ChecksWLO.extract_data_and_lab(data, P["obs"], 
+																		get(P,"obs_group","-"), 
+																		get(P,"obs_i",1);
 																		kwargs...)
 		 )
 
@@ -162,6 +163,43 @@ function f_extract_data_and_lab(P::AbstractDict; kwargs...)::Function
 
 end 
 
+tex(lab::AbstractString)::String = "\$$lab\$"   
+
+function plotdict_WCC(P::AbstractDict, 
+											task::CompTask,
+											obs::AbstractString,
+											d::Int; 
+											)::Dict{String,Any}
+
+	data = task.get_data(P; fromPlot=true, mute=false, target=obs)  
+
+	ks,klabels = CalcWLO.xxlabel(data)
+
+	legend = data[CalcWLO.fn_legend(obs)] 
+
+	y0 = transpose(selectdim(data[obs],2,d))
+
+	ks ./= pi 
+
+	return Dict{String,Any}(
+
+					"xs"=> repeat(transpose(ks),outer=(size(y0,1),3)),
+
+					"ys"=> hcat(y0 .- 1, y0, y0 .+ 1),
+					
+					"labels" => map(tex, legend["sector"]),
+
+					"xlim"=> extrema(ks),
+
+					"ylim"=> (-0.7, 0.7),
+
+					"xlabel" => tex(klabels[d]*"/\\pi"),
+
+					"ylabel" => tex(legend["dir"][d]),
+
+					)
+
+end 
 
 function plotdict_checkzero(
 												 (x,xlabel)::Tuple{<:AbstractVector,<:AbstractString},
@@ -169,12 +207,13 @@ function plotdict_checkzero(
 													)::Tuple{<:AbstractVector{<:AbstractVector},
 																	 <:AbstractVector{<:String},
 																	 <:AbstractString},
-												 P::AbstractDict=Dict();
+												 P::AbstractDict;
 												 transf_lab::AbstractString="",
 												 kwargs...
 												 )::Dict{String,Any} 
 
-	Dict{String,Any}(
+
+	out = Dict{String,Any}(
 
 		"xs"=> [x for y=ys],
 
@@ -191,6 +230,10 @@ function plotdict_checkzero(
 		"xlabel" => xlabel,
 
 		)
+
+	ComputeTasks.add_line!(out, P, "perturb_strength", "x")
+
+	return out 
 
 end  
 
@@ -230,6 +273,44 @@ function plot_check_zero_multi(P::AbstractDict,
 end  
 
 
+function add_default_obs(observables::AbstractVector{<:AbstractString}
+												 )::Function 
+
+	P0 = Dict{String,Any}("obs"=>first(observables))
+
+	return function adjust_params(P::AbstractDict)::AbstractDict
+
+		(haskey(P,"obs") && in(P["obs"],observables)) ? P : merge(P,P0)
+
+	end 
+
+end  
+
+
+function get_dir1(P::AbstractDict)::Int 
+
+	min(2, get(P,"obs_i",1))  
+
+end 
+
+function get_dir2(P::AbstractDict)::Int 
+
+	3-get_dir1(P)
+
+end 
+
+
+function Wannier_gap_text(gap::Real)::String  
+
+	gap<1e-10 && return " (gap\$=0.0\$)"
+
+	gap = string(round(gap, digits=Int(ceil(-log10(gap)))+2))[1:min(end,6)]
+
+#	gap = rpad(gap, 6, "0")
+
+	return " (gap\$=$gap\$)"
+
+end 
 
 #===========================================================================#
 #
@@ -243,12 +324,14 @@ function CheckZero(init_dict::AbstractDict;
 	observables_ = intersect(observables, ChecksWLO.calc_observables)
 
 
+
 	task = CompTask(Calculation("Check zeros",
 															ChecksWLO, init_dict; 
 															observables=observables_, kwargs...))
 
+
 	function plot(P::AbstractDict)::Dict{String,Any} 
-		
+
 		plot_check_zero(P, task; 
 										transf_lab="\$\\log_{10}\$",
 										transf_data=apply_log10abs!
@@ -259,11 +342,69 @@ function CheckZero(init_dict::AbstractDict;
 	return PlotTask(task, 
 									[init_sliders_obs(observables_);
 									 [("obs_group", ChecksWLO.combs_groups()),	("ylim",)]], 
-									"Curves_yofx", plot)
-
+									"Curves_yofx", plot∘add_default_obs(observables_))
 end 
 
 
+#===========================================================================#
+#
+function WannierBands1(init_dict::AbstractDict;
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	obs = "WannierBands1"
+
+	observables_ = filter(==(obs), observables)
+
+	task = CompTask(Calculation("Wannier bands",
+															CalcWLO, init_dict; 
+															observables=observables_, kwargs...))
+
+
+	function plot(P::AbstractDict)::Dict{String,Any} 
+
+		out = plotdict_WCC(P,task,obs,get_dir1(P))
+
+		gap = Utils.reduce_dist_periodic(min, eachrow(out["ys"])..., 1)
+
+		out["ylabel"] *= 	Wannier_gap_text(gap)
+
+		return out 
+
+	end 
+
+
+	return PlotTask(task, ("obs_index", 2), "Scatter", plot,)
+end 
+
+#===========================================================================#
+#
+function WannierBands2(init_dict::AbstractDict;
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	obs = "WannierBands2"
+
+	observables_ = filter(==(obs), observables)
+
+	task = CompTask(Calculation("Nested Wannier bands",
+															CalcWLO, init_dict; 
+															observables=observables_, kwargs...))
+
+
+	function plot(P::AbstractDict)::Dict{String,Any} 
+
+		plotdict_WCC(P,task,obs,get_dir2(P))
+
+	end 
+
+
+	return PlotTask(task, ("obs_index",2), "Scatter", plot,)
+end 
 
 #===========================================================================#
 #
@@ -347,11 +488,25 @@ function CheckZero_atY(init_dict::AbstractDict;
 
 	task, out_dict, = ComputeTasks.init_multitask(C, [Y=>1], [1=>""])
 
-	P0 = Dict("obs_group"=>"-") 
+	P0 = Dict{String,Any}("obs_group"=>"-") 
+
+
+#		plot∘add_default_obs(observables_)∘Base.Fix1(merge,P0) 
 
 	function plot(P::AbstractDict)::Dict{String,Any} 
-		
-		plot_check_zero_multi(merge(P, P0), task, out_dict;
+
+		P1 = if haskey(P,"obs") && in(P["obs"],observables_)
+
+				copy(P)
+
+			else 
+
+				merge(P,Dict{String,Any}("obs"=>first(observables)))
+
+			end  
+
+
+		return plot_check_zero_multi(merge!(P1,P0), task, out_dict;
 										transf_lab="\$\\log_{10}\$",
 										transf_data=apply_log10abs!
 										)

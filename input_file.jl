@@ -56,7 +56,10 @@ input_checks  = Dict{Symbol,Any}(
 		),
   
 	:observables => ["D110","D111","D48","D30","D123","D125","D127a",
-									 "WannierGap","WannierBands1","WannierBands2"],
+									 "WannierGap",
+									 "WannierBands1",
+									 "WannierBands2",
+									 ],
 
 	
 )

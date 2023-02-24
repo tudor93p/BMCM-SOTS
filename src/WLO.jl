@@ -694,29 +694,66 @@ end
 
 
 		
-function get_kij(n::Int, k0::Real)::Function 
+function get_kij(n::Int, k0::Real; 
+								 restricted::Bool=true
+								)::Function 
+
+
+#
+#	function restrict_to_period(inds::T)::T where T<:Union{Tuple{Vararg{Int}}, <:AbstractVector{Int}}
+#
+#		for i in inds 
+#			@assert 1<=i<n
+#		end 
+#
+#		return inds 
+#
+#
+#	end 
+
 
 	dk = 2pi/(n-1)
 
-	function get_kij_(inds::Tuple{Vararg{Int,N}})::Vector{Float64} where N
+	function get_kij_(inds::Union{Tuple{Vararg{Int}},
+																			<:AbstractVector{Int}}
+													 )::Vector{Float64} 
 	
-		k = fill(2pi+k0+dk, N)
+		k = fill(2pi+k0+dk,length(inds))
 		
-		for i=1:N 
+		for (i,ind)=enumerate(inds)
 
-			@assert 1 <= inds[i] < n
+			restricted && @assert 1<=ind<n
 
-			k[i] -= dk*inds[i] 
+			k[i] -= dk*ind 
 
 		end 
 
 		return k 
 
-	end 
+	end  
+
 
 	get_kij_(inds::Int...)::Vector{Float64} = get_kij_(inds)
-	
-	return get_kij_
+
+	return get_kij_ 
+
+#	if restricted   
+#
+#		return function get_kij_(inds::Union{Tuple{Vararg{Int}}, <:AbstractVector{Int}}
+#														 )::Vector{Float64} 
+#			
+#			get_kij_unsafe_(restrict_to_period(inds))
+#	
+#		end  
+#
+#	end  
+#		
+#	return function get_kij_(inds::Union{Tuple{Vararg{Int}}, <:AbstractVector{Int}}
+#														 )::Vector{Float64} 
+#			
+#		get_kij_unsafe_(inds)
+#	
+#	end  
 
 end  
 

@@ -5,11 +5,14 @@ import BMCMSOTS
 
 include("input_file.jl")
 
-task = init(BMCMSOTS,:CheckZero) 
+tasks = [
+				 init(BMCMSOTS,:CheckZero),
+				 init(BMCMSOTS,:WannierBands2),
+				 ]
 
 
-ComputeTasks.missing_data(task)
-ComputeTasks.get_data_one(task, mute=false) 
+ComputeTasks.missing_data.(tasks)
+ComputeTasks.get_data_one.(tasks, mute=false) 
 
 
 
@@ -19,7 +22,7 @@ ComputeTasks.get_data_one(task, mute=false)
 
 if occursin("y",lowercase(readline(stdin))) 
 
-	ComputeTasks.get_data_all(task, mute=false) 
+	ComputeTasks.get_data_all.(tasks, mute=false) 
 
 end 
 
