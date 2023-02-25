@@ -20,26 +20,29 @@ const quantized_wcc2_values = [0,0.5]
 #---------------------------------------------------------------------------#
 
 
-function dispersion((kx,ky))
+function dispersion((kx,ky)::AbstractVector{<:Real})::Float64
 
 	1 - cos(kx) - cos(ky)
 
 end 
 
 
-function Delta((kx,ky),sigma)
+function Delta((kx,ky)::AbstractVector{<:Real},
+							 sigma::Real)::ComplexF64
 
 	sigma*sin(kx) - im*sin(ky) 
 
 end 
 
-function singlet((s0,sx,sy),(kx,ky))
+function singlet((s0,sx,sy)::AbstractVector{<:Real},
+								 (kx,ky)::AbstractVector{<:Real})::Float64
 
 	s0 + sx*cos(kx) + sy*cos(ky)
 
 end 
 
-function complex_b((bx,by),sigma)
+function complex_b((bx,by)::AbstractVector{<:Real},
+									 sigma::Real)::ComplexF64
 
 	bx + sigma*im*by 
 
@@ -57,11 +60,11 @@ function H(k::AbstractVector{<:Real},
 	
 	Dm = Delta(k,-1)
 	
-	bp = complex_b(bs[1:2],1)
+	bp = complex_b(view(bs,1:2),1)
 	
-	bm = complex_b(bs[1:2],-1)
+	bm = complex_b(view(bs, 1:2),-1)
 
-	sk = singlet(bs[3:5], k)
+	sk = singlet(view(bs, 3:5), k)
 
 
 	return [[xi bm Dp sk];

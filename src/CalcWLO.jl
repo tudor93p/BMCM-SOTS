@@ -433,10 +433,12 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function check_nu_k_dep(nu::AbstractMatrix{<:Real},
+function check_nu_k_dep(nu::AbstractMatrix{T},
 												d::Int;
 												atol::Float64=1e-10
-												)
+												)::Tuple{Bool,<:AbstractVector{T}} where T<:Real 
+
+	out = true 
 
 	for i=2:size(nu,d) 
 
@@ -451,10 +453,13 @@ function check_nu_k_dep(nu::AbstractMatrix{<:Real},
 
 		@show Utils.reduce_dist_periodic(max, selectdim(nu,3-d,i), selectdim(nu,3-d,1), 1)
 
+		out=false 
 #		break 
 
 	end  
- 
+
+	return (out,selectdim(nu,d,1))
+
 end 
 
 
