@@ -69,7 +69,7 @@ function inversion(k::NTuple{N,Int}, rev::Function)::NTuple{N,Int} where N
 
 end   
 
-function inversion!(k::AbstractVector{T})::Vector{T} where T<:Real 
+function inversion!(k::AbstractVector{T})::AbstractVector{T} where T<:Real 
 
 	k .*= -1 
 
@@ -79,14 +79,14 @@ end
 
 function rotationC2(k::AbstractVector{T}, d::Int)::Vector{T} where T<:Real 
 
-	[d==i ? -ki : ki for (i,ki)=enumerate(k)]
+	[d==i ? ki : -ki for (i,ki)=enumerate(k)]
 
 end 
 
 function rotationC2(k::NTuple{N,Int}, d::Int, rev::Function
 										)::NTuple{N,Int} where N 
 
-	Tuple(d==i ? rev(ki) : ki for (i,ki)=enumerate(k))
+	Tuple(d==i ? ki : rev(ki) for (i,ki)=enumerate(k))
 
 end 
 
@@ -199,9 +199,6 @@ function has_symm(op::Function, A::AbstractMatrix, B::AbstractMatrix=A;
 	isapprox(A,op(B),atol=atol)
 
 end   
-
-
-
 
 
 

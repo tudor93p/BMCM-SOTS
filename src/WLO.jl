@@ -5,7 +5,7 @@ import LinearAlgebra, Statistics
 
 import myLibs:Utils,SignalProcessing 
 
-import ..Helpers: PeriodicFuns 
+import ..Helpers: PeriodicFuns, Symmetries 
 
 
 
@@ -322,11 +322,11 @@ end
 
 
 
-function init_occup(args...)
-
-	init_eigH(args...; halfspace=true)
-
-end 
+#function init_occup(args...)
+#
+#	init_eigH(args...; halfspace=true)
+#
+#end 
 
 function init_eigH(k::AbstractVector, H::Function, data...; kwargs...) 
 
@@ -408,21 +408,36 @@ end
 #
 #end   
 
-function eigH!(storage, ij::NTuple{2,Int}, kij::Function, 
-							 perturb::AbstractArray{ComplexF64,4},
+#function eigH!(storage, ij::NTuple{2,Int}, get_k::Function, 
+#							 perturb::AbstractArray{ComplexF64,4},
+#							 Hdata...; kwargs...)::Nothing 
+#
+#	eigH!(storage, get_k(ij), Hdata..., select_mesh_point(perturb, ij);
+#				kwargs...) 
+#
+#
+#end   
+
+function eigH!(storage, 
+							 ij_or_k::Union{AbstractVector{<:Real}, Tuple{Vararg{<:Real}}},
+							 H::Function,
+							 #ij::NTuple{2,Int}, get_k::Function, perturb::AbstractArray{ComplexF64,4},
 							 Hdata...; kwargs...)::Nothing 
 
-	eigH!(storage, kij(ij), Hdata..., select_mesh_point(perturb, ij);
-				kwargs...)
+	eigH!!(storage, H(ij_or_k, Hdata...); kwargs...) 
 
-end  
 
-function eigH!(storage, k::AbstractVector{<:Real}, H::Function, Hdata...;
-														kwargs...)::Nothing 
+end   
 
-	eigH!!(storage, H(k, Hdata...); kwargs...)
+#tuple, H, get_k 
 
-end  
+
+#function eigH!(storage, k::AbstractVector{<:Real}, H::Function, Hdata...;
+#														kwargs...)::Nothing 
+#
+#	eigH!!(storage, H(k, Hdata...); kwargs...)
+#
+#end  
 
 
 
@@ -665,7 +680,7 @@ function check_kMirror_possible(n::Int, k0::Real)::Int
 
 	end  
 
-	return m1 
+	return Utils.reduce_index(m1,n-1)
 
 end 
 
@@ -679,6 +694,9 @@ function uniqueInds_kMirror(n::Int, k0::Real)::Vector{Int}
 #	start = div(m,2) + isodd(m)
 #out = Utils.reduce_index.(start+1:start+nr, n-1)
 
+#	@show start=div(m,2)+1+isodd(m)
+#	@show div(n,2)+iseven(m)*isodd(n)
+#
 	out = range(start=div(m,2)+1+isodd(m),length=div(n,2)+iseven(m)*isodd(n))
 
 	return sort!(Utils.reduce_index.(out,n-1))
@@ -816,6 +834,7 @@ function select_mesh_point(data::AbstractArray{T,M},
 	selectdim(selectdim(data,M,j),M-1,i)
 
 end  
+
 function select_mesh_point(data::AbstractArray{T,M},
 													 (i,j)::NTuple{2,Int}
 													 )::AbstractArray{T,M-2} where {T<:Number,M}
@@ -823,6 +842,16 @@ function select_mesh_point(data::AbstractArray{T,M},
 	select_mesh_point(data, i, j)
 
 end 
+
+function select_mesh_point(get_data::Function, 
+													 i_or_ij::Union{Int, NTuple{2,Int}},
+													 j_or_none::Int...
+													 )::AbstractArray
+
+	get_data(i_or_ij, j_or_none...)
+
+end 
+
 
 function select_mesh_point(data::Union{<:AbstractArray{<:AbstractArray},
 																			 <:Tuple{Vararg{<:AbstractArray}}},
@@ -833,6 +862,14 @@ function select_mesh_point(data::Union{<:AbstractArray{<:AbstractArray},
 
 end 
 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -909,9 +946,9 @@ end
 #---------------------------------------------------------------------------#
 
 function init_storage(item1::AbstractArray{T,N}, n::Int; kwargs...
-											)::Array{T,N+2} where T<:Number where N
+											)::AbstractArray{T,N+2} where T<:Number where N
 
-	repeat(item1, ones(Int, N)..., n-1, n-1)
+	repeat(zero(item1), ones(Int, N)..., n-1, n-1)
 
 end 
 
@@ -926,11 +963,12 @@ end
 
 function store_on_mesh(get_one::Function, 
 												source::AbstractArray{<:Number},
-											 data...
+											 data...; kwargs...
 												)
 
 
-	store_on_mesh(get_one, nr_kPoints_from_mesh(source), source, data...)
+	store_on_mesh(get_one, nr_kPoints_from_mesh(source), source, data...;
+								kwargs...)
 
 end   
 
@@ -961,11 +999,11 @@ function store_on_mesh!(get_one::Function,
 																		NTuple{N, <:AbstractArray} where N,
 																		},
 												dest::AbstractArray,
-												data...
+												data...; kwargs...
 												)::Nothing  
 
 	store_on_mesh!(get_one, nr_kPoints_from_mesh(dest), 
-								 source, dest, data...)
+								 source, dest, data...; kwargs...)
 
 end 
 
@@ -975,12 +1013,12 @@ function store_on_mesh!(get_one::Function,
 																		NTuple{N, <:AbstractArray} where N,
 																		},
 												dest::AbstractArray,
-												data...
+												data...; kwargs...
 												)::Nothing 
 
 	for j=1:n-1, i=1:n-1
 
-		store_on_mesh_one!(get_one, source, i, j, dest, data...)
+		store_on_mesh_one!(get_one, source, i, j, dest, data...; kwargs...)
 
 	end 
 
@@ -1105,6 +1143,13 @@ end
 #---------------------------------------------------------------------------#
 
 
+function get_item_ij(ij::Union{AbstractVector{Int}, NTuple{2,Int}},
+										 get_item_::Function,
+										 )::AbstractArray
+
+	get_item_(ij) 
+
+end 
 
 function get_item_ij((i,j)::Union{AbstractVector{Int},
 																	Tuple{Int,Int}},
@@ -1245,26 +1290,145 @@ function psiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
 	store_on_mesh!!(eigH!, kij, Bloch_WFs, H, Hdata...; kwargs...)
 
 	return Bloch_WFs 
+##
+#	store_on_mesh!!(eigH!, source=kij, dest=Bloch_WFs,  H, Hdata...) 
+#	Hdata = (bs,)
+#
+#	store_one!!(eigH!, source=kij, i, j, dest=Bloch_WFs, H, Hdata...)
+#
+#	get_one_wrapper!(Bloch_WFs[i,j], eigH!, kij, i, j, H, Hdata...)
+#
+#	eigH!(Bloch_WFs[i,j], k, H, Hdata...)
+#
+# eigH(Bloch_WFs[i,j], H(k, Hdata...); kwargs...) OK 
+ 
+##
 
 end 
 
 
 function psiH_on_mesh(n::Int, k0::Real, 
 											perturb::AbstractArray{ComplexF64,4},
-											Hdata...; kwargs...
+											H::Function, Hdata...; kwargs...
 											)::Array{ComplexF64,4}
 
 	kij = get_kij(n,k0)  
 
-	Bloch_WFs = init_storage(init_eigH(kij, Hdata...; kwargs...)[1], n; 
+	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; 
 													 kwargs...)
 
-	store_on_mesh!!(eigH!, tuple, Bloch_WFs, kij, perturb, Hdata...; kwargs...)
+	store_on_mesh!!(eigH!, tuple, Bloch_WFs, H, kij, perturb, Hdata...; 
+									kwargs...)
+
+##
+#	store_on_mesh!!(eigH!, source=tuple, dest=Bloch_WFs,  rest...)
+#	rest= (H,kij,perturb,Hdata...)
+#	Hdata = (bs,pert_strength)
+#
+#	store_one!!(eigh!, source=tuple, i, j, dest=Bloch_WFs, rest...)
+#
+#	get_one_wrapper!(Bloch_WFs[i,j], eigH!, tuple, i, j, rest...)
+#
+#	eigH!(Bloch_WFs[i,j], (i,j), rest...) 
+#	
+#	eigH!(Bloch_WFs[i,j], (i,j), H, rest...) 
+#	rest= (kij,perturb,Hdata...)
+#
+# eigH(Bloch_WFs[i,j], H(ij, rest...); kwargs...)
+#
+# H(ij, kij, perturb, bs, pert_strength)
+#
+##
 
 	return Bloch_WFs 
 
 end 
 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function has_symm_on_mesh_one(ij::NTuple{2,Int},
+															repres::NTuple{2,Function}, 
+															A::AbstractArray{ComplexF64,4};
+															kwargs...
+															)::BitVector  
+
+	has_symm_on_mesh_one(ij,  repres, get_item_ij, A; kwargs...)
+							
+end  
+
+function has_symm_on_mesh_one(ij::NTuple{2,Int},
+															(op,fij)::NTuple{2,Function}, 
+															# act on H and k spaces, respectively
+															get_array::Function,
+															data...; kwargs...
+															)::BitVector  
+
+	BitVector((Symmetries.has_symm(op, 
+																 get_array(ij, data...), 
+																get_array(fij(ij), data...);
+																kwargs...),
+						 ))
+							
+end  
+
+
+
+function has_symm_on_mesh(n::Int, k0::Real, # k0 not used 
+													symm::NTuple{2,Function},
+													A::AbstractArray;
+													kwargs...
+													)::BitArray{3}
+
+	store_on_mesh(has_symm_on_mesh_one, n, tuple, symm, A; kwargs...)
+
+
+end 
+
+
+function has_symm_on_mesh(n::Int, k0::Real, symm::NTuple{2,Function},
+													H::Function, args...; kwargs...
+													)::BitArray{3}
+
+	store_on_mesh(has_symm_on_mesh_one, 
+								n, tuple, symm, H, get_kij(n,k0), args...;
+								kwargs...)
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function symmetrize_on_mesh!(A::AbstractArray{ComplexF64,4},
+														 inds::Union{Int,Tuple{<:AbstractVector{Int},
+																									 <:AbstractVector{Int}}},
+														 (op,fij)::NTuple{2,Function}; # symm;
+														 kwargs...
+														 )::Nothing
+
+	store_on_mesh!!(symmetrize_on_mesh_one!, inds, fij, A, A, op;
+								 kwargs...)
+
+end 
+
+function symmetrize_on_mesh_one!(Aij::AbstractMatrix{ComplexF64},
+									opij::NTuple{2,Int}, 
+									seed::AbstractArray{<:Number,4},
+									op::Function; kwargs...)::Nothing
+
+	Symmetries.symmetrize!!(Aij, select_mesh_point(seed, opij), op;
+													kwargs...)
+
+end 
 
 
 
@@ -1376,7 +1540,7 @@ function Wannier_subspaces_on_mesh(W::AbstractArray)
 
 end  
 
-function Wannier_subspaces_on_mesh_loseW(W::AbstractArray)
+function Wannier_subspaces_on_mesh!(W::AbstractArray)
 
 	Wij = get_item_ij(W)
 
@@ -1946,7 +2110,7 @@ function get_wlo_data_mesh(psiH::AbstractArray{ComplexF64,4},
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
-	eigW1 = Wannier_subspaces_on_mesh_loseW(wlo1_on_mesh(dir1, psi))
+	eigW1 = Wannier_subspaces_on_mesh!(wlo1_on_mesh(dir1, psi))
 
 	if get_wlo2 
 

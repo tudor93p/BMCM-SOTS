@@ -1,4 +1,6 @@
-import JLD, OrderedCollections, Combinatorics
+import JLD, OrderedCollections, Combinatorics 
+
+import myLibs: Utils 
 
 
 
@@ -17,19 +19,22 @@ input_checks  = Dict{Symbol,Any}(
 
 		braiding_time = [1/4],
 					
-		nr_kPoints = 10:20:90,
+		nr_kPoints = 10:20:70,
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = ["None"; join.(Combinatorics.powerset(["Mx", "Ct", "TC2y", "Tt"],1,2),"+"); "All"],  
+		preserved_symmetries = ["None"; join.(Combinatorics.powerset(["Mx", "Ct", "Tt"],1,2),"+"); "All"],  
 
-		nr_perturb_strength = [25],
+		nr_perturb_strength = [8],
 		
-		max_perturb_strength = [0.8],
+		max_perturb_strength = [0.6],
 
-		nr_perturb_instances = [8],
+		nr_perturb_instances = [1],
 
-		perturb_strength = 0:0.2:0.8,
+#		perturb_strength = 0:0.2:0.8,
+		
+		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true),
+														 0.4:0.2:0.6),
 
   		), 
 
@@ -50,7 +55,7 @@ input_checks  = Dict{Symbol,Any}(
 
 			nr_perturb_instances = (2,0),
 			
-			perturb_strength = (1,2),
+			perturb_strength = (1,3),
 
 
 		),

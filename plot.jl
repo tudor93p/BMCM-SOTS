@@ -6,17 +6,23 @@ import BMCMSOTS, myPlots
 include("input_file.jl")
 
 tasks = [
-	init(BMCMSOTS,:CheckZero),
-	init(BMCMSOTS,:CheckZero_atY; Y=:preserved_symmetries),
-	init(BMCMSOTS,:CheckZero_atY; Y=:nr_kPoints),
+#	init(BMCMSOTS,:CheckZero_atY; Y=:preserved_symmetries),
+#	init(BMCMSOTS,:CheckZero_atY; Y=:nr_kPoints),
+init(BMCMSOTS,:WannierBands2),
+init(BMCMSOTS,:CheckZero),
+	init(BMCMSOTS,:WannierBands1),
 	init(BMCMSOTS,:WannierGap),
-	init(BMCMSOTS,:WannierGap_atY; Y=:preserved_symmetries),
-	init(BMCMSOTS,:WannierGap_atY; Y=:nr_kPoints),
+#	init(BMCMSOTS,:WannierGap_atY; Y=:preserved_symmetries),
+#	init(BMCMSOTS,:WannierGap_atY; Y=:nr_kPoints),
 	 ]
 
 
-@assert ComputeTasks.missing_data(tasks[1])==0
+for t in tasks[2:2]
+#	@assert ComputeTasks.missing_data(t)==0
+end 
 
-#ComputeTasks.get_data_one(tasks[1], mute=false) 
+for t in tasks[1:2]
+	ComputeTasks.get_data_one(t, mute=false) 
+end 
 
 myPlots.plot(tasks)

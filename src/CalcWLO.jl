@@ -2,7 +2,8 @@ module CalcWLO
 #############################################################################
 
 using Distributed 
-import Random, LinearAlgebra
+import Random, LinearAlgebra, Statistics, Combinatorics
+
 using OrderedCollections: OrderedDict 
 
 import myLibs: ReadWrite, Utils
@@ -212,7 +213,7 @@ function ylabels(obs::AbstractString, legend::AbstractString
 		obs[end]=='1' && return ["\\overline{x}","\\overline{y}"]
 
 #		obs[end]=='2' && return ["\\tilde{\\nu}_x","\\tilde{\\nu}_y"]
-		obs[end]=='2' && return ["\\overline{x}'","\\overline{y}'"]
+		obs[end]=='2' && return ["\\overline{x}_y","\\overline{y}_x"]
 
 	end 
 	
@@ -295,14 +296,18 @@ end
 #
 #
 #---------------------------------------------------------------------------#
-function symmetrize_on_mesh_one!(Aij::AbstractMatrix{ComplexF64},
-									opij::NTuple{2,Int}, 
-									seed::AbstractArray{<:Number,4},
-									op::Function; kwargs...)::Nothing
 
-	Symmetries.symmetrize!!(Aij, WLO.select_mesh_point(seed, opij), op)
 
-end 
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 function symmetrize_on_mesh(seed::AbstractArray{ComplexF64,4},
@@ -318,23 +323,6 @@ function symmetrize_on_mesh(seed::AbstractArray{ComplexF64,4},
 end  
 
 
-function symmetrize_on_mesh!(
-														 A::AbstractArray{ComplexF64,4},
-														 opers::AbstractString,
-														 n::Int, k0::Real,
-														 )::Nothing 
-
-	for op in MB.sepSymmString(opers)
-
-		WLO.store_on_mesh!!(symmetrize_on_mesh_one!,
-									MB.getOp_uniqueInds(op,n,k0),
-									MB.getOp_fij(op,n,k0),
-									A, A, 
-									MB.getOpFun(op),
-									) 
-	end 
-
-end  
 
 
 function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4}, 
@@ -342,7 +330,7 @@ function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4},
 
 	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
 
-	symmetrize_on_mesh!(pert, args...)
+	MB.symmetrize_on_mesh!(pert, args...)
 
 	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
 
@@ -387,12 +375,11 @@ function get_perturb_on_mesh(
 											P::UODict, args...
 										 )::Array{ComplexF64,4}
 
-
 	get_perturb_on_mesh(preserved_symmetries(P), 
 											nr_kPoints(P),
 											kPoint_start(P),
 											args... 
-											) #.*= perturb_strength(P)
+											) 
 
 end 
 
@@ -470,6 +457,8 @@ function check_nu_k_dep(nu::AbstractMatrix{<:Real},
  
 end 
 
+
+
 function cp_wcc_to_results(results::AbstractDict{<:AbstractString,<:Any},
 													obs::AbstractString,
 													wccs::Union{Tuple{<:T,<:T}, AbstractVector{<:T}
@@ -493,7 +482,9 @@ function cp_wcc_to_results(results::AbstractDict{<:AbstractString,<:Any},
 
 	end # sector  
 
-end 
+end  
+
+
 
 #===========================================================================#
 #
@@ -597,21 +588,15 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
 	strength = perturb_strength(P)
-	parallel=nprocs()>=4
+	#parallel=nprocs()>=2 # nothing to do in parallel...
 
 	results = init_results(nk, k0, get_target(target; kwargs...))
 
-#	all(isauxfile, keys(results)) && return results
-
-
-	perturb1 = get_perturb_on_mesh(P,3268) # strength 1 so far, seed given
-
+	perturb1 = get_perturb_on_mesh(P,3268) 
 
 	psi = MB.get_psiH(MBtime, nk, k0, perturb1, strength)
 
-	data = get_data(psi, results) 
-
-	set_results_two!(results, nk, k0, data) 
+	set_results_two!(results, nk, k0, get_data(psi, results))
 
 
 	return results

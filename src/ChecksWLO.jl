@@ -91,37 +91,6 @@ end
 
 
 
-function has_symm_on_mesh_one(ij::NTuple{2,Int},
-															A::AbstractArray{ComplexF64,4},
-															op::Function,
-															fij::Function
-															)::BitVector  
-
-	[Symmetries.has_symm(op, 
-											WLO.select_mesh_point(A, ij), 
-											WLO.select_mesh_point(A, fij(ij))
-											)]
-							
-end 
-
-function has_symm_on_mesh(
-														 A::AbstractArray{ComplexF64,4},
-														 opers_::AbstractString,
-														 n::Int, k0::Real,
-														 )::Array{Bool}
-
-	mapreduce(.|, MB.sepSymmString(opers_)) do op 
-
-		WLO.store_on_mesh(has_symm_on_mesh_one, n, tuple, A, 
-									MB.getOpFun(op),
-									MB.getOp_fij(op,n,k0),
-									)
-
-	end 
-
-end  
-
-
 
 #===========================================================================#
 #
@@ -722,15 +691,10 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 		
 	if haskey(results,"D48")
 
-#			SignalProcessing.run_m1!(results["D48"], trial,
-#									abs.(WLO.wcc_stat_axpy!(-1,nus2pm...)),
-#								 i_ps,dir1,:)
-# nus2pm[2] has been overwritten
-################## !!!!!!!!!!!!!!!!!!!!!! incorrectly implemented  
-# desired: separate comparison to zero 
-#
-	for sector in 1:2 
+		for sector in 1:2 
 
+#nu_y recoreded at dir1==1=x
+#nu_x recoreded at dir1==2=y
 
 			SignalProcessing.run_m1!(results["D48"], trial,
 									abs.(WLO.wcc_stat!(view(nus2pm[sector],:),
@@ -739,7 +703,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 # nus2pm overwritten 
 
-	end 
+		end 
 
 #
 	end 

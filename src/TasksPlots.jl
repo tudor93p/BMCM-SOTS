@@ -17,7 +17,7 @@ using myLibs.ComputeTasks: CompTask
 import myPlots
 using myPlots: PlotTask 
 
-import ..ChecksWLO, ..Helpers, ..CalcWLO
+import ..ChecksWLO, ..Helpers, ..CalcWLO, ..WLO 
 
 using ..Helpers.hParameters: Calculation  
 
@@ -179,6 +179,9 @@ function plotdict_WCC(P::AbstractDict,
 
 	y0 = transpose(selectdim(data[obs],2,d))
 
+	yave = WLO.wcc_stat!(sum(eachrow(y0)),[0,0.5])[1] 
+
+
 	ks ./= pi 
 
 	return Dict{String,Any}(
@@ -196,6 +199,8 @@ function plotdict_WCC(P::AbstractDict,
 					"xlabel" => tex(klabels[d]*"/\\pi"),
 
 					"ylabel" => tex(legend["dir"][d]),
+		
+					"yline" => Utils.closest_periodic_b(yave,[0,0.5],1),
 
 					)
 
@@ -300,17 +305,39 @@ function get_dir2(P::AbstractDict)::Int
 end 
 
 
+function nr2str(x::Real,n::Int=3; fixedsize::Bool=true)::String 
+		
+	d = Int(n-ceil(log10(abs(x))))
+
+	s = string(round(x, digits=d))[1:min(end,d+n)]
+
+	return fixedsize ? rpad(s,d+n-1,'0') : s
+
+end 
+	
+
 function Wannier_gap_text(gap::Real)::String  
 
 	gap<1e-10 && return " (gap\$=0.0\$)"
 
-	gap = string(round(gap, digits=Int(ceil(-log10(gap)))+2))[1:min(end,6)]
+	gap = nr2str(gap, 3)[1:min(end,5)]
 
-#	gap = rpad(gap, 6, "0")
-
-	return " (gap\$=$gap\$)"
+	return "(gap\$=$gap\$)"
 
 end 
+
+function wcc_stat_text(stat::AbstractVector{<:Real})::String  
+
+	wcc_stat_text(nr2str.(stat, 3))
+
+end  
+
+function wcc_stat_text(stat::AbstractVector{<:AbstractString})::String  
+
+	tex("("* join(stat,",")*")")
+
+end 
+
 
 #===========================================================================#
 #
@@ -369,7 +396,7 @@ function WannierBands1(init_dict::AbstractDict;
 
 		gap = Utils.reduce_dist_periodic(min, eachrow(out["ys"])..., 1)
 
-		out["ylabel"] *= 	Wannier_gap_text(gap)
+		out["ylabel"] *= " "*Wannier_gap_text(gap)
 
 		return out 
 
@@ -398,7 +425,24 @@ function WannierBands2(init_dict::AbstractDict;
 
 	function plot(P::AbstractDict)::Dict{String,Any} 
 
-		plotdict_WCC(P,task,obs,get_dir2(P))
+		out = plotdict_WCC(P,task,obs,get_dir2(P))
+
+		for i=1:2 
+
+			stat = -apply_log10abs(WLO.wcc_stat(selectdim(out["ys"],1,i), [0,0.5]))
+
+			out["labels"][i] *= " " * wcc_stat_text(stat)
+
+		end  
+
+
+
+
+		out["ylabel"] *= ",  L:\$-\\log_{10}\$" * wcc_stat_text(["\\mu","\\sigma"])
+	
+		out["ylabel"] *= "="*wcc_stat_text(-apply_log10abs(WLO.wcc_stat!(sum(eachrow(out["ys"])),[0,0.5])))
+
+		return out 
 
 	end 
 

@@ -9,6 +9,7 @@ for fn in [
 
 #"periodic_funs",
 
+#"symms",
 
 "wlos",
 

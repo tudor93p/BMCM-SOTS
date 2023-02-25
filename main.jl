@@ -6,7 +6,7 @@ import BMCMSOTS
 include("input_file.jl")
 
 tasks = [
-				 init(BMCMSOTS,:CheckZero),
+#				 init(BMCMSOTS,:CheckZero),
 				 init(BMCMSOTS,:WannierBands2),
 				 ]
 
@@ -18,11 +18,9 @@ ComputeTasks.get_data_one.(tasks, mute=false)
 
 @info "Preparations finished. Proceed to calculations? y/n" 
 
-
-
 if occursin("y",lowercase(readline(stdin))) 
 
-	ComputeTasks.get_data_all.(tasks, mute=false) 
+	ComputeTasks.get_data_all.(tasks, shuffle=true, mute=false) 
 
 end 
 

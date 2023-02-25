@@ -84,13 +84,41 @@ end
 
 function H(k::AbstractVector{<:Real},
 					 bs::AbstractVector{<:Real},
-					 pstrength::Real,
-					 perturb0::AbstractMatrix{<:Number},
+					 pstrength::Real, 
+					 perturb0::AbstractMatrix{<:Number}, 
 					 )::Matrix{ComplexF64}
 
 	LinearAlgebra.axpy!(pstrength, perturb0, H(k,bs))
 
 end  
+
+
+function H(ij::NTuple{2,Int},
+						kpoint::Union{Function,<:AbstractArray{<:Real,4}},
+						perturb::Union{Function,<:AbstractArray{<:Number,4}},
+						args...
+					 )::Matrix{ComplexF64}
+
+	H(WLO.get_item_ij(ij, kpoint), args..., WLO.get_item_ij(ij, perturb))
+
+end 
+
+function H(ij::NTuple{2,Int},
+						kpoint::Union{Function,<:AbstractArray{<:Real,4}},
+						bs::AbstractVector{<:Real},
+					 )::Matrix{ComplexF64}
+
+	H(WLO.get_item_ij(ij, kpoint), bs)
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 function get_s_param_from_b(b::Real,bp::Real)::Float64 
@@ -133,25 +161,187 @@ braiding_theta(P::UODict)::Float64 = braiding_theta(braiding_time(P))
 
 
 
-function get_psiH(MBtime::Real, n::Int, k0::Real)::Array{ComplexF64,4}
-
-	WLO.psiH_on_mesh(n, k0, H,  bsss_cycle(braiding_theta(MBtime)))
-
-end 
-
-function get_psiH(MBtime::Real, n::Int, k0::Real, 
-									perturb0::AbstractArray{ComplexF64,4},
-									strength::Real,
-											)::Array{ComplexF64,4}
-
-	iszero(strength) && return get_psiH(MBtime, n, k0)
+function get_pertHdata(MBtime::Real; kwargs...
+							 )
 	
-	return WLO.psiH_on_mesh(n, k0, perturb0, 
-													H,  bsss_cycle(braiding_theta(MBtime)),
-													strength,
-													)
+	(bsss_cycle(braiding_theta(MBtime)),)
 
 end 
+
+function get_pertHdata(MBtime::Real, h::Function; kwargs...
+							 )
+	
+	(h, get_pertHdata(MBtime)...)
+
+end 
+
+function get_pertHdata(MBtime::Real, p::AbstractArray; kwargs...
+							 )
+	
+	(p, get_pertHdata(MBtime)...)
+
+end 
+
+function get_pertHdata(MBtime::Real, h::Function, p::AbstractArray; kwargs...
+							 )
+	
+	(p, get_pertHdata(MBtime, h)...)
+
+end 
+
+function get_pertHdata(MBtime::Real, p::AbstractArray, s::Real;
+							 atol::Float64=1e-12
+							 )
+
+	isapprox(s,0,atol=atol) && return get_pertHdata(MBtime)  
+
+	isapprox(s,1,atol=atol) && return get_pertHdata(MBtime, p)
+
+	return (get_pertHdata(MBtime, p)..., s)
+
+end 
+
+
+function get_pertHdata(MBtime::Real, h::Function, p::AbstractArray, s::Real;
+							 atol::Float64=1e-12
+							 )
+
+	isapprox(s,0,atol=atol) && return get_pertHdata(MBtime, h) 
+
+	isapprox(s,1,atol=atol) && return get_pertHdata(MBtime, h, p)
+	
+	return (get_pertHdata(MBtime, h, p)..., s) 
+
+end 
+
+#t,h,p,s 
+#t,h,p
+#t,h
+#t
+#
+#t,p,s 
+#t,p,
+#t
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+function get_psiH(MBtime::Real, n::Int, k0::Real, args...;
+									atol::Float64=1e-12
+								 )::Array{ComplexF64,4}
+
+	WLO.psiH_on_mesh(n, k0, get_pertHdata(MBtime, H, args...; atol=atol)...)
+
+end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+function has_symm_on_mesh_(single_oper::AbstractString, 
+													 n::Int, k0::Real, args...; kwargs...
+													 )::BitArray{3}
+
+	WLO.has_symm_on_mesh(
+									n,k0,
+									(getOpFun(single_oper), getOp_fij(single_oper,n,k0)),
+									args...; kwargs...
+									)
+
+end  
+
+
+
+
+
+
+
+
+
+
+function has_symm_on_mesh(opers_::AbstractString, args...; kwargs...
+												 )::BitArray{3}
+
+	opers = sepSymmString(opers_) 
+
+	@assert !isempty(opers)
+
+	op1, op2e = Base.Iterators.peel(opers)
+
+	S = has_symm_on_mesh_(op1, args...; kwargs...)
+
+	for op in op2e 
+
+		S .&= has_symm_on_mesh_(op, args...; kwargs...)
+
+	end 
+
+	return S 
+
+end  
+
+
+
+
+function has_symm_on_mesh(Hamilt_mesh::AbstractArray{<:Number,4},
+													args::Vararg{Any,3}; kwargs...
+													)::BitArray{3}
+
+	has_symm_on_mesh(args..., Hamilt_mesh; kwargs...)
+
+end  
+
+function has_symm_on_mesh(MBtime::Real, 
+													symm::AbstractString, n::Int, k0::Real,
+													args...;
+													kwargs...
+#													atol::Float64=1e-12
+													)::BitArray{3}
+
+	has_symm_on_mesh(symm, n, k0, H, 
+									 get_pertHdata(MBtime, args...; atol=1e-10)...;
+									 kwargs...)
+													
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function symmetrize_on_mesh!(
+														 A::AbstractArray{ComplexF64,4},
+														 opers::AbstractString,
+														 n::Int, k0::Real,
+														 )::Nothing 
+
+	for op in sepSymmString(opers)
+
+		WLO.symmetrize_on_mesh!(A,
+														getOp_uniqueInds(op,n,k0),
+														(getOpFun(op), getOp_fij(op,n,k0)),
+														)
+
+	end  
+
+
+end  
+
+
+
 
 
 
@@ -595,9 +785,7 @@ end
 
 function operTC2y(k::AbstractVector)::Vector
 
-	out = Symmetries.inversion!(Symmetries.rotationC2(k,2))
-	@assert out ==k .* [1,-1]
-	return out 
+	Symmetries.inversion!(Symmetries.rotationC2(k,2))
 
 end  
 
