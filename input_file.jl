@@ -23,7 +23,7 @@ input_checks  = Dict{Symbol,Any}(
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = ["None"; join.(Combinatorics.powerset(["Mx", "Ct", "Tt"],1,2),"+"); "All"],  
+		preserved_symmetries = ["None"; join.(Combinatorics.powerset(["P", "Mx", "Ct", "Tt"],1,2),"+"); "All"],  
 
 		nr_perturb_strength = [8],
 		
@@ -60,7 +60,7 @@ input_checks  = Dict{Symbol,Any}(
 
 		),
   
-	:observables => ["D110","D111","D48","D30","D123","D125","D127a",
+	:observables => ["D110","D111","D48","D30","D123","D125",#"D127a",
 									 "WannierGap",
 									 "WannierBands1",
 									 "WannierBands2",

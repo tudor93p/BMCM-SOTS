@@ -7,13 +7,13 @@ include("input_file.jl")
 
 tasks = [
 	init(BMCMSOTS,:CheckZero_atY; Y=:preserved_symmetries),
-	init(BMCMSOTS,:CheckZero_atY; Y=:nr_kPoints),
+#	init(BMCMSOTS,:CheckZero_atY; Y=:nr_kPoints),
 #	init(BMCMSOTS,:WannierBands1),
 #	init(BMCMSOTS,:WannierGap),
 #	init(BMCMSOTS,:WannierBands2),
 #	init(BMCMSOTS,:CheckZero),
 	init(BMCMSOTS,:WannierGap_atY; Y=:preserved_symmetries),
-	init(BMCMSOTS,:WannierGap_atY; Y=:nr_kPoints),
+#	init(BMCMSOTS,:WannierGap_atY; Y=:nr_kPoints),
 	 ]
 
 

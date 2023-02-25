@@ -592,7 +592,43 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	results = init_results(nk, k0, get_target(target; kwargs...))
 
-	perturb1 = get_perturb_on_mesh(P,3268) 
+	perturb1 = get_perturb_on_mesh(P,3268)  
+
+#
+#	if !in(symms ,["None","All"])
+#
+#	symms2 = join.(Combinatorics.powerset(["P", "Mx", "Ct", "Tt"],1,2),"+") 
+#
+#	println()
+#
+#	@show symms 
+#
+#	println("Ham.: ",
+#					all(MB.has_symm_on_mesh(MBtime, symms, nk,k0)))
+#
+#	for s2 in symms2 
+#
+#		println("$s2:\t\t",
+#						all(MB.has_symm_on_mesh(MBtime, s2, nk,k0)))
+#
+#	end 
+#
+#
+#	println("\nPert.: ",
+#					all(MB.has_symm_on_mesh(perturb1, symms, nk,k0)))
+#
+#	for s2 in symms2 
+#
+#		println("$s2:\t\t",
+#						all(MB.has_symm_on_mesh(perturb1, s2, nk,k0)))
+#
+#	end 
+#
+#	println()
+#
+#
+#end 
+
 
 	psi = MB.get_psiH(MBtime, nk, k0, perturb1, strength)
 

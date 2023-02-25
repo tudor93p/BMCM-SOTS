@@ -754,7 +754,7 @@ end
 
 function operP(h::AbstractMatrix)::Matrix
 
-	Symmetries(PRepr,-conj(h))
+	Symmetries.UdAV(PRepr,-conj(h))
 
 end 
 

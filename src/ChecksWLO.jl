@@ -611,31 +611,30 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 			p1occup_ = sum(nus2pm)
 			p1unocc_ = sum(eta2pm) 
 		
-			if haskey(results,"D127a")
-	
-			#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
-				SignalProcessing.run_m1!(results["D127a"], trial, 
-										abs.(WLO.wcc_stat_axpy!(-1,p1occup_,p1occup,[0,0.5])), 
-									 i_ps,dir1,1,:) 
-			
-			# p1occup has been overwritten
-			
-				SignalProcessing.run_m1!(results["D127a"], trial, 
-										abs.(WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc,[0,0.5])), 
-									 i_ps,dir1,2,:) 
-			
-			#	p1unocc has been overwritten  
-	
-			end 
+#			if haskey(results,"D127a") # INCORRECT --> MEANINGLESS
+#	
+#			#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
+#				SignalProcessing.run_m1!(results["D127a"], trial, 
+#										abs.(WLO.wcc_stat_axpy!(-1,p1occup_,p1occup,[0,0.5])), 
+#									 i_ps,dir1,1,:) 
+#			
+#			# p1occup has been overwritten
+#			
+#				SignalProcessing.run_m1!(results["D127a"], trial, 
+#										abs.(WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc,[0,0.5])), 
+#									 i_ps,dir1,2,:) 
+#			
+#			#	p1unocc has been overwritten  
+#	
+#			end 
 	
 			if haskey(results,"D125")
 	
 			#	D125: total polarization zero 
 				SignalProcessing.run_m1!(results["D125"], trial,
-										abs.(WLO.wcc_stat_axpy!(1,p1occup_,p1unocc_,[0,0.5])),
+										abs.(WLO.wcc_stat_axpy(1,p1occup_,p1unocc_,[0,0.5])),
 									 i_ps,dir1,:)
 			
-			#	p1unocc_ has been overwritten
 			end 	
 
 		end 
@@ -687,7 +686,7 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 	end 
 
-#	D48 for dir1==2. Calc also dir1==1
+#	D48 for dir1==2 needed. Calc also dir1==1
 		
 	if haskey(results,"D48")
 
