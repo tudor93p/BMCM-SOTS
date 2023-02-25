@@ -9,8 +9,9 @@ import ..WLO#, ..MB
 #
 #import ..WLO: kPOINT_START, NR_kPOINTS
 
-const MODEL_MATRICES_PAULI = ["30","21","22","23","10"]  
+const MODEL_MATRICES_PAULI::Vector{String} = ["30","21","22","23","10"]  
 
+const delta::Float64 = 1e-8
 
 #===========================================================================#
 #
@@ -103,7 +104,7 @@ end
 
 function BBHparams(th::Real)::Vector{Float64} 
 
-	[1, 1, 1 + 0.5*cos(th), 1+0.5*sin(th), 0.01]
+	[1, 1, 1 + 0.5*cos(th), 1+0.5*sin(th), 1e-8]
 
 end  
 

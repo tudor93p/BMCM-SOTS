@@ -5,10 +5,13 @@ import LinearAlgebra
 
 import BMCMSOTS:WLO, CalcWLO, ChecksWLO ,BBH
 
-#import BMCMSOTS: MB
+import BMCMSOTS: MB
 
 
-P = (braiding_time = 0.25, nr_kPoints = 60, kPoint_start = -1, preserved_symmetries = "None", nr_perturb_strength = 10, max_perturb_strength = 0.6, nr_perturb_instances = 1, perturb_strength = 0.2)
+P = (braiding_time = 0.25, kPoint_start = -1, 
+		 nr_kPoints = 30, 
+		 preserved_symmetries = "All", 
+		 nr_perturb_strength = 10, max_perturb_strength = 0.6, nr_perturb_instances = 1, perturb_strength = 0.2)
 
 @show P
 
@@ -60,42 +63,67 @@ println("Preserved symmetry: $symms\n")
 
 
 
+#===========================================================================#
+#
+# Calculate wavefunctions and WLOs
+#
+#---------------------------------------------------------------------------#
 
-#psiH = MB.get_psiH(MBtime, nk, k0, perturb0, ps) 
+
+
+
+psiH = MB.get_psiH(MBtime, nk, k0, perturb0, ps) 
 
 psi_BBH = BBH.get_psiH(BBHtheta, nk, k0, perturb0, ps) 
 
-#data = ChecksWLO.get_data(psiH, results) 
+data = ChecksWLO.get_data(psiH, results) 
 
 data_BBH = ChecksWLO.get_data(psi_BBH, results)
 
 
-#(
-#(eigW1_occup_x,nus2pm_xy), 
-#(eigW1_unocc_x,eta2pm_xy),
-#(eigW1_occup_y,nus2pm_yx), 
-#(eigW1_unocc_y,eta2pm_yx) ) = data 
+(
+(eigW1_occup_x,nus2pm_xy), 
+(eigW1_unocc_x,eta2pm_xy),
+(eigW1_occup_y,nus2pm_yx), 
+(eigW1_unocc_y,eta2pm_yx) ) = data 
 (
 (BBH_eigW1_occup_x,BBH_nus2pm_xy), 
 (BBH_eigW1_unocc_x,BBH_eta2pm_xy),
 (BBH_eigW1_occup_y,BBH_nus2pm_yx), 
-(BBH_eigW1_unocc_y,BBH_eta2pm_yx) ) = data_BBH
-		
+(BBH_eigW1_unocc_y,BBH_eta2pm_yx) ) = data_BBH 
+
+
+eigW1_all_x = WLO.Wannier_subspaces_on_mesh!(WLO.wlo1_on_mesh(1,psiH))
+eigW1_all_y = WLO.Wannier_subspaces_on_mesh!(WLO.wlo1_on_mesh(2,psiH))
+
+BBH_eigW1_all_x = WLO.Wannier_subspaces_on_mesh!(WLO.wlo1_on_mesh(1,psi_BBH))
+BBH_eigW1_all_y = WLO.Wannier_subspaces_on_mesh!(WLO.wlo1_on_mesh(2,psi_BBH))
+
+
+
 #data_x[1] = eig1: (wf_plus, nu_plus, wf_minus, nu_minus)
 #data_x[2] = nus2: (nu2_plus, nu2_minus)
 #
 
-@testset "p(MB)==p(BBH)" begin 
+
+#===========================================================================#
+#
+# Easy sanity checks
+#
+#---------------------------------------------------------------------------#
+
+
+@testset "corner polarization around 0 and 1/2" begin 
 
 	for (
-#			 (nu2_plus,nu2_minus),
+			 (nu2_plus,nu2_minus),
 			 (BBH_nu2_plus,BBH_nu2_minus),
 			 expected_nu_BBH) in zip(
-#															 (nus2pm_yx, nus2pm_xy),
+															 (nus2pm_yx, nus2pm_xy),
 															 (BBH_nus2pm_yx, BBH_nus2pm_xy),
 														 BBH.BBHoutcomes(BBHtheta))
 
-#		@test Utils.closest_periodic_b(rand(nu2_minus),[0,0.5],1)≈expected_nu_BBH
+		@test Utils.closest_periodic_b(rand(nu2_minus),[0,0.5],1)≈expected_nu_BBH
 		@test Utils.closest_periodic_b(rand(BBH_nu2_minus),[0,0.5],1)≈expected_nu_BBH
 
 
@@ -107,44 +135,52 @@ data_BBH = ChecksWLO.get_data(psi_BBH, results)
 end 
 
 
-#gaps = [WLO.WannierGap_fromSubspaces(eig) for eig in (eigW1_occup_x, eigW1_unocc_x, eigW1_occup_y, eigW1_unocc_y)]
-#@show gaps 
+gaps = [WLO.WannierGap_fromSubspaces(eig) for eig in (eigW1_occup_x, eigW1_unocc_x, eigW1_occup_y, eigW1_unocc_y)]
+
 gaps_BBH = [WLO.WannierGap_fromSubspaces(eig) for eig in (BBH_eigW1_occup_x, BBH_eigW1_unocc_x, BBH_eigW1_occup_y, BBH_eigW1_unocc_y)]
 
-@show gaps_BBH 
+@testset "Wannier gaps >1e-2" begin 
 
-println()
+	@test all(>(1e-2),gaps)
+	@test all(>(1e-2),gaps_BBH)
 
-####
+end; println()
 
-#p1occup_x = WLO.polariz_fromSubspaces(eigW1_occup_x)
-#p1unocc_x = WLO.polariz_fromSubspaces(eigW1_unocc_x)
-#p1occup_y = WLO.polariz_fromSubspaces(eigW1_occup_y)
-#p1unocc_y = WLO.polariz_fromSubspaces(eigW1_unocc_y)
+
+p1all_x = sum(eachslice(WLO.polariz_fromSubspaces(eigW1_all_x),dims=1))
+p1all_y = sum(eachslice(WLO.polariz_fromSubspaces(eigW1_all_y),dims=1))
+BBH_p1all_x = sum(eachslice(WLO.polariz_fromSubspaces(BBH_eigW1_all_x),dims=1))
+BBH_p1all_y = sum(eachslice(WLO.polariz_fromSubspaces(BBH_eigW1_all_y),dims=1))
+
+p1occup_x = WLO.polariz_fromSubspaces(eigW1_occup_x)
+p1unocc_x = WLO.polariz_fromSubspaces(eigW1_unocc_x)
+p1occup_y = WLO.polariz_fromSubspaces(eigW1_occup_y)
+p1unocc_y = WLO.polariz_fromSubspaces(eigW1_unocc_y)
 
 BBH_p1occup_x = WLO.polariz_fromSubspaces(BBH_eigW1_occup_x)
 BBH_p1unocc_x = WLO.polariz_fromSubspaces(BBH_eigW1_unocc_x)
 BBH_p1occup_y = WLO.polariz_fromSubspaces(BBH_eigW1_occup_y)
 BBH_p1unocc_y = WLO.polariz_fromSubspaces(BBH_eigW1_unocc_y)
 
-#p1occup_y_ = sum(nus2pm_xy) 
-#p1occup_x_ = sum(nus2pm_yx) 
-#p1unocc_y_ = sum(eta2pm_xy) 
-#p1unocc_x_ = sum(eta2pm_yx) 
+p1occup_y_ = sum(nus2pm_xy) 
+p1occup_x_ = sum(nus2pm_yx) 
+p1unocc_y_ = sum(eta2pm_xy) 
+p1unocc_x_ = sum(eta2pm_yx) 
 
 BBH_p1occup_y_ = sum(BBH_nus2pm_xy) 
 BBH_p1occup_x_ = sum(BBH_nus2pm_yx) 
 BBH_p1unocc_y_ = sum(BBH_eta2pm_xy) 
 BBH_p1unocc_x_ = sum(BBH_eta2pm_yx) 
 
-#p1xs = (p1occup_x, 
-#				p1unocc_x, 
-#				p1occup_x_, 
-#				p1unocc_x_ )
-#p1ys = (p1occup_y, 
-#				p1unocc_y, 
-#				p1occup_y_, 
-#				p1unocc_y_ )
+p1xs = (p1occup_x, 
+				p1unocc_x, 
+				p1occup_x_, 
+				p1unocc_x_ )
+
+p1ys = (p1occup_y, 
+				p1unocc_y, 
+				p1occup_y_, 
+				p1unocc_y_ )
 
 BBH_p1xs = (BBH_p1occup_x, 
 				BBH_p1unocc_x, 
@@ -154,28 +190,65 @@ BBH_p1xs = (BBH_p1occup_x,
 BBH_p1ys = (BBH_p1occup_y, 
 				BBH_p1unocc_y, 
 				BBH_p1occup_y_, 
-				BBH_p1unocc_y_ )
+				BBH_p1unocc_y_ ) 
+
 #println(LinearAlgebra.norm(Utils.dist_periodic(p1occup_y_, p1occup_y, 1)))
 
 
 
 @testset "nu_d dep. on perp. k_d only" begin 
 
-#	global p1xs,p1ys = map(enumerate((p1xs,p1ys))) do (dir1,p1s)
-#
-#		map(p1s) do p1 
-#			
-#			t,p11 = CalcWLO.check_nu_k_dep(selectdim(p1,1,1), dir1)
-#
-#			@test t 
-#
-#			return copy(p11)
-#	
-#		end 
-#	
-#	end   
+	global p1s = global (
+					( p1occup_x, p1unocc_x, p1occup_x_, p1unocc_x_,),
+					( p1occup_y, p1unocc_y, p1occup_y_, p1unocc_y_,)
+					) = map(enumerate((p1xs,p1ys))) do (dir1,p1s)
 
-	global BBH_p1xs,BBH_p1ys = map(enumerate((BBH_p1xs,BBH_p1ys))
+		map(p1s) do p1 
+			
+			t,p11 = CalcWLO.check_nu_k_dep(selectdim(p1,1,1), dir1)
+
+			@test t 
+
+			return copy(p11)
+	
+		end 
+	
+	end   
+
+	global (p1all_x,p1all_y) = map(enumerate((p1all_x,p1all_y))) do (dir1,p1)
+
+		t,p11 = CalcWLO.check_nu_k_dep(p1, dir1)
+
+		@test t 
+
+		return copy(p11) 
+
+	end 
+
+
+
+	global nus2pm_yx,nus2pm_xy = map(enumerate((nus2pm_yx,nus2pm_xy))
+																	 ) do (dir2,nus2)
+
+		map(nus2) do nu2
+			
+			t,nu21 = CalcWLO.check_nu_k_dep(selectdim(nu2,1,1), dir2)
+
+			@test t 
+
+			return copy(nu21)
+	
+		end 
+	
+	end    
+
+end;println() 
+
+@testset "BBH nu_d dep. on perp. k_d only" begin 
+	global BBH_p1s = global (
+					(BBH_p1occup_x, BBH_p1unocc_x, BBH_p1occup_x_, BBH_p1unocc_x_,),
+					(BBH_p1occup_y, BBH_p1unocc_y, BBH_p1occup_y_, BBH_p1unocc_y_,)
+					) = map(enumerate((BBH_p1xs,BBH_p1ys))
 																 ) do (dir1,p1s)
 
 		map(p1s) do p1 
@@ -188,22 +261,20 @@ BBH_p1ys = (BBH_p1occup_y,
 	
 		end 
 	
-	end    
+	end     
 
-#	global nus2pm_yx,nus2pm_xy = map(enumerate((nus2pm_yx,nus2pm_xy))
-#																	 ) do (dir2,nus2)
-#
-#		map(nus2) do nu2
-#			
-#			t,nu21 = CalcWLO.check_nu_k_dep(selectdim(nu2,1,1), dir2)
-#
-#			@test t 
-#
-#			return copy(nu21)
-#	
-#		end 
-#	
-#	end    
+	global (BBH_p1all_x,BBH_p1all_y
+					) = map(enumerate((BBH_p1all_x,BBH_p1all_y))) do (dir1,p1)
+
+		t,p11 = CalcWLO.check_nu_k_dep(p1, dir1)
+
+		@test t 
+
+		return copy(p11) 
+
+	end 
+
+
 
 	global BBH_nus2pm_yx,BBH_nus2pm_xy = map(enumerate((BBH_nus2pm_yx,BBH_nus2pm_xy))) do (dir2,nus2)
 
@@ -223,79 +294,119 @@ end; println()
 
 
 
-#p1xs,p1ys = (Tuple(copy(selectdim(selectdim(p1,1,1),d1,1)) for p1=p1s) for (d1,p1s)=enumerate((p1xs,p1ys)))
-
-#( p1occup_x, p1unocc_x, p1occup_x_, p1unocc_x_,) = p1xs 
-#( p1occup_y, p1unocc_y, p1occup_y_, p1unocc_y_,) = p1ys  
-
-(BBH_p1occup_x, 
- BBH_p1unocc_x, 
- BBH_p1occup_x_, 
- BBH_p1unocc_x_,) = BBH_p1xs  
-
-(BBH_p1occup_y, 
- BBH_p1unocc_y, 
- BBH_p1occup_y_, 
- BBH_p1unocc_y_,) = BBH_p1ys  
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
-@testset "wcc1: total polariz. zero " begin 
+@testset "wcc1: vanishing total polariz." begin 
 
-#	@test same(p1occup_x  + p1unocc_x,0) 
-#	@test same(p1occup_y  + p1unocc_y,0)
+	@test same(p1occup_x  + p1unocc_x, 0) 
+	@test same(p1occup_y  + p1unocc_y, 0) 
+
 	@test same(BBH_p1occup_x  + BBH_p1unocc_x,0) 
 	@test same(BBH_p1occup_y  + BBH_p1unocc_y,0)
-	
-	@test same(BBH_p1occup_x_  + BBH_p1unocc_x_,0) 
-	@test same(BBH_p1occup_y_  + BBH_p1unocc_y_,0)
-end;println() 
 
-
-@testset "D127a: polariz. in two ways BBH" begin 
-
-
-	@show WLO.wcc_stat(BBH_p1occup_x, [0,0.5])
-	@show WLO.wcc_stat(BBH_p1unocc_x, [0,0.5])
-	@show WLO.wcc_stat(BBH_p1occup_x_,[0,0.5])
-	@show WLO.wcc_stat(BBH_p1unocc_x_,[0,0.5])
-
-	println()
-
-	@show WLO.wcc_stat(BBH_p1occup_y, [0,0.5])
-	@show WLO.wcc_stat(BBH_p1unocc_y, [0,0.5])
-	@show WLO.wcc_stat(BBH_p1occup_y_,[0,0.5])
-	@show WLO.wcc_stat(BBH_p1unocc_y_,[0,0.5])
-
-	println()
-
-
-	diff_x_BBH = [maximum(Utils.dist_periodic(BBH_p1occup_x, p1,1)) for p1=(BBH_p1occup_x_,BBH_p1unocc_x_)]
-
-	diff_y_BBH = [maximum(Utils.dist_periodic(BBH_p1occup_y, p1,1)) for p1=(BBH_p1occup_y_,BBH_p1unocc_y_)]
-
-	@show diff_x_BBH diff_y_BBH
-	
-#	@test same(BBH_p1occup_x, BBH_p1occup_x_)|same(BBH_p1occup_x, BBH_p1unocc_x_)
-
+#	@show WLO.wcc_stat(p1occup_y_  + p1unocc_y_)
 
 end;println()
 
 
-@testset "nested quantization BBH x=0" begin 
+@testset "wcc2: vanishing total polariz." begin 
+
+	
+	@test same(p1occup_x_  + p1unocc_x_, 0) 
+	@test same(p1occup_y_  + p1unocc_y_, 0) broken=true  
+
+	@test same(BBH_p1occup_x_  + BBH_p1unocc_x_,0) 
+	@test same(BBH_p1occup_y_  + BBH_p1unocc_y_,0) 
+
+	#@show WLO.wcc_stat(BBH_p1occup_y_  + BBH_p1unocc_y_)
+
+end;println() 
+
+
+@testset "D127a BBH: polariz. in two ways" begin 
+
+	for (d1,BBH_p1d) in enumerate(BBH_p1s)
+
+		for BBH_item1 in BBH_p1d 
+
+			@test same(WLO.wcc_stat(BBH_item1), 0)
+
+		end 
+
+		diff_d1_BBH = [maximum(Utils.dist_periodic(BBH_p1d[1],item1,1)) for item1=BBH_p1d[3:end]]
+
+#		@show diff_d1_BBH 
+
+		@test any(Base.Fix1(same,0), diff_d1_BBH)
+
+	end 
+
+
+end;println() 
+
+
+@testset "D127a: polariz. in two ways" begin 
+
+
+	for (d1,p1d) in enumerate(p1s)
+
+		for item1 in p1d 
+
+			@test same(WLO.wcc_stat(item1), 0) skip=(d1==2)
+
+		end 
+
+		diff_d1 = [maximum(Utils.dist_periodic(p1d[1],item1,1)) for item1=p1d[3:end]]
+
+#		@show diff_d1 
+		@test any(Base.Fix1(same,0), diff_d1) skip=(d1==2)
+
+	end 
+
+end;println()
+
+
+
+
+@testset "nested quantization x=0" begin 
 
 	for BBH_nu in BBH_nus2pm_yx
 		
-		@show WLO.wcc_stat(BBH_nu,[0,0.5])  
+#		@show WLO.wcc_stat(BBH_nu,[0,0.5])  
+		@test WLO.wcc_stat(BBH_nu,[0,0.5])[2]≈0 atol=BBH.delta 
+				
+	end  
+	for nu in nus2pm_yx
+		
+#		@show WLO.wcc_stat(nu,[0,0.5])  
+
+		@test same(WLO.wcc_stat(nu,[0,0.5])[2],0,atol=1e-7)
+
 				
 	end  
 
-end 
+end;println()
 
-@testset "nested quantization BBH y=0.5" begin 
+@testset "nested quantization y=0.5" begin 
 
 	for BBH_nu in BBH_nus2pm_xy 
 		
-		@show WLO.wcc_stat(BBH_nu,[0,0.5])  
+#		@show WLO.wcc_stat(BBH_nu,[0,0.5])   
+		
+		@test WLO.wcc_stat(BBH_nu,[0,0.5])[2]≈0 atol=BBH.delta 
+
+	end   
+
+	for nu in nus2pm_xy 
+		
+#		@show WLO.wcc_stat(nu,[0,0.5]) 
+		@test same(WLO.wcc_stat(nu,[0,0.5])[2],0,atol=1e-4)
+
 
 	end  
 
@@ -303,22 +414,19 @@ end
 end; println() 
 
 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+
 error() 
-
-
-
-@testset "D127a: polariz. in two ways" begin 
-
-	@show same(p1occup_x, p1occup_x_)
-	@show same(p1occup_x, p1unocc_x_)
-
-	diff_x = [maximum(Utils.dist_periodic(p1occup_x, p1,1)) for p1=(p1occup_x_,p1unocc_x_)]
-	diff_y = [maximum(Utils.dist_periodic(p1occup_y, p1,1)) for p1=(p1occup_y_,p1unocc_y_)]
-
-	@show diff_x diff_y 
-
-
-end;println()
 #
 #
 #@testset "D125 for wcc2: total polarization zero" begin 
