@@ -32,21 +32,21 @@ echo "Current time"
 date 
 
 
-echo
-echo 'Local folder size in MB and GB'
-du $dest -md 0
-du $dest -hd 0
-
-echo
-echo 'Remote folder size in MB and GB'
-#echo $remotefolder
-ssh $server "du $remotefolder -md 0"
-ssh $server "du $remotefolder -hd 0"
-
-echo 
-echo 'Local disk usage in MB and GB'
-df -m $dest
-df -h $dest
+#echo
+#echo 'Local folder size in MB and GB'
+#du $dest -md 0
+#du $dest -hd 0
+#
+#echo
+#echo 'Remote folder size in MB and GB'
+##echo $remotefolder
+#ssh $server "du $remotefolder -md 0"
+#ssh $server "du $remotefolder -hd 0"
+#
+#echo 
+#echo 'Local disk usage in MB and GB'
+#df -m $dest
+#df -h $dest
 
 
 echo

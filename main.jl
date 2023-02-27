@@ -1,9 +1,11 @@
+import Dates  
+
+t0 = Dates.now() 
+
 import myLibs: ComputeTasks 
-import Dates 
 
 import BMCMSOTS  
 
-#t0 =Dates.now() 
 
 include("input_file.jl")
 
@@ -24,15 +26,16 @@ ComputeTasks.get_data_one.(tasks, mute=false)
 
 #if occursin("y",lowercase(readline(stdin)))  
 
-t0 = Dates.DateTime(2023,02,27,17,00,00) 
+t1 = Dates.DateTime("2023-02-27T17:33:32.010")
 
-while Dates.now() < t0 #< Dates.Minute(9)
+
+while Dates.now() < t1 #< Dates.Minute(9)
 
 	sleep(1)
 
 end 
 
 
-ComputeTasks.get_data_all.(tasks, shuffle=true, seed=1, mute=true)
+ComputeTasks.get_data_all.(tasks, shuffle=true, seed=2, mute=true)
 
 
