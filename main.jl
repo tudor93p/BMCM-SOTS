@@ -3,7 +3,7 @@ import Dates
 
 import BMCMSOTS  
 
-t0 =Dates.now() 
+#t0 =Dates.now() 
 
 include("input_file.jl")
 
@@ -24,9 +24,11 @@ ComputeTasks.get_data_one.(tasks, mute=false)
 
 #if occursin("y",lowercase(readline(stdin)))  
 
-while Dates.now() - t0 < Dates.Minute(9)
+t0 = Dates.DateTime(2023,02,27,17,00,00) 
 
-sleep(5)
+while Dates.now() < t0 #< Dates.Minute(9)
+
+	sleep(1)
 
 end 
 
