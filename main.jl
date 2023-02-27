@@ -16,16 +16,21 @@ tasks = [
 ComputeTasks.missing_data.(tasks)
 ComputeTasks.get_data_one.(tasks, mute=false) 
 
-shuffle = gethostname()=="tudor-HP"
+#shuffle = gethostname()=="tudor-HP"
 
 
 
 #@info "Preparations finished. Proceed to calculations? y/n" 
 
-#if occursin("y",lowercase(readline(stdin))) 
-if Dates.now() - t0 > Dates.Minute(5)
+#if occursin("y",lowercase(readline(stdin)))  
 
-	ComputeTasks.get_data_all.(tasks, shuffle=shuffle, mute=false) 
+while Dates.now() - t0 < Dates.Minute(9)
+
+sleep(5)
 
 end 
+
+
+ComputeTasks.get_data_all.(tasks, shuffle=true, seed=1, mute=true)
+
 
