@@ -11,7 +11,7 @@ include("input_file.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
-				 init(BMCMSOTS,:WannierBands2),
+#				 init(BMCMSOTS,:WannierBands2),
 				 ];
 
 
@@ -26,8 +26,8 @@ ComputeTasks.get_data_one.(tasks, mute=false)
 
 #if occursin("y",lowercase(readline(stdin)))  
 
-t1 = Dates.DateTime("2023-02-27T17:33:32.010")
 
+t1 = Dates.DateTime("2023-02-27T18:11:46.870")
 
 while Dates.now() < t1 #< Dates.Minute(9)
 
