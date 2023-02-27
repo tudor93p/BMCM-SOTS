@@ -25,7 +25,7 @@ input_checks  = Dict{Symbol,Any}(
 		
 		b_Hamilt = 0.4:0.3:1.6, 
 					
-		nr_kPoints = vcat(10,50:5:70),# 10:5:70,
+		nr_kPoints = vcat(10:5:50,60,70),# 10:5:70,
 
 		kPoint_start = [-1], 
 

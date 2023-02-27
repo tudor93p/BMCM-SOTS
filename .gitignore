@@ -2,4 +2,5 @@ pyqt_config
 pyqt_figures
 Data/ 
 .*.swp
-Manifest.toml
+Manifest.toml 
+.fuse_hid*

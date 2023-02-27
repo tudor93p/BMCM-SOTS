@@ -12,10 +12,10 @@ include("input_file.jl")
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
 				 init(BMCMSOTS,:WannierBands2),
-				 ]
+				 ];
 
 
-ComputeTasks.missing_data.(tasks)
+#ComputeTasks.missing_data.(tasks)
 ComputeTasks.get_data_one.(tasks, mute=false) 
 
 #shuffle = gethostname()=="tudor-HP"
