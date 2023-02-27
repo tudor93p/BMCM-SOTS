@@ -4,13 +4,13 @@ module WLO
 import LinearAlgebra, Statistics 
 
 import myLibs:Utils,SignalProcessing 
+import myLibs.Parameters:UODict
+
 
 import ..Helpers: PeriodicFuns, Symmetries 
 
 
 
-
-
 #===========================================================================#
 #
 #
@@ -24,7 +24,19 @@ import ..Helpers: PeriodicFuns, Symmetries
 #
 #---------------------------------------------------------------------------#
 
+usedkeys::Vector{Symbol} = [:nr_kPoints, :kPoint_start]
 
+function nr_kPoints(P::UODict)::Int 
+
+	P[:nr_kPoints]
+
+end  
+
+function kPoint_start(P::UODict)::Float64
+
+	pi*P[:kPoint_start]
+
+end  
 
 
 #===========================================================================#

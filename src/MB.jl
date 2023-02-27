@@ -133,7 +133,7 @@ end
 
 
 
-function bsss_cycle((theta,s0)::AbstractVector{<:Real})::Vector{Float64}
+function bsss_cycle((theta,s0,s,b)::AbstractVector{<:Real})::Vector{Float64}
 
 	if !(theta≈pi/2)
 
@@ -143,26 +143,26 @@ function bsss_cycle((theta,s0)::AbstractVector{<:Real})::Vector{Float64}
 
 		theta>2pi && @warn "Theta outside [0,2pi]. Perhaps theta*2pi given?"
 
+		@assert theta≈pi/2 
+
 	end 
-	@assert theta≈pi/2 
 
+	bs = Float64[-sin(theta), 
+								cos(theta),
+								s0,
+								0.0,
+								0.0,
+								]
 
-	bx = -sin(theta)
-	by = cos(theta)
+	bs[1:2] .*= b 
 
-	sx = get_s_param_from_b(by,bx)
-	
-	sy = -get_s_param_from_b(bx,by) 
+	bs[4] = get_s_param_from_b(bs[2], bs[1]) 
 
+	bs[5] = -get_s_param_from_b(bs[1], bs[2]) 
 
-	out = [bx, by, s0,
-#				 (sx+sy)*0.1
-				 sx, sy]
+	bs[4:5] .*= s 
 
-	out .*= 0.3 
-#	return 0.3*[bx,by,0,0,0]
-#	return 0.3*[bx,by,0.01/0.3,sx,sy]
-	return out
+	return bs .*= 0.3  
 
 end 
 
@@ -172,6 +172,14 @@ end
 #
 #
 #---------------------------------------------------------------------------#
+
+usedkeys::Vector{Symbol} = [:braiding_time,
+														:s0_Hamilt,
+														:s_Hamilt,
+														:b_Hamilt,
+														]
+
+
 
 braiding_time(P::UODict)::Float64 = P[:braiding_time]   
 braiding_time(params::AbstractVector{<:Real})::Float64 = params[1] 
@@ -186,23 +194,34 @@ braiding_theta(t::Real)::Float64  = t*2pi
 #
 #end 
 
-s0_Hamiltonian(P::UODict)::Float64 = s0_Hamiltonian(P[:s0_Hamiltonian])
-s0_Hamiltonian(s0::Real)::Float64 = s0 
+s0_Hamilt(P::UODict)::Float64 = s0_Hamilt(P[:s0_Hamilt])
+s0_Hamilt(s0::Real)::Float64 = s0  
+
+s_Hamilt(P::UODict)::Float64 = s_Hamilt(P[:s_Hamilt])
+s_Hamilt(s::Real)::Float64 = s
+
+b_Hamilt(P::UODict)::Float64 = b_Hamilt(P[:b_Hamilt])
+b_Hamilt(s::Real)::Float64 = s
 
 parse_MB_params(p::Vararg{<:Real,2})::Vector{Float64} = parse_MB_params(p)
 
 
-function parse_MB_params((t,s0)::Union{<:AbstractVector{<:Real},
+function parse_MB_params((t,s0,s,b)::Union{<:AbstractVector{<:Real},
 																			 <:Tuple{Vararg{<:Real}}},
 																			)::Vector{Float64}
 
-	[braiding_theta(t), s0_Hamiltonian(s0)]
+	[braiding_theta(t), s0_Hamilt(s0), s_Hamilt(s), b_Hamilt(b)]
 
 end 
 
+function params_fromP(P::UODict)::Vector{Float64}
+
+	[braiding_time(P),s0_Hamilt(P), s_Hamilt(P), b_Hamilt(P)]
+
+end 
 #function parse_MB_params(P::UODict)::Vector{Float64}
 #
-#	[braiding_theta(P),s0_Hamiltonian(P)]
+#	[braiding_theta(P),s0_Hamilt(P)]
 #
 #end 
 
@@ -291,14 +310,15 @@ end
 #---------------------------------------------------------------------------#
 
 
+
 function get_psiH(P::UODict, args...)::Array{ComplexF64,4}
 
-	get_psiH([braiding_time(P),s0_Hamiltonian(P)], args...)
+	get_psiH(params_fromP(P), args...)
 
 end 
 function get_enpsiH(P::UODict, args...)::Vector{Array}
 
-	get_enpsiH([braiding_time(P),s0_Hamiltonian(P)], args...)
+	get_enpsiH(params_fromP(P), args...)
 
 
 end 

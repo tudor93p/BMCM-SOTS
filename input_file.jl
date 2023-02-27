@@ -19,15 +19,19 @@ input_checks  = Dict{Symbol,Any}(
 
 		braiding_time = [1/4],
 
-		s0_Hamiltonian = 0:0.1:0.4,#Utils.uniqlinsp(1e-3,0.4,5,3; Trunc=true),
+		s0_Hamilt = 0:0.1:0.5,#Utils.uniqlinsp(1e-3,0.4,5,3; Trunc=true),
+		
+		s_Hamilt = 0.4:0.3:1.6, 
+		
+		b_Hamilt = 0.4:0.3:1.6, 
 					
-		nr_kPoints = 10:10:40,
+		nr_kPoints = 10:5:50,
 
 		kPoint_start = [-1], 
 
 		preserved_symmetries = ["None"; join.(Combinatorics.powerset(["P", "Mx", "Ct", "Tt"],1,2),"+"); "All"],  
 
-		nr_perturb_strength = [8],
+		nr_perturb_strength = [11],
 		
 		max_perturb_strength = [0.6],
 
@@ -45,7 +49,13 @@ input_checks  = Dict{Symbol,Any}(
 
 			braiding_time = (1,2),
 
-			s0_Hamiltonian = (1,2),
+			s0_Hamilt = (1,2), 
+
+			s_Hamilt = (1,2),
+
+			b_Hamilt = (1,2),
+
+
 
 			nr_kPoints = (3,0),
 

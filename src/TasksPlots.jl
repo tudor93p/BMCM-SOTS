@@ -179,9 +179,11 @@ function plotdict_WCC(P::AbstractDict,
 
 	y0 = transpose(selectdim(data[obs],2,d))
 
-	yave = WLO.wcc_stat!(sum(eachrow(y0)),[0,0.5])[1] 
+	#yave = WLO.wcc_stat!(sum(eachrow(y0)),[0,0.5])[1] 
 
+	yave = y0[1]
 
+#	@show yave 
 	ks ./= pi 
 
 	return Dict{String,Any}(
@@ -192,7 +194,7 @@ function plotdict_WCC(P::AbstractDict,
 					
 					"labels" => map(tex, legend["sector"]),
 
-					"xlim"=> extrema(ks),
+					"xlim"=> Utils.extend_limits(extrema(ks),1e-3),
 
 					"ylim"=> (-0.7, 0.7),
 

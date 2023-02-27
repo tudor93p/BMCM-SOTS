@@ -8,7 +8,10 @@ import BMCMSOTS:WLO, CalcWLO, ChecksWLO ,BBH
 import BMCMSOTS: MB
 
 
-P = (braiding_time = 0.25, s0_Hamiltonian = 0.1,
+P = (braiding_time = 0.25, 
+		 s0_Hamilt = 0.1,
+		 s_Hamilt = 1,
+		 b_Hamilt = 1,
 		 kPoint_start = -1, 
 		 nr_kPoints = 10,
 		 preserved_symmetries = "All",#Ct",#"None",#"Ct",
@@ -120,10 +123,15 @@ pdata =map(tasks ) do task0
 
 p = ComputeTasks.get_first_paramcomb(task0)
 
+@assert p[1]==task0.get_paramcombs()[1][1]
+
+@show p[1]
+
 target = rand(observables)
 
 P = task0.get_plotparams(p)
-	P["obs_group"]= "dir1"
+
+P["obs_group"]= "dir1"
 
 P["obs"] = target 
 P["obs_i"] = rand(1:10)

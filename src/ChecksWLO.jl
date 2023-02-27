@@ -17,8 +17,9 @@ import ..FILE_STORE_METHOD, ..WLO, ..MB, ..Helpers
 import ..Helpers: Symmetries
 
 
-import ..MB: parse_MB_params
-import ..CalcWLO: nr_kPoints, kPoint_start, preserved_symmetries, all_symms_preserved, get_perturb_on_mesh_
+#import ..MB: parse_MB_params
+import ..WLO: nr_kPoints, kPoint_start
+import ..CalcWLO: preserved_symmetries, all_symms_preserved, get_perturb_on_mesh_
 
 #===========================================================================#
 #
@@ -26,15 +27,13 @@ import ..CalcWLO: nr_kPoints, kPoint_start, preserved_symmetries, all_symms_pres
 #
 #---------------------------------------------------------------------------#
 
+Dependencies = [MB,WLO]
+
 
 usedkeys()::Vector{Symbol} = [
-						:braiding_time,
-						:s0_Hamiltonian,
 
-						:nr_kPoints,
-						:kPoint_start,
+						:preserved_symmetries, 
 
-						:preserved_symmetries,
 						:nr_perturb_strength,
 						:max_perturb_strength,
 						:nr_perturb_instances,
@@ -748,7 +747,9 @@ function set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
 		
 				set_result_one!(results, "D127",
 												abs.(WLO.wcc_stat(p1occup_, [0,0.5])),
-												trial, i_ps, dir1, "occup")
+												trial, i_ps, dir1, "occup") 
+
+
 				set_result_one!(results, "D127",
 												abs.(WLO.wcc_stat(p1unocc_, [0,0.5])),
 												trial, i_ps, dir1, "unocc")
@@ -942,7 +943,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------------- with perturbation -------------- # 
 
-	trials = get_perturb_on_mesh(P, 3268) # seed ensures results recovered
+	trials = get_perturb_on_mesh(P)#, 3268) # seed ensures results recovered
 
 	
 	if parallel #---- parallel evaluation ---#

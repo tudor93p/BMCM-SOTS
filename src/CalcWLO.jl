@@ -14,7 +14,7 @@ import ..FILE_STORE_METHOD
 
 import ..MB, ..WLO, ..Helpers
 
-import ..MB: parse_MB_params
+import ..WLO: nr_kPoints, kPoint_start 
 import ..Helpers: Symmetries 
 
 #===========================================================================#
@@ -28,14 +28,10 @@ function perturb_strength end
 zero_perturb_strength = <(1e-12)∘perturb_strength   
 
 
+Dependencies = [MB,WLO]
 
 
 usedkeys()::Vector{Symbol} = [
-						:braiding_time,
-						:s0_Hamiltonian,
-
-						:nr_kPoints,
-						:kPoint_start,
 						:preserved_symmetries, 
 
 						:perturb_strength,
@@ -67,17 +63,6 @@ calc_observables = ["WannierBands1","WannierBands2"] # no "WannierGap"
 
 
 
-function nr_kPoints(P::UODict)::Int 
-
-	P[:nr_kPoints]
-
-end  
-
-function kPoint_start(P::UODict)::Float64
-
-	pi*P[:kPoint_start]
-
-end  
 function preserved_symmetries(P::UODict)::String 
 
 	P[:preserved_symmetries]
@@ -570,7 +555,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	results = init_results(nk, k0, get_target(target; kwargs...))
 
-	perturb1 = get_perturb_on_mesh(P,3268)  
+	perturb1 = get_perturb_on_mesh(P)#,3268)  
 
 #
 #	if !in(symms ,["None","All"])
