@@ -14,7 +14,7 @@ import ..FILE_STORE_METHOD
 
 import ..MB, ..WLO, ..Helpers
 
-import ..MB: braiding_time
+import ..MB: parse_MB_params
 import ..Helpers: Symmetries 
 
 #===========================================================================#
@@ -32,9 +32,12 @@ zero_perturb_strength = <(1e-12)∘perturb_strength
 
 usedkeys()::Vector{Symbol} = [
 						:braiding_time,
+						:s0_Hamiltonian,
+
 						:nr_kPoints,
 						:kPoint_start,
-						:preserved_symmetries,
+						:preserved_symmetries, 
+
 						:perturb_strength,
 						]
 									 
@@ -433,36 +436,6 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function check_nu_k_dep(nu::AbstractMatrix{T},
-												d::Int;
-												atol::Float64=1e-10
-												)::Tuple{Bool,<:AbstractVector{T}} where T<:Real 
-
-	out = true 
-
-	for i=2:size(nu,d) 
-
-
-		D = Utils.reduce_dist_periodic(max, selectdim(nu,d,i), selectdim(nu,d,1), 1)
-
-		D<atol &&  continue
-	
-		@warn "nux depends on kx | nuy depends on ky?" 
-
-		@show LinearAlgebra.norm(D)
-
-		@show Utils.reduce_dist_periodic(max, selectdim(nu,3-d,i), selectdim(nu,3-d,1), 1)
-
-		out=false 
-#		break 
-
-	end  
-
-	return (out,selectdim(nu,d,1))
-
-end 
-
-
 
 function cp_wcc_to_results(results::AbstractDict{<:AbstractString,<:Any},
 													obs::AbstractString,
@@ -475,7 +448,7 @@ function cp_wcc_to_results(results::AbstractDict{<:AbstractString,<:Any},
 
 	for (sector,nu_sector) in enumerate(wccs)
 
-		check_nu_k_dep(selectdim(nu_sector,1,1), d) # one band 
+		WLO.check_nu_k_dep(selectdim(nu_sector,1,1), d) # one band 
 
 		for i=1:n 
 
@@ -497,20 +470,20 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function set_results_two!(results::AbstractDict,
+function set_results!(results::AbstractDict,
 													nk::Int, k0::Real,
 													data)::Nothing
 
 	for (dir1,d) in enumerate(data)
 					
-		set_results_one!(results, nk, k0, dir1, d) 
+		set_results_onedir!(results, nk, k0, dir1, d) 
 
 	end 
 
 end  
 
 
-function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
+function set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
 													dir1::Int,
 													(eigW1_occup,nus2pm)::Tuple{
 																<:AbstractVector{<:AbstractArray},
@@ -588,7 +561,7 @@ end
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
 										kwargs...)::Dict{String,Any}
 
-	MBtime = braiding_time(P)
+#	MBparams = parse_MB_params(P) 
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
@@ -609,12 +582,12 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 #	@show symms 
 #
 #	println("Ham.: ",
-#					all(MB.has_symm_on_mesh(MBtime, symms, nk,k0)))
+#					all(MB.has_symm_on_mesh(MBparams, symms, nk,k0)))
 #
 #	for s2 in symms2 
 #
 #		println("$s2:\t\t",
-#						all(MB.has_symm_on_mesh(MBtime, s2, nk,k0)))
+#						all(MB.has_symm_on_mesh(MBparams, s2, nk,k0)))
 #
 #	end 
 #
@@ -635,9 +608,9 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 #end 
 
 
-	psi = MB.get_psiH(MBtime, nk, k0, perturb1, strength)
+	psi = MB.get_psiH(P, nk, k0, perturb1, strength)
 
-	set_results_two!(results, nk, k0, get_data(psi, results))
+	set_results!(results, nk, k0, get_data(psi, results))
 
 
 	return results

@@ -1,6 +1,6 @@
 module MB  
 
-import LinearAlgebra
+import LinearAlgebra, Statistics
 
 import ..WLO 
 import ..Helpers:Symmetries 
@@ -133,7 +133,19 @@ end
 
 
 
-function bsss_cycle(theta::Real)::Vector{Float64}
+function bsss_cycle((theta,s0)::AbstractVector{<:Real})::Vector{Float64}
+
+	if !(theta≈pi/2)
+
+		@show theta 
+
+		0<=theta<=1 && @warn "Perhaps braiding_time given as parameter?"
+
+		theta>2pi && @warn "Theta outside [0,2pi]. Perhaps theta*2pi given?"
+
+	end 
+	@assert theta≈pi/2 
+
 
 	bx = -sin(theta)
 	by = cos(theta)
@@ -142,7 +154,10 @@ function bsss_cycle(theta::Real)::Vector{Float64}
 	
 	sy = -get_s_param_from_b(bx,by) 
 
-	out = [bx,by,(sx+sy)*0.1,sx,sy]
+
+	out = [bx, by, s0,
+#				 (sx+sy)*0.1
+				 sx, sy]
 
 	out .*= 0.3 
 #	return 0.3*[bx,by,0,0,0]
@@ -158,62 +173,105 @@ end
 #
 #---------------------------------------------------------------------------#
 
-braiding_time(P::UODict)::Float64 = P[:braiding_time]  
-braiding_theta(t::Real)::Float64  = t*2pi 
-braiding_theta(P::UODict)::Float64 = braiding_theta(braiding_time(P))
+braiding_time(P::UODict)::Float64 = P[:braiding_time]   
+braiding_time(params::AbstractVector{<:Real})::Float64 = params[1] 
+
+braiding_theta(t::Real)::Float64  = t*2pi   
+
+#function braiding_theta(P::Union{<:UODict,
+#																 <:AbstractVector{<:Real}}
+#												)::Float64 
+#	
+#	braiding_theta(braiding_time(P)) 
+#
+#end 
+
+s0_Hamiltonian(P::UODict)::Float64 = s0_Hamiltonian(P[:s0_Hamiltonian])
+s0_Hamiltonian(s0::Real)::Float64 = s0 
+
+parse_MB_params(p::Vararg{<:Real,2})::Vector{Float64} = parse_MB_params(p)
 
 
+function parse_MB_params((t,s0)::Union{<:AbstractVector{<:Real},
+																			 <:Tuple{Vararg{<:Real}}},
+																			)::Vector{Float64}
 
-function get_pertHdata(MBtime::Real; kwargs...
-							 )
-	
-	(bsss_cycle(braiding_theta(MBtime)),)
-
-end 
-
-function get_pertHdata(MBtime::Real, h::Function; kwargs...
-							 )
-	
-	(h, get_pertHdata(MBtime)...)
-
-end 
-
-function get_pertHdata(MBtime::Real, p::AbstractArray; kwargs...
-							 )
-	
-	(p, get_pertHdata(MBtime)...)
-
-end 
-
-function get_pertHdata(MBtime::Real, h::Function, p::AbstractArray; kwargs...
-							 )
-	
-	(p, get_pertHdata(MBtime, h)...)
+	[braiding_theta(t), s0_Hamiltonian(s0)]
 
 end 
 
-function get_pertHdata(MBtime::Real, p::AbstractArray, s::Real;
+#function parse_MB_params(P::UODict)::Vector{Float64}
+#
+#	[braiding_theta(P),s0_Hamiltonian(P)]
+#
+#end 
+
+
+
+
+
+
+
+
+function get_pertHdata(MBparams::AbstractVector{<:Real}; kwargs...
+							 )
+	
+	(bsss_cycle(parse_MB_params(MBparams)),)
+
+end 
+
+function get_pertHdata(MBparams::AbstractVector{<:Real}, h::Function; kwargs...
+							 )
+	
+	(h, get_pertHdata(MBparams)...)
+
+end 
+
+function get_pertHdata(MBparams::AbstractVector{<:Real}, p::AbstractArray; kwargs...
+							 )
+	
+	(p, get_pertHdata(MBparams)...)
+
+end 
+
+function get_pertHdata(MBparams::AbstractVector{<:Real}, h::Function, p::AbstractArray; kwargs...
+							 )
+	
+	(p, get_pertHdata(MBparams, h)...)
+
+end 
+
+function get_pertHdata(MBparams::AbstractVector{<:Real}, p::AbstractArray, s::Real;
 							 atol::Float64=1e-12
 							 )
 
-	isapprox(s,0,atol=atol) && return get_pertHdata(MBtime)  
+	if isapprox(s,0,atol=atol) || isapprox(Statistics.mean(abs,p),0,atol=atol)
+		
+			return get_pertHdata(MBparams)  
 
-	isapprox(s,1,atol=atol) && return get_pertHdata(MBtime, p)
+	end 
 
-	return (get_pertHdata(MBtime, p)..., s)
+
+	isapprox(s,1,atol=atol) && return get_pertHdata(MBparams, p)
+
+	return (get_pertHdata(MBparams, p)..., s)
 
 end 
 
 
-function get_pertHdata(MBtime::Real, h::Function, p::AbstractArray, s::Real;
+function get_pertHdata(MBparams::AbstractVector{<:Real}, h::Function, p::AbstractArray, s::Real;
 							 atol::Float64=1e-12
 							 )
 
-	isapprox(s,0,atol=atol) && return get_pertHdata(MBtime, h) 
+	if isapprox(s,0,atol=atol) || isapprox(Statistics.mean(abs,p),0,atol=atol)
 
-	isapprox(s,1,atol=atol) && return get_pertHdata(MBtime, h, p)
+		return get_pertHdata(MBparams, h) 
+
+	end 
+
+	isapprox(s,1,atol=atol) && return get_pertHdata(MBparams, h, p)
 	
-	return (get_pertHdata(MBtime, h, p)..., s) 
+	return (get_pertHdata(MBparams, h, p)..., s) 
 
 end 
 
@@ -233,12 +291,31 @@ end
 #---------------------------------------------------------------------------#
 
 
+function get_psiH(P::UODict, args...)::Array{ComplexF64,4}
 
-function get_psiH(MBtime::Real, n::Int, k0::Real, args...;
+	get_psiH([braiding_time(P),s0_Hamiltonian(P)], args...)
+
+end 
+function get_enpsiH(P::UODict, args...)::Vector{Array}
+
+	get_enpsiH([braiding_time(P),s0_Hamiltonian(P)], args...)
+
+
+end 
+
+
+function get_psiH(MBparams::AbstractVector{<:Real}, n::Int, k0::Real, args...;
 									atol::Float64=1e-12
 								 )::Array{ComplexF64,4}
 
-	WLO.psiH_on_mesh(n, k0, get_pertHdata(MBtime, H, args...; atol=atol)...)
+	WLO.psiH_on_mesh(n, k0, get_pertHdata(MBparams, H, args...; atol=atol)...)
+
+end 
+function get_enpsiH(MBparams::AbstractVector{<:Real}, n::Int, k0::Real, args...;
+									atol::Float64=1e-12
+									)::Vector{Array} #{ComplexF64,4}
+
+	WLO.enpsiH_on_mesh(n, k0, get_pertHdata(MBparams, H, args...; atol=atol)...)
 
 end 
 
@@ -305,7 +382,7 @@ function has_symm_on_mesh(Hamilt_mesh::AbstractArray{<:Number,4},
 
 end  
 
-function has_symm_on_mesh(MBtime::Real, 
+function has_symm_on_mesh(MBparams::AbstractVector{<:Real}, 
 													symm::AbstractString, n::Int, k0::Real,
 													args...;
 													kwargs...
@@ -313,7 +390,7 @@ function has_symm_on_mesh(MBtime::Real,
 													)::BitArray{3}
 
 	has_symm_on_mesh(symm, n, k0, H, 
-									 get_pertHdata(MBtime, args...; atol=1e-10)...;
+									 get_pertHdata(MBparams, args...; atol=1e-10)...;
 									 kwargs...)
 													
 
@@ -344,6 +421,42 @@ function symmetrize_on_mesh!(
 end  
 
 
+
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function add_nupm(storage::AbstractVector{<:AbstractArray},
+									dir::Int; kwargs...
+								 )::Vector{Float64}
+
+	out = zeros(size(storage[1],2))
+
+	for s in storage 
+
+		@assert ndims(s)==3
+
+		out .+= WLO.check_nu_k_dep(selectdim(s,1,1), dir; kwargs...)[2]
+
+	end 
+
+	return out 
+		
+end    
+
+function polariz_fromSubspaces1(storage::AbstractVector{<:AbstractArray},
+																dir::Int; kwargs...)::Vector{Float64}
+
+	add_nupm(view(storage,[2,4]), dir; kwargs...)
+
+end  
 
 
 

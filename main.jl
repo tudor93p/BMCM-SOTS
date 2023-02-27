@@ -6,7 +6,7 @@ import BMCMSOTS
 include("input_file.jl")
 
 tasks = [
-#				 init(BMCMSOTS,:CheckZero),
+				 init(BMCMSOTS,:CheckZero),
 				 init(BMCMSOTS,:WannierBands2),
 				 ]
 

@@ -17,7 +17,7 @@ import ..FILE_STORE_METHOD, ..WLO, ..MB, ..Helpers
 import ..Helpers: Symmetries
 
 
-import ..MB: braiding_time
+import ..MB: parse_MB_params
 import ..CalcWLO: nr_kPoints, kPoint_start, preserved_symmetries, all_symms_preserved, get_perturb_on_mesh_
 
 #===========================================================================#
@@ -29,8 +29,11 @@ import ..CalcWLO: nr_kPoints, kPoint_start, preserved_symmetries, all_symms_pres
 
 usedkeys()::Vector{Symbol} = [
 						:braiding_time,
+						:s0_Hamiltonian,
+
 						:nr_kPoints,
 						:kPoint_start,
+
 						:preserved_symmetries,
 						:nr_perturb_strength,
 						:max_perturb_strength,
@@ -52,9 +55,8 @@ function usedkeys(P::UODict)::Vector{Symbol}
 
 end 
 
-obs_batch_1 = ["D110", "D111", "WannierGap"]
-obs_batch_2 = ["D30", "D48","D123", "D125", "D127a"]  
-
+obs_batch_1 = ["D110", "D111", "D113", "WannierGap"]
+obs_batch_2 = ["D30", "D48","D123", "D125", "D127.1", "D127"]  
 
 calc_observables = vcat(obs_batch_1, obs_batch_2)
 
@@ -155,7 +157,12 @@ function get_data_args(psiH::AbstractArray{<:Number,4},
 
 end  
 
-get_data_iter = Base.Fix2(Base.Iterators.partition, 2) 
+function get_data_dir1(data::AbstractVector, dir1::Int
+											)::AbstractVector
+
+	view(data, 2dir1-1:2dir1)
+
+end 
 
 
 function get_data(psiH::AbstractArray{ComplexF64,4}, 
@@ -460,7 +467,7 @@ function init_results(strengths::AbstractVector{<:Real},
 
 	L = length(strengths)
 
-	for eq in ("D123","D127a","D48")
+	for eq in ("D123","D127.1","D48","D113","D127")
 
 		in(eq,obs) || continue 
 
@@ -518,9 +525,13 @@ function ylabels(obs::AbstractString, legend::AbstractString
 
 		obs in ("D123","D48")  && return ["+", "-"]
 
-		obs=="D127a" && return ["\\mathrm{occup}","\\mathrm{unocc}"]
+		if obs in ("D113","D127", "D127.1") 
+			
+			return ["\\mathrm{occup}","\\mathrm{unocc}"]
 
-# tex command \text{...} not understood in plots 
+			# tex command \text{...} not understood in matplotlib 
+			
+		end 
 
 	end  
 
@@ -528,6 +539,38 @@ function ylabels(obs::AbstractString, legend::AbstractString
 
 end 
 
+function set_result_one!(results::AbstractDict{String,Any},
+												 obs::AbstractString,
+												 numerical_result::T,
+												 trial::Int, i_ps::Int, inds...
+												 )::T where T<:AbstractVector{<:Real} 
+
+
+	
+	I = map(inds,values(results[fn_legend(obs)])) do val,vals 
+
+				val isa Int && return val 
+
+				i = findfirst(==(string(val)),vals)
+
+				if isnothing(i) 
+
+					i = findfirst((occursin(val,V) for V=vals))
+
+				end 
+
+				@assert i isa Int  
+
+				return i 
+
+			end 
+				
+	SignalProcessing.run_m1!(results[obs], trial, numerical_result, 
+													 i_ps, I..., :)
+
+	return numerical_result 
+
+end 
 
 
 
@@ -539,21 +582,96 @@ end
 
 
 
-function set_results_two!(results::AbstractDict,
+function set_results!(results::AbstractDict,
 													nk::Int, k0::Real,
 													trial::Int, i_ps::Int,
 													data)::Nothing
 
-	for (dir1,d) in enumerate(get_data_iter(data))
+	for dir1=1:2 
 					
-		set_results_one!(results, nk, k0, trial, i_ps, dir1, d...) 
+		set_results_onedir!(results, nk, k0, trial, i_ps, dir1, 
+												get_data_dir1(data, dir1)...)
 
+	end  
+
+	set_results_twodir!(results, nk, k0, trial, i_ps, 
+											get_data_dir1(data, 1)..., 
+											get_data_dir1(data, 2)... 
+											)
+
+end   
+
+
+function set_results_twodir!(results::AbstractDict, nk::Int, k0::Real,
+													trial::Int,i_ps::Int,
+													(eigW1_occup_x,nus2pm_xy)::Tuple{
+																<:AbstractVector{<:AbstractArray},
+																<:AbstractVector{<:AbstractArray{<:Real,3}}
+																			},
+													(eigW1_unocc_x,eta2pm_xy)::Tuple{
+																<:AbstractVector{<:AbstractArray},
+																<:AbstractVector{<:AbstractArray{<:Real,3}}
+																			},
+													(eigW1_occup_y,nus2pm_yx)::Tuple{
+																<:AbstractVector{<:AbstractArray},
+																<:AbstractVector{<:AbstractArray{<:Real,3}}
+																			},
+													(eigW1_unocc_y,eta2pm_yx)::Tuple{
+																<:AbstractVector{<:AbstractArray},
+																<:AbstractVector{<:AbstractArray{<:Real,3}}
+																			},
+
+													)::Nothing  
+
+
+	if haskey(results,"D127.1") 
+
+	#	D127.1: polariz = sum over Wannier sectors  
+	
+		p1 = WLO.polariz_fromSubspaces1(eigW1_occup_x)
+		p1_ = WLO.add_nupm(nus2pm_yx)
+
+		set_result_one!(results, "D127.1", 
+										abs.(WLO.wcc_stat_diff!(p1_,p1,[0,0.5])), 
+										trial, i_ps, "x", "occup")
+
+
+		WLO.polariz_fromSubspaces1!(p1, eigW1_unocc_x)  
+		WLO.add_nupm!(p1_, eta2pm_yx)
+	
+		set_result_one!(results, "D127.1", 
+										abs.(WLO.wcc_stat_diff!(p1_,p1,[0,0.5])), 
+										trial, i_ps, "x", "unocc")
+
+
+		WLO.polariz_fromSubspaces1!(p1, eigW1_occup_y)
+		WLO.add_nupm!(p1_, nus2pm_xy) 
+
+		set_result_one!(results, "D127.1", 
+										abs.(WLO.wcc_stat_diff!(p1_,p1,[0,0.5])), 
+										trial, i_ps, "y", "occup")
+
+
+		WLO.polariz_fromSubspaces1!(p1, eigW1_unocc_y)  
+		WLO.add_nupm!(p1_, eta2pm_xy)
+	
+		set_result_one!(results, "D127.1", 
+										abs.(WLO.wcc_stat_diff!(p1_,p1,[0,0.5])), 
+										trial, i_ps, "y", "unocc")
 	end 
 
-end  
 
 
-function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
+
+
+
+	return  
+
+
+
+end 
+
+function set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
 													trial::Int,i_ps::Int,dir1::Int,
 													(eigW1_occup,nus2pm)::Tuple{
 																<:AbstractVector{<:AbstractArray},
@@ -580,18 +698,17 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 	# -------------------------------------------- #
 
-	if any((haskey(results,k) for k in ("D110","D111","D127a","D125")))
+	if any(in(keys(results)), obs_batch_1)
 
-		p1occup = WLO.polariz_fromSubspaces!(eigW1_occup)
-		p1unocc = WLO.polariz_fromSubspaces!(eigW1_unocc)
-	
-	# eigW1[2] are overwritten
+		p1occup = MB.polariz_fromSubspaces1(eigW1_occup,dir1) # vector
+		p1unocc = MB.polariz_fromSubspaces1(eigW1_unocc,dir1) # vector 
+
 
 		if haskey(results,"D110")
 	
 			#	D110: p1occup-p1unocc ==0
 				SignalProcessing.run_m1!(results["D110"],trial,
-										abs.(WLO.wcc_stat_axpy(-1,p1occup,p1unocc)),
+										abs.(WLO.wcc_stat_diff(p1occup,p1unocc)),
 										i_ps,dir1,:)
 			
 		end 
@@ -600,61 +717,73 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 		#	D111: p1occup+p1unocc ==0
 			SignalProcessing.run_m1!(results["D111"],trial,
-									abs.(WLO.wcc_stat_axpy(1,p1occup,p1unocc)),
+									abs.(WLO.wcc_stat_sum(p1occup,p1unocc)),
 									i_ps,dir1,:)
 		
 		end 	
 	
-	
-		if haskey(results,"D127a")|haskey(results,"D125")		
-	
-			p1occup_ = sum(nus2pm)
-			p1unocc_ = sum(eta2pm) 
-		
-#			if haskey(results,"D127a") # INCORRECT --> MEANINGLESS
-#	
-#			#	D127a: polariz = sum over Wannier sectors  (occ=1/unocc=2)
-#				SignalProcessing.run_m1!(results["D127a"], trial, 
-#										abs.(WLO.wcc_stat_axpy!(-1,p1occup_,p1occup,[0,0.5])), 
-#									 i_ps,dir1,1,:) 
-#			
-#			# p1occup has been overwritten
-#			
-#				SignalProcessing.run_m1!(results["D127a"], trial, 
-#										abs.(WLO.wcc_stat_axpy!(-1,p1unocc_,p1unocc,[0,0.5])), 
-#									 i_ps,dir1,2,:) 
-#			
-#			#	p1unocc has been overwritten  
-#	
-#			end 
-	
-			if haskey(results,"D125")
-	
-			#	D125: total polarization zero 
-				SignalProcessing.run_m1!(results["D125"], trial,
-										abs.(WLO.wcc_stat_axpy(1,p1occup_,p1unocc_,[0,0.5])),
-									 i_ps,dir1,:)
-			
-			end 	
+		if haskey(results,"D113")
 
+		#	D113: p1occup or p1unocc in [0,0.5] 
+
+			set_result_one!(results, "D113",
+											abs.(WLO.wcc_stat(p1occup,[0,0.5])),
+											trial, i_ps, dir1, "occup") 
+
+			set_result_one!(results, "D113",
+											abs.(WLO.wcc_stat(p1unocc,[0,0.5])),
+											trial, i_ps, dir1, "unocc") 
+
+		end 	
+	
+		if haskey(results,"D125")||haskey(results,"D127") 
+
+
+			p1occup_ = MB.add_nupm(nus2pm,3-dir1)
+			p1unocc_ = MB.add_nupm(eta2pm,3-dir1)
+
+
+			if haskey(results,"D127")
+				# occupied polarization quantized. Should be identical to D113
+		
+				set_result_one!(results, "D127",
+												abs.(WLO.wcc_stat(p1occup_, [0,0.5])),
+												trial, i_ps, dir1, "occup")
+				set_result_one!(results, "D127",
+												abs.(WLO.wcc_stat(p1unocc_, [0,0.5])),
+												trial, i_ps, dir1, "unocc")
+
+				
+			end 
+
+			if haskey(results,"D125")
+				#	D125: total polarization zero  
+				# Should be identical to D111
+			
+					SignalProcessing.run_m1!(results["D125"], trial,
+											abs.(WLO.wcc_stat_sum(p1occup_,p1unocc_,[0,0.5])),
+										 i_ps,dir1,:)
+				
+			end 
 		end 
 
 	end 
 
-	# -------------------------------------------- #
-
 
 	# -------------------------------------------- #
-	for sector in 1:2 # plus and minus 
+	if haskey(results,"D123")  
+
+		for sector in 1:2 # plus and minus  sectors 
 
 #	D123: nu2pm == eta2pm 
-		haskey(results,"D123") && SignalProcessing.run_m1!(results["D123"], trial,
-				abs.(WLO.wcc_stat_axpy!(-1, nus2pm[sector], eta2pm[sector])), 
-							 i_ps, dir1, sector, :) 
+			
+			set_result_one!(results, "D123",
+											abs.(WLO.wcc_stat_diff(nus2pm[sector], eta2pm[sector])), 
+											trial, i_ps, dir1, sector)
 
-#	eta2pm has been overwritten
+		end # sector 
 
-	end # sector 
+	end
 
 
 
@@ -662,26 +791,12 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 
 	if haskey(results,"D30")
 
-#		if dir1==1 
-#			nu2_minus_mkx = view(nus2pm[2], 1,
-#													 WLO.ind_minusk.(axes(nus2pm[2],2),nk,k0),
-#													 :)
-#		elseif dir1==2
-#
-#			nu2_minus_mky = view(nus2pm[2], 1,
-#													 :,
-#													 WLO.ind_minusk.(axes(nus2pm[2],3),nk,k0),
-#													 )
-#	
-#
-#		end 
-
 			nu2_minus_mk = selectdim(nus2pm[2],dir1+1,
 								WLO.ind_minusk.(axes(nus2pm[2],dir1+1),nk,k0)
 								)
 
 			SignalProcessing.run_m1!(results["D30"], trial,
-									abs.(WLO.wcc_stat_axpy(-1,nus2pm[1],nu2_minus_mk)),
+									abs.(WLO.wcc_stat_diff(nus2pm[1],nu2_minus_mk)),
 								 i_ps,dir1,:)
 
 	end 
@@ -696,11 +811,10 @@ function set_results_one!(results::AbstractDict, nk::Int, k0::Real,
 #nu_x recoreded at dir1==2=y
 
 			SignalProcessing.run_m1!(results["D48"], trial,
-									abs.(WLO.wcc_stat!(view(nus2pm[sector],:),
+									abs.(WLO.wcc_stat(view(nus2pm[sector],:),
 																		 [0,0.5])),
 									i_ps, dir1, sector, : )
 
-# nus2pm overwritten 
 
 		end 
 
@@ -778,7 +892,6 @@ end
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
 										kwargs...)::Dict{String,Any}
 
-	MBtime = braiding_time(P)
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
@@ -804,8 +917,8 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------ no perturbation --------- #
 
-	set_results_two!(results, nk, k0, 1, s1,  
-										 get_data(MB.get_psiH(MBtime, nk, k0), results;
+	set_results!(results, nk, k0, 1, s1,  
+										 get_data(MB.get_psiH(P, nk, k0), results;
 															parallel=parallel))
 
 
@@ -836,14 +949,14 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
-			get_data(MB.get_psiH(MBtime, nk, k0, pert...), results)
+			get_data(MB.get_psiH(P, nk, k0, pert...), results)
 
 		end # get_data contains 4 jobs  
 
 
 		for (I,d) in zip(Iterators.product(eachindex(trials),s2e), data_all)
 
-			set_results_two!(results, nk, k0, I..., d)
+			set_results!(results, nk, k0, I..., d)
 
 		end  
 
@@ -854,9 +967,9 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				data = get_data(MB.get_psiH(MBtime, nk, k0, perturb0, ps), results)
+				data = get_data(MB.get_psiH(P, nk, k0, perturb0, ps), results)
 	
-				set_results_two!(results, nk, k0, j, i, data)
+				set_results!(results, nk, k0, j, i, data)
 	
 			end  
 	

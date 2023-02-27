@@ -4,14 +4,15 @@ module BBH
 import LinearAlgebra 
 
 import myLibs: Groups
-import ..WLO#, ..MB 
+import ..WLO#, ..MB  
+import ..Helpers:Symmetries 
 #import LinearAlgebra
 #
 #import ..WLO: kPOINT_START, NR_kPOINTS
 
 const MODEL_MATRICES_PAULI::Vector{String} = ["30","21","22","23","10"]  
 
-const delta::Float64 = 1e-8
+#const delta::Float64 = 1e-8
 
 #===========================================================================#
 #
@@ -208,7 +209,94 @@ function get_psiH(BBHtheta::Real, n::Int, k0::Real, args...;
 
 end 
 
+function get_enpsiH(BBHtheta::Real, n::Int, k0::Real, args...;
+									atol::Float64=1e-12
+									)::Vector{Array}
 
+	WLO.enpsiH_on_mesh(n, k0, get_pertHdata(BBHtheta, H, args...; atol=atol)...)
+
+end 
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+R2repr = -im*Groups.GammaMatrix(0,2)
+
+function operR2(h::AbstractMatrix)::Matrix 
+
+	Symmetries.UdAV(R2repr, h)
+
+end 
+
+function operR2((V,U)::Tuple{AbstractMatrix,AbstractMatrix})::Matrix 
+
+	Symmetries.UdAV(V, R2repr, U)
+
+end 
+
+function operR2(k::AbstractVector{<:Real})::Vector{Float64}
+
+	Symmetries.inversion(k)
+
+end 
+
+
+function fij_operR2(n::Int, k0::Real)::Function # = Symmetries.inversion   
+
+	ind_minusk = WLO.ind_minusk(n, k0)
+
+	fij_(k::Vararg{Int,2})::NTuple{2,Int} = fij_(k) 
+
+	fij_(k::NTuple{2,Int})::NTuple{2,Int} = Symmetries.inversion(k, ind_minusk)
+
+end 
+
+
+
+function uniqueInds_operR2(n::Int, k0::Real
+																)::Tuple{<:AbstractVector{Int}, 
+																				 <:AbstractVector{Int}
+																				}
+
+	(WLO.uniqueInds_kMirror(n,k0), Base.OneTo(n-1))
+
+end  
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function get_perturb_on_mesh(
+										 symms::AbstractString, 
+										 n::Int, k0::Real,
+										 )::Array{ComplexF64,4}
+
+	@assert symms=="R2" 
+
+	pert = rand(ComplexF64,4,4,n-1,n-1)
+	
+	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
+		
+	WLO.symmetrize_on_mesh!(pert,
+													uniqueInds_operR2(n,k0),
+													(operR2, fij_operR2(n,k0))
+														)
+
+#	MB.symmetrize_on_mesh!(pert, args...)
+
+	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
+	
+	return  pert 
+end   
 
 
 

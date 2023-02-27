@@ -18,8 +18,10 @@ input_checks  = Dict{Symbol,Any}(
   :allparams => (
 
 		braiding_time = [1/4],
+
+		s0_Hamiltonian = 0:0.1:0.4,#Utils.uniqlinsp(1e-3,0.4,5,3; Trunc=true),
 					
-		nr_kPoints = 10:20:70,
+		nr_kPoints = 10:10:40,
 
 		kPoint_start = [-1], 
 
@@ -43,6 +45,8 @@ input_checks  = Dict{Symbol,Any}(
 
 			braiding_time = (1,2),
 
+			s0_Hamiltonian = (1,2),
+
 			nr_kPoints = (3,0),
 
 			kPoint_start = (1,2), 
@@ -60,7 +64,9 @@ input_checks  = Dict{Symbol,Any}(
 
 		),
   
-	:observables => ["D110","D111","D48","D30","D123","D125",#"D127a",
+	:observables => ["D110","D111","D113",
+									 "D48","D30","D123",
+									 "D125","D127","D127.1",
 									 "WannierGap",
 									 "WannierBands1",
 									 "WannierBands2",

@@ -130,6 +130,32 @@ function wcc_stat_axpy!(a::Real,
 
 end 		
 
+function wcc_stat_diff(args...; kwargs...)::Vector{Float64}
+
+	wcc_stat_axpy(-1, args...; kwargs...)
+
+end 		
+
+function wcc_stat_diff!(args...; kwargs...)::Vector{Float64}
+
+	wcc_stat_axpy!(-1, args...; kwargs...)
+
+end 		
+
+function wcc_stat_sum!(args...; kwargs...)::Vector{Float64}
+
+	wcc_stat_axpy!(1, args...; kwargs...)
+
+end 		
+
+function wcc_stat_sum(args...; kwargs...)::Vector{Float64}
+
+	wcc_stat_axpy(1, args...; kwargs...)
+
+end 		
+
+
+
 
 #===========================================================================#
 #
@@ -418,7 +444,7 @@ end
 #
 #end   
 
-function eigH!(storage, 
+function eigH!(storage::AbstractArray, 
 							 ij_or_k::Union{AbstractVector{<:Real}, Tuple{Vararg{<:Real}}},
 							 H::Function,
 							 #ij::NTuple{2,Int}, get_k::Function, perturb::AbstractArray{ComplexF64,4},
@@ -449,7 +475,8 @@ function eigH!(storage, H::AbstractMatrix; kwargs...)::Nothing
 
 end  
 
-function eigH!!(storage, H::AbstractMatrix; kwargs...)::Nothing 
+function eigH!!(storage::AbstractArray, H::AbstractMatrix; kwargs...
+							 )::Nothing 
 
 	eig = LinearAlgebra.eigen!(H)
 
@@ -1305,6 +1332,33 @@ function psiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
 ##
 
 end 
+function enpsiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
+												)::Vector{Array}
+
+	kij = get_kij(n,k0)  
+
+	storage = init_storage(init_eigH(kij, H, Hdata...; kwargs...), n; kwargs...)
+
+	store_on_mesh!!(eigH!, n, kij, storage, H, Hdata...; kwargs...)
+
+	return storage 
+
+end 
+
+function enpsiH_on_mesh(n::Int, k0::Real, 
+											perturb::AbstractArray{ComplexF64,4},
+											H::Function, Hdata...; kwargs...
+											)::Vector{Array}
+
+	kij = get_kij(n,k0)   
+
+	storage = init_storage(init_eigH(kij, H, Hdata...; kwargs...), n; kwargs...)
+
+	store_on_mesh!!(eigH!, n, tuple, storage, H, kij, perturb, Hdata...; kwargs...) 
+
+	return storage 
+
+end 
 
 
 function psiH_on_mesh(n::Int, k0::Real, 
@@ -1314,11 +1368,11 @@ function psiH_on_mesh(n::Int, k0::Real,
 
 	kij = get_kij(n,k0)  
 
-	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; 
-													 kwargs...)
 
-	store_on_mesh!!(eigH!, tuple, Bloch_WFs, H, kij, perturb, Hdata...; 
-									kwargs...)
+	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
+
+
+	store_on_mesh!!(eigH!, tuple, Bloch_WFs, H, kij, perturb, Hdata...; kwargs...) 
 
 ##
 #	store_on_mesh!!(eigH!, source=tuple, dest=Bloch_WFs,  rest...)
@@ -1840,10 +1894,50 @@ end
 function polariz_fromSubspaces(storage::AbstractVector{<:AbstractArray}
 															 )::Array{Float64,3}
 
-
+# to be removed 
 	sum(nuPlusMinus_fromSubspaces(storage))
 
-end 
+end  
+
+
+function polariz_fromSubspaces1(storage::AbstractVector{<:AbstractArray}
+															 )::Array{Float64,3}
+
+	add_nupm(view(storage,[2,4]))
+
+
+end  
+
+function polariz_fromSubspaces1!(out::AbstractArray{Float64,3},
+																 storage::AbstractVector{<:AbstractArray}
+															 )::AbstractArray{Float64,3}
+
+	# wf_plus,nu_plus,wf_minus,nu_minus  
+	
+	add_nupm!(out, view(storage,[2,4]))
+
+end   
+
+function add_nupm(storage::AbstractVector{<:AbstractArray}
+															 )::Array{Float64,3}
+
+	sum(storage)
+
+end   
+
+function add_nupm!(out::AbstractArray{Float64,3},
+																 storage::AbstractVector{<:AbstractArray}
+															 )::AbstractArray{Float64,3}
+
+	copy!(out, storage[1]) # only nu_plus, nu_minus 
+
+	out .+= storage[2] 
+
+	return out 
+
+end   
+
+
 function polariz_fromSubspaces!(storage::AbstractVector{<:AbstractArray}
 									 )::AbstractArray{<:Real,3}
 
@@ -1859,6 +1953,50 @@ function WannierGap_fromSubspaces(storage::AbstractVector{<:AbstractArray}
 																		)::Float64
 
 	Wannier_min_gap_mesh(nuPlusMinus_fromSubspaces(storage)...)
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function check_nu_k_dep(nu::AbstractMatrix{T},
+												d::Int;
+												atol::Float64=1e-10,
+												onewarning::Bool=false,
+												assert::Bool=true,
+												)::Tuple{Bool,<:AbstractVector{T}} where T<:Real 
+
+	out = true 
+
+	for i=2:size(nu,d) 
+
+
+		D = Utils.reduce_dist_periodic(max, selectdim(nu,d,i), selectdim(nu,d,1), 1)
+
+		D<atol &&  continue
+	
+		@warn "nux depends on kx | nuy depends on ky?" 
+
+		@show LinearAlgebra.norm(D)
+
+		@show Utils.reduce_dist_periodic(max, selectdim(nu,3-d,i), selectdim(nu,3-d,1), 1)
+
+		out=false 
+#		break 
+
+		onewarning && break 
+
+	end   
+
+	assert && @assert out 
+
+	return (out,selectdim(nu,d,1))
 
 end 
 
