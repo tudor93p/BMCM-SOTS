@@ -8,16 +8,16 @@ path = [
 				]
 
 
-tiers = [Dict("spaceml4"=>28, 
-							#"yoshi"=>12, 
+tiers = [Dict("spaceml4"=>29, 
+							"yoshi"=>12, 
 							"nut"=>23, 
 							"toad"=>38,
 							"taranis"=>15,
 							"horon"=>7,
-							"sia"=>8,
+							"sia"=>7,
 							"re"=>11,
-							"neper"=>8,
-							"kis"=>8,
+							"neper"=>7,
+							"kis"=>7,
 							)
 				 ]
 

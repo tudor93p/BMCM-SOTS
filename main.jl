@@ -16,7 +16,7 @@ tasks = [
 
 
 #ComputeTasks.missing_data.(tasks)
-ComputeTasks.get_data_one.(tasks, mute=true)#false) 
+ComputeTasks.get_data_one.(tasks, mute=false) 
 
 #shuffle = gethostname()=="tudor-HP"
 
@@ -38,6 +38,11 @@ while Dates.now() < t1 #< Dates.Minute(9)
 end 
 
 
-ComputeTasks.get_data_all.(tasks, shuffle=true, seed=2, mute=true)
+ComputeTasks.get_data_all.(tasks, shuffle=true, seed=4, mute=true)
+
+
+
+
+
 
 

@@ -712,7 +712,7 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 
 	observables_ = intersect(observables, ChecksWLO.calc_observables) 
 
-	C = Calculation("Check zeros at fixed PS vs. $X", 
+	C = Calculation("Check zeros at fixed PS for several $Y",
 									ChecksWLO, init_dict; 
 									observables=observables_, kwargs...)
 

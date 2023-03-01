@@ -12,8 +12,8 @@ server=pahomit@$host.ethz.ch
 
 subfolder=""
 
-#subfolder=DeviceWithLeads/
-#subfolder=Ribbon/
+#subfolder=BMCMSOTS/CalcWLO/
+subfolder=BMCMSOTS/ChecksWLO/
 
 
 
