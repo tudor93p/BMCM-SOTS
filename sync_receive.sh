@@ -61,10 +61,10 @@ rsync -azh $src $dest
 
 #ssh $server "cd $remotefolder; find . -newermt '$since' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest 
 
-echo 
-echo 'Local disk usage in MB and GB'
+#echo 
+#echo 'Local disk usage in MB and GB'
 #df -m $dest
-df -h $dest
+#df -h $dest
 
 echo "***** Done! *****"
 

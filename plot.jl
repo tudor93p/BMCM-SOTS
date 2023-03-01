@@ -22,7 +22,7 @@ for t in tasks[2:2]
 end 
 
 for t in tasks[1:2]
-	ComputeTasks.get_data_one(t, mute=false) 
+#	ComputeTasks.get_data_one(t, mute=false) 
 end 
 
 myPlots.plot(tasks)

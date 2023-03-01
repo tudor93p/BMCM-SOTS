@@ -2326,7 +2326,7 @@ end
 
 
 
-# w_x in (6.6)
+# w_x in (6.5)
 
 function Wannier_band_basis0(k::AbstractVector, 
 														dir1::Int, 
@@ -2448,7 +2448,8 @@ function Wannier_band_basis!(w::AbstractMatrix,
 
 #	LinearAlgebra.mul!(w, U, W) 
 
-	return 
+	return  
+
 end 
 
 

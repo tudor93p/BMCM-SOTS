@@ -16,7 +16,7 @@ tasks = [
 
 
 #ComputeTasks.missing_data.(tasks)
-ComputeTasks.get_data_one.(tasks, mute=false) 
+ComputeTasks.get_data_one.(tasks, mute=true)#false) 
 
 #shuffle = gethostname()=="tudor-HP"
 
@@ -28,6 +28,8 @@ ComputeTasks.get_data_one.(tasks, mute=false)
 
 
 t1 = Dates.DateTime("2023-02-27T18:11:46.870")
+
+println("Calculations start at: ",t1)
 
 while Dates.now() < t1 #< Dates.Minute(9)
 

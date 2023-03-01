@@ -3,4 +3,5 @@ pyqt_figures
 Data/ 
 .*.swp
 Manifest.toml 
-.fuse_hid*
+.fuse_hid* 
+nohup.out

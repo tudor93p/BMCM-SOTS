@@ -105,8 +105,8 @@ symmetries = input_checks[:allparams][:preserved_symmetries]
 #	p1 = (braiding_time = 0.25, nr_kPoints = 40, kPoint_start = -1, preserved_symmetries = symm, nr_perturb_strength = 6, max_perturb_strength = 0.8, nr_perturb_instances = 2, perturb_strength = 0.1)
 #
 #
-@time data2 = CalcWLO.Compute(P; observables=observables)
-@time data1 = ChecksWLO.Compute(P; observables=observables)
+#@time data2 = CalcWLO.Compute(P; observables=observables)
+#@time data1 = ChecksWLO.Compute(P; observables=observables)
 #
 #end 
 #
@@ -116,10 +116,16 @@ tasks = [
 				 init(BMCMSOTS, :CheckZero), 
 				 
 				 init(BMCMSOTS, :WannierBands2),
-				 init(BMCMSOTS, :WannierBands1),
+#				 init(BMCMSOTS, :WannierBands1),
+				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
+				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s_Hamilt),
+				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:b_Hamilt),
+				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s0_Hamilt),
 				 ];
-#
-pdata =map(tasks ) do task0
+
+task0 = init(BMCMSOTS, :CheckZero)
+
+pdata =map(tasks ) do task
 
 p = ComputeTasks.get_first_paramcomb(task0)
 
@@ -131,12 +137,14 @@ target = rand(observables)
 
 P = task0.get_plotparams(p)
 
+P["perturb_strength"] = 0.3 
+
 P["obs_group"]= "dir1"
 
 P["obs"] = target 
 P["obs_i"] = rand(1:10)
 
-task0.plot(P)
+task.plot(P)
 
 end  
 

@@ -347,6 +347,7 @@ function extract_data_and_lab(Y::AbstractArray{<:Number,N},
 															obs_groups::AbstractVector{<:AbstractString},
 															obs_i::Int;
 															transf_data::Function=copy!,
+															#inplace!
 															out_type::DataType=Float64,
 															kwargs...
 															)::Tuple{Vector{Vector{<:Number}},
@@ -370,6 +371,16 @@ function extract_data_and_lab(Y::AbstractArray{<:Number,N},
 	nr_curves = mapreduce(length,*,I)
 
 	chlabels = Vector{String}(undef,nr_curves)
+
+#
+#	println()
+#	@show I first.(I)
+#	(n1,i1),iter2e = Iterators.peel(enumerate(Iterators.product(I...)))
+#	@show n1 i1 collect(iter2e)
+#	println() 
+#
+#	transf_data(ys[n1], view(Y, :, i1...))
+
 
 	ys = [Vector{out_type}(undef,size(Y,1)) for i=1:nr_curves] 
 

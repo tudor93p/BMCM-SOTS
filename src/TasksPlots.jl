@@ -163,6 +163,43 @@ function f_extract_data_and_lab(P::AbstractDict; kwargs...)::Function
 
 end 
 
+function f_extract_data_and_lab_atPS(P::AbstractDict; kwargs...)::Function
+
+	PS = max(get(P, "perturb_strength", 0), 1e-4)
+
+
+	function F2_(((x,xlabel),(ys,chlabels,fixedlab)
+								)::Tuple{Tuple,Tuple}
+							 )::Tuple
+
+		(PS,xlabel,
+		 [SignalProcessing.Interp1D(x,y,1,PS) for y=ys],
+		 chlabels,
+		 fixedlab)
+
+	end 
+
+	return F2_ ∘ f_extract_data_and_lab(P; kwargs...)
+
+end 
+
+
+
+
+
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
 tex(lab::AbstractString)::String = "\$$lab\$"   
 
 function plotdict_WCC(P::AbstractDict, 
@@ -487,7 +524,7 @@ end
 
 #===========================================================================#
 #
-function WannierGap_atY(init_dict::AbstractDict;
+function WannierGap_atYs(init_dict::AbstractDict;
 											 Y::Symbol,
 											observables::AbstractVector{<:AbstractString},
 											kwargs...)::PlotTask
@@ -520,7 +557,7 @@ end
 
 #===========================================================================#
 #
-function CheckZero_atY(init_dict::AbstractDict;
+function CheckZero_atYs(init_dict::AbstractDict;
 											 Y::Symbol,
 											observables::AbstractVector{<:AbstractString},
 											kwargs...)::PlotTask
@@ -572,7 +609,185 @@ end
 
 
 
+#===========================================================================#
+#
+function CheckZero_atPS_vsX(init_dict::AbstractDict;
+											 X::Symbol,
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
 
+	observables_ = intersect(observables, ChecksWLO.calc_observables) 
+
+	C = Calculation("Check zeros at fixed PS vs. $X", 
+									ChecksWLO, init_dict; 
+									observables=observables_, kwargs...)
+
+	task, out_dict, = ComputeTasks.init_multitask(C, [X=>1])#, [1=>""])
+
+
+	P1 = Dict{String,Any}("obs"=>first(observables_))
+
+	#d3(d::Tuple)::Float64 = only(d[3]) 
+
+	function plot(P2::AbstractDict)::Dict{String,Any} 
+
+		P = in(get(P2,"obs",0), observables_) ? P2 : merge(P2,P1)
+
+		transf_lab="\$\\log_{10}\$" 
+
+		kwargs = (transf_lab="\$\\log_{10}\$",
+							transf_data=apply_log10abs!
+							)
+
+		F = f_extract_data_and_lab_atPS(P; kwargs...)
+
+		data = task.get_data(P; fromPlot=true, target=P["obs"], apply_rightaway=F)
+		
+		chlabs = data[1][4] 
+
+		ys = [zeros(length(data)) for l=chlabs]
+
+		for (i,d) in enumerate(data)
+			for (j,y) in enumerate(d[3])
+
+				ys[j][i]=y
+
+			end 
+		end 
+
+
+#		ys = mapreduce(Base.Fix2(getindex,3),hcat,data)
+
+
+		ylabel = myPlots.join_label(transf_lab*P["obs"],
+																data[1][5], 
+																"PS="*nr2str(data[1][1],2),
+																						 )
+		return Dict{String,Any}(
+
+							"xs" => [out_dict["x"] for y=ys],
+							
+							"ys" => ys,
+
+							"xlim" => extrema(out_dict["x"]),
+
+							"ylim" => get_ylim(P, ys),
+
+
+							"labels" => chlabs,
+
+							"ylabel" => ylabel,
+
+							"xlabel" => out_dict["xlabel"],
+
+
+						)
+
+
+#										transf_lab="\$\\log_{10}\$",
+#										transf_data=apply_log10abs!
+#										)
+
+	end
+
+	return PlotTask(task,  
+									[init_sliders_obs(observables_);
+									 [("obs_group", ChecksWLO.combs_groups()),	("ylim",)]], 
+									"Curves_yofx", 
+									plot)
+
+end 
+
+
+#===========================================================================#
+#
+function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
+											 X::Symbol,Y::Symbol,
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	observables_ = intersect(observables, ChecksWLO.calc_observables) 
+
+	C = Calculation("Check zeros at fixed PS vs. $X", 
+									ChecksWLO, init_dict; 
+									observables=observables_, kwargs...)
+
+	task, out_dict, construct_Z, = ComputeTasks.init_multitask(C, [X=>1, Y=>1])
+
+
+	P0 = Dict{String,Any}("obs_group"=>"-") 
+
+	P1 = Dict{String,Any}("obs"=>first(observables_))
+		
+	d3(d::Tuple)::Float64 = only(d[3])
+
+	function plot(P2::AbstractDict)::Dict{String,Any} 
+
+		P = in(get(P2,"obs",0),observables_) ? merge(P2,P0) : merge(P2,P1,P0)
+
+		transf_lab="\$\\log_{10}\$" 
+
+		kwargs = (transf_lab="\$\\log_{10}\$",
+							transf_data=apply_log10abs!
+							)
+
+		F = f_extract_data_and_lab_atPS(P; kwargs...)
+
+		data = task.get_data(P; fromPlot=true, target=P["obs"], apply_rightaway=F)
+	
+		for d in data
+			@assert length(d[3])==length(d[4])==1
+			@assert isempty(only(d[4]))
+		end 
+
+
+		ys = collect.(eachcol(construct_Z(d3, data)["z"]))
+
+
+
+		ylabel = myPlots.join_label(transf_lab*P["obs"],
+																data[1][5], 
+																"PS="*nr2str(data[1][1],2),
+																						 )
+
+		out = Dict{String,Any}(
+
+							"xs" => [out_dict["x"] for y=ys],
+
+							"xlabel" => out_dict["xlabel"],
+
+							"ys" => ys,
+
+							"xlim" => extrema(out_dict["x"]),
+
+							"ylim" => get_ylim(P, ys),
+
+							"labels" => out_dict["y"],
+		
+							"ylabel" => ylabel,
+
+							)
+
+	ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero
+
+	return out 
+
+#										transf_lab="\$\\log_{10}\$",
+#										transf_data=apply_log10abs!
+#										)
+
+	end
+
+	return PlotTask(task, 
+									[init_sliders_obs(observables_); ("ylim",)], 
+									"Curves_yofx", 
+									plot)
+
+end 
 
 
 

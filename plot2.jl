@@ -10,8 +10,8 @@ Ys = [:preserved_symmetries, :nr_kPoints, :s0_Hamilt, :s_Hamilt,:b_Hamilt]
 
 
 tasks = vcat(
-				[init(BMCMSOTS,:CheckZero_atY; Y=Y) for Y=Ys],
-				[init(BMCMSOTS,:WannierGap_atY; Y=Y) for Y=Ys],
+				[init(BMCMSOTS,:CheckZero_atYs; Y=Y) for Y=Ys],
+				[init(BMCMSOTS,:WannierGap_atYs; Y=Y) for Y=Ys],
 				)
 
 
