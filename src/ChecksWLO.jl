@@ -167,7 +167,7 @@ end
 function get_data(psiH::AbstractArray{ComplexF64,4}, 
 									results::AbstractDict;
 									parallel::Bool=false
-									)::Vector
+									)::Vector 
 
 	(parallel ? pmap : map)(Base.splat(WLO.get_wlo_data_mesh), 
 													get_data_args(psiH, results))
@@ -917,7 +917,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	@assert iszero(zero_strength)
 
 
-	results = init_results(strengths, get_target(target; kwargs...))
+results = init_results(strengths, get_target(target; kwargs...))
 
 
 #	return Dict{String,Any}(k=>v for (k,v)=pairs(results) if isauxfile(k)) 

@@ -185,25 +185,6 @@ end
 
 
 
-#function matmul!(A::AbstractMatrix{T},
-#								 B::AbstractMatrix{Tb},
-#								 C::AbstractMatrix{Tc},
-#								 f1::Function=identity
-#								 )::Nothing where {T<:Number,Tb<:T,Tc<:T}
-#
-#	A .= 0 
-#
-#	for k in axes(C,2), j in axes(B,2), i in axes(B,1)
-#
-#		A[i,k] += f1(B[i,j]) * C[j,k]
-#
-#	end 
-#
-#	return 
-#
-#end  
-#
-
 function overlap(wf1::AbstractMatrix{T1},
 								 wf2::AbstractMatrix{T2}=wf1;
 								 dim::Int=2
@@ -653,19 +634,15 @@ end
 
 
 
-function unitary_part(G)
+function unitary_part(G::AbstractMatrix)::Matrix
 
 	F = copy(G) 
 
 	unitary_part!(F) 
 
-	return F 
-
 end  
 
-function unitary_part!(G)
-
-#	return 
+function unitary_part!(G::AbstractMatrix)::AbstractMatrix
 
 	svd = LinearAlgebra.svd!(G)  
 
@@ -682,18 +659,16 @@ function unitary_overlap(wf1::AbstractMatrix{T1},
 
 	unitary_part!(A)
 
-	return A 
-
 end 
 
 function unitary_overlap!(A::AbstractMatrix{T},
 									wf1::AbstractMatrix{T1},
 								 wf2::AbstractMatrix{T2}
-								 )::Nothing where {T<:Number,T1<:T,T2<:T}
+								 )::AbstractMatrix{T} where {T<:Number,T1<:T,T2<:T}
 
 	overlap!(A, wf1,wf2)
 
-	unitary_part!(A) 
+	unitary_part!(A)  
 
 end 
 
@@ -1307,8 +1282,185 @@ function wlo_from_mesh(
 
 	end 
 	
+end  
+
+#
+#function matmulpairs!(dst::AbstractArray{T,3},
+#											src::AbstractArray{T,3},
+#											N::Int=size(src,3)
+#											)::AbstractMatrix{T} where T<:Number 
+#
+#	N == 1 && return selectdim(src,3,1)
+#	
+#	offset = isodd(N) 
+#
+#	offset && copy!(selectdim(dst,3,1), selectdim(src,3,1))
+#
+#	for (i,i2) in zip(1+offset:div(N,2)+offset,2+offset:2:N)
+#
+#		LinearAlgebra.mul!(selectdim(dst,3,i),
+#											 selectdim(src,3,i2-1),
+#											 selectdim(src,3,i2)
+#											 )
+#	end 
+#
+#	matmulpairs!(src, dst, div(N+1,2))
+#
+#end 
+
+function matmulpairs!(aux::AbstractArray{T,3},
+											matrices::Vararg{<:AbstractMatrix{T},N}
+											)::AbstractMatrix{T} where T<:Number where N 
+
+	for i=1:div(N,2) 
+
+		LinearAlgebra.mul!(selectdim(aux,3,i),matrices[2i-1],matrices[2i])
+
+	end 
+
+	isodd(N) && copy!(selectdim(aux,3,div(N+1,2)), matrices[N])
+
+	return matmulpairs!(aux, div(N+1,2))
+
 end 
 
+
+function matmulpairs!(dst::AbstractArray{T,3},
+											src::AbstractArray{T,3},
+											i0::Int=1,
+											)::AbstractMatrix{T} where T<:Number 
+
+	size(src,3) == 1 && return selectdim(src,3,1)
+	
+	offset = isodd(size(src,3))
+
+
+	Npairs = div(size(src,3),2)
+
+
+	for (i,i2) in zip(1+offset:Npairs+offset,2+offset:2:size(src,3))
+
+		LinearAlgebra.mul!(selectdim(dst,3,i+i0-1),
+											 selectdim(src,3,i2-1),
+											 selectdim(src,3,i2)
+											 )
+	end 
+
+	if offset 
+		
+		copy!(selectdim(dst,3,i0), selectdim(src,3,1))
+
+		return matmulpairs!(dst,
+												selectdim(dst,3,i0:i0+Npairs),
+												size(dst,3)+1>2i0+Npairs ? i0+Npairs+1 : 1
+											)
+
+	else 
+
+		return matmulpairs!(dst,
+												selectdim(dst,3,i0:i0+Npairs-1),
+												size(dst,3)+2>2i0+Npairs ? i0+Npairs : 1
+												)
+	end 
+end 
+
+
+
+function matmulpairs!(data::AbstractArray{T,3},
+											 stop::Int=size(data,3)-1,
+											 N::Int=stop,
+											)::AbstractMatrix{T} where T<:Number 
+
+	while N>1 
+
+		for (j,k) in zip(stop:-1:stop-div(N,2)+1, stop-2:-2:stop-N)
+	
+			LinearAlgebra.mul!(selectdim(data, 3, mod(j,size(data,3))+1),
+												 selectdim(data, 3, mod(k,size(data,3))+1),
+												 selectdim(data, 3, mod(k+1,size(data,3))+1),
+												 )
+	
+		end 
+	
+	
+		if isodd(N) 
+	
+			copy!(selectdim(data, 3, mod(stop-div(N,2), size(data,3))+1),
+						selectdim(data, 3, mod(stop-N, size(data,3))+1))
+	
+		end  
+	
+		stop = mod(stop,size(data,3))+1
+	
+		N = div(N+1,2)
+
+	end 
+	
+	
+	return selectdim(data,3,stop)
+
+
+end  
+
+
+
+
+#
+#function matmulpairs!(dst::AbstractArray{T,3},
+#											src::AbstractArray{T,3},
+#											N::Int=size(src,3)
+#											)::AbstractMatrix{T} where T<:Number 
+#
+#	N == 1 && return selectdim(src,3,1)
+#
+#	isodd(N) && copy!(selectdim(dst,3,div(N+1,2)), selectdim(src,3,N))
+#
+#	for (i,i2) in enumerate(1:2:N-1)
+#
+#		LinearAlgebra.mul!(selectdim(dst,3,i),
+#											 selectdim(src,3,i2),
+#											 selectdim(src,3,i2+1)
+#											 )
+#	end 
+#
+#	return matmulpairs!(src, dst, div(N+1,2))
+#
+#end 
+
+
+function wlo_from_mesh!(dst::AbstractMatrix{ComplexF64},
+												IJ0::Union{AbstractVector{Int},Tuple{Int,Int}},
+												dir::Int,
+											 wfs::AbstractArray{ComplexF64,4},
+											 n::Int,
+											 aux::AbstractArray{ComplexF64,3},
+											 )::Nothing 
+
+
+	for k = 1:n-1  
+
+		unitary_overlap!(
+										 selectdim(aux,3,k),
+										 get_item_ij(k, dir, IJ0, wfs),
+										 get_item_ij(k+1, dir, IJ0, wfs),
+										 )
+
+	end  
+
+	copy!(dst, matmulpairs!(aux))
+
+#	@assert 1<=dir<=2 "Direction must be 1=='x' or 2=='y'"
+#
+#	return mapreduce(*, 1:nr_kPoints_from_mesh(wfs)-1) do k 
+#
+#		unitary_overlap(get_item_ij(k, dir, IJ0, wfs),
+#										get_item_ij(k+1, dir, IJ0, wfs))
+#
+#
+
+	return  
+
+end 
 
 
 
@@ -1553,9 +1705,87 @@ function wlo1_on_mesh(dir1::Int, Bloch_WFs::AbstractArray,
 								nr_kPoints_from_mesh(Bloch_WFs), 
 								tuple, 
 								dir1, 
-								Bloch_WFs)
+								Bloch_WFs) 
+
+
+end  
+
+
+function orderinds(dir1::Int, i::Int, j::Int)::NTuple{2,Int}
+
+	dir1==1 && return (i,j)
+
+	dir1==2 && return (j,i)
+
+	error()
 
 end 
+
+
+
+function wlo1_on_mesh_inplace(dir1::Int, Bloch_WFs::AbstractArray,
+											)::Array
+
+	nmesh = nr_kPoints_from_mesh(Bloch_WFs) 
+
+	nwf = size(Bloch_WFs,2) 
+
+	dest = Array{ComplexF64,4}(undef, nwf, nwf, nmesh-1, nmesh-1)
+
+	aux = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1)
+
+	overlaps = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1) 
+
+#	ovinds = Vector{Int}(undef, nmesh-1)
+
+
+	for n=1:nmesh-1 
+
+		for k = 1:nmesh-1  
+
+			unitary_overlap!(selectdim(overlaps,3,k),
+											 get_item_ij(k, dir1, orderinds(dir1,1,n), Bloch_WFs),
+											 get_item_ij(k+1, dir1, orderinds(dir1,1,n), Bloch_WFs),
+											 )
+
+#			ovinds[k] = k 
+
+		end  
+
+		copy!(select_mesh_point(dest, orderinds(dir1,1,n)), 
+					matmulpairs!(aux, overlaps))
+
+
+		for m=2:nmesh-1
+
+#			ovinds .+= 1 
+
+#			ovinds[end-m+2] -= nmesh-1
+
+#			copy!(select_mesh_point(dest, orderinds(dir1,m,n)), 
+#						matmulpairs!(aux, selectdim(overlaps,3,ovinds)))
+# equivalent 
+
+			copy!(select_mesh_point(dest, orderinds(dir1,m,n)),
+						matmulpairs!(aux,
+												 inv(selectdim(overlaps, 3, m-1)),
+												 select_mesh_point(dest, orderinds(dir1,m-1,n)),
+												 selectdim(overlaps, 3, m-1)
+												 ))
+									
+
+		end 
+
+
+	end 
+
+
+	return dest 
+
+end 
+
+
+
 
 
 
@@ -1622,6 +1852,7 @@ function Wannier_subspaces_on_mesh!(W::AbstractArray)
 
 end  
 
+
 function Wannier_subspace_on_mesh(s::Union{Function,Real}, Hdata...)
 
 	W,U = wlo1_on_mesh(Hdata...)
@@ -1647,7 +1878,8 @@ function Wannier_band_basis_mesh(
 
 	return Wannier_band_basis_mesh(eig[1], Bloch_WFs)[1], eig 
 
-end  
+end   
+
 
 function Wannier_band_basis_mesh(
 																 eigvecs::AbstractArray,
@@ -1667,6 +1899,8 @@ end
 function Wannier_band_basis_mesh(
 																 s::Union{Function,Real},
 																 data...)
+
+	@warn "Inefficient obsolete method"
 
 	Wannier_band_basis_mesh(wlo1_on_mesh(data...)..., s)
 
@@ -1721,17 +1955,12 @@ end
 
 
 	
-function wlo2_on_mesh(					 
-											dir2::Int,
-											data...)
+function wlo2_on_mesh(dir2::Int, data...)::Array{ComplexF64,4}
 
-	nested_WF_dir1 = Wannier_band_basis_mesh(data...)[1]
+	wlo1_on_mesh_inplace(dir2, Wannier_band_basis_mesh(data...)[1])
 
-	return store_on_mesh(wlo_from_mesh, 
-											 nr_kPoints_from_mesh(nested_WF_dir1),
-											 tuple, dir2, nested_WF_dir1)
-	
 end 
+
 
 
 function wlo2_on_mesh(dir2::Int,
@@ -2260,7 +2489,16 @@ function get_wlo_data_mesh(psiH::AbstractArray{ComplexF64,4},
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
-	eigW1 = Wannier_subspaces_on_mesh!(wlo1_on_mesh(dir1, psi))
+#@assert wlo1_on_mesh_inplace(dir1, psi)≈wlo1_on_mesh(dir1, psi) 
+#println()
+#@time wlo1_on_mesh_inplace(dir1, psi) 
+#@time wlo1_on_mesh(dir1, psi) 
+##println()
+
+
+	eigW1 = Wannier_subspaces_on_mesh!(wlo1_on_mesh_inplace(dir1, psi)) 
+
+#	wlo1_on_mesh and wcc2mesh_fromSubspaces1 -- equally most costly
 
 	if get_wlo2 
 

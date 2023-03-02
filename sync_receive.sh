@@ -5,7 +5,7 @@ host='horon'
 #host='plumpy'
 #host='nut'
 
-since='2022-06-09 01:17:00'
+since='2023-03-01 21:45:00'
 
 server=pahomit@$host.ethz.ch
 
@@ -13,7 +13,7 @@ server=pahomit@$host.ethz.ch
 subfolder=""
 
 #subfolder=BMCMSOTS/CalcWLO/
-subfolder=BMCMSOTS/ChecksWLO/
+#subfolder=BMCMSOTS/ChecksWLO/
 
 
 
@@ -30,6 +30,11 @@ dest=$localfolder
 echo 
 echo "Current time"
 date 
+
+echo 
+echo 'Local and remote folders' 
+echo $localfolder
+echo $remotefolder
 
 
 #echo
@@ -50,16 +55,16 @@ date
 
 
 echo
+#
+#echo "***** Receiving remote data *****"
+#rsync -azh $src $dest 
 
-echo "***** Receiving remote data *****"
-rsync -azh $src $dest 
 
+echo "***** Receiving remote data produced since $since *****"
 
-#echo "***** Receiving remote data produced since $since *****"
+##ssh $server "cd $remotefolder; find . -name '*.jld' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest
 
-###ssh $server "cd $remotefolder; find . -name '*.jld' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest
-
-#ssh $server "cd $remotefolder; find . -newermt '$since' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest 
+ssh $server "cd $remotefolder; find . -newermt '$since' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest 
 
 #echo 
 #echo 'Local disk usage in MB and GB'

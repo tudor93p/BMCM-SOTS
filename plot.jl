@@ -18,11 +18,11 @@ init(BMCMSOTS,:CheckZero),
 
 
 for t in tasks[2:2]
-#	@assert ComputeTasks.missing_data(t)==0
+	@assert ComputeTasks.missing_data(t)==0
 end 
 
-for t in tasks[1:2]
-#	ComputeTasks.get_data_one(t, mute=false) 
+for t in tasks[1:1]
+	ComputeTasks.get_data_one(t, mute=false) 
 end 
 
 myPlots.plot(tasks)

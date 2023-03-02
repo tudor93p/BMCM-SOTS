@@ -301,6 +301,7 @@ function plot_check_zero_multi(P::AbstractDict,
 
 	F = f_extract_data_and_lab(P; kwargs...)
 
+
 	data = task.get_data(P; fromPlot=true, target=P["obs"], apply_rightaway=F)
 	
 	curves = vcat((d[2][1] for d in data)...)
@@ -572,7 +573,6 @@ function CheckZero_atYs(init_dict::AbstractDict;
 	task, out_dict, = ComputeTasks.init_multitask(C, [Y=>1], [1=>""])
 
 	P0 = Dict{String,Any}("obs_group"=>"-") 
-
 
 #		plot∘add_default_obs(observables_)∘Base.Fix1(merge,P0) 
 

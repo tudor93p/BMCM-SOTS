@@ -54,7 +54,8 @@ end
 println() 
 
 observables=input_checks[:observables]
-symmetries = input_checks[:allparams][:preserved_symmetries] 
+symmetries = input_checks[:allparams][:preserved_symmetries]  
+meshsizes = input_checks[:allparams][:nr_kPoints]
 	
 #
 #MBparams = ChecksWLO.parse_MB_params(P)
@@ -106,11 +107,29 @@ symmetries = input_checks[:allparams][:preserved_symmetries]
 #
 #
 #@time data2 = CalcWLO.Compute(P; observables=observables)
-#@time data1 = ChecksWLO.Compute(P; observables=observables)
+
+
+for n in meshsizes 
+
+	n>60 && break 
+
+	println() 
+
+	@show n 
+
+	p1 = Utils.adapt_merge(P, :nr_kPoints=>n)
+
+	data1 = ChecksWLO.Compute(p1; observables=observables) 
+
+	println() 
+
+end 
+
+
 #
 #end 
 #
-#error() 
+error() 
 #
 tasks = [
 				 init(BMCMSOTS, :CheckZero), 
@@ -123,7 +142,7 @@ tasks = [
 				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s0_Hamilt),
 				 ];
 
-task0 = init(BMCMSOTS, :CheckZero)
+task0 = init(BMCMSOTS, :CheckZero);
 
 pdata =map(tasks ) do task
 

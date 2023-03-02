@@ -5,14 +5,19 @@ import BMCMSOTS, myPlots
 
 include("input_file.jl")
 
-Ys = [:preserved_symmetries, :nr_kPoints, :s0_Hamilt, :s_Hamilt,:b_Hamilt]
+Ys = [
+#			:preserved_symmetries, 
+			:nr_kPoints, 
+#			:s0_Hamilt, 
+			:s_Hamilt,:b_Hamilt]
+
 
 
 
 tasks = vcat(
 				[init(BMCMSOTS,:CheckZero_atYs; Y=Y) for Y=Ys],
 				[init(BMCMSOTS,:WannierGap_atYs; Y=Y) for Y=Ys],
-				)
+				);
 
 
 #for t in tasks 
