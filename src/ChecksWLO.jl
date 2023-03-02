@@ -145,13 +145,14 @@ end
 #---------------------------------------------------------------------------#
 
 function get_data_args(psiH::AbstractArray{<:Number,4},
-											 results::AbstractDict
+											 results::AbstractDict,
+											 f::Function=identity
 											 )::Vector{Tuple{Array,Bool,Int,Bool}}
 
 	r = any(in(keys(results)), obs_batch_2)
 
-	return [(psiH, true, 1, r), (psiH, false, 1, r), 
-					(psiH, true, 2, r), (psiH, false, 2, r),
+	return [(f(psiH), true, 1, r), (f(psiH), false, 1, r), 
+					(f(psiH), true, 2, r), (f(psiH), false, 2, r),
 					]
 
 end  
@@ -168,9 +169,20 @@ function get_data(psiH::AbstractArray{ComplexF64,4},
 									results::AbstractDict;
 									parallel::Bool=false
 									)::Vector 
+	
+	if parallel
 
-	(parallel ? pmap : map)(Base.splat(WLO.get_wlo_data_mesh), 
-													get_data_args(psiH, results))
+		args = get_data_args(psiH, results, copy)
+
+		return pmap(Base.splat(WLO.get_wlo_data_mesh), args)
+
+	else 
+
+		args = get_data_args(psiH, results)
+
+		return map(Base.splat(WLO.get_wlo_data_mesh), args)
+
+	end
 
 end 
 

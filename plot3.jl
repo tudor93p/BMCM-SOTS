@@ -27,9 +27,9 @@ tasks = [
 #				)
 
 
-#for t in tasks 
-#	@assert ComputeTasks.missing_data(t)==0
-#end 
+for t in tasks[1:1]
+@assert ComputeTasks.missing_data(t)==0
+end 
 
 #ComputeTasks.get_data_one(tasks[1], mute=false) 
 
