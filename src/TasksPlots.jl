@@ -163,19 +163,42 @@ function f_extract_data_and_lab(P::AbstractDict; kwargs...)::Function
 
 end 
 
-function f_extract_data_and_lab_atPS(P::AbstractDict; kwargs...)::Function
+function f_extract_data_and_lab_atPS(P::AbstractDict; 
+																		 atol::Float64=1e-10,
+																		 kwargs...)::Function
 
-	PS = max(get(P, "perturb_strength", 0), 1e-4)
-
+	PS = get(P, "perturb_strength", 0)
 
 	function F2_(((x,xlabel),(ys,chlabels,fixedlab)
 								)::Tuple{Tuple,Tuple}
 							 )::Tuple
 
-		(PS,xlabel,
-		 [SignalProcessing.Interp1D(x,y,1,PS) for y=ys],
-		 chlabels,
-		 fixedlab)
+		if isapprox(extrema(x)..., atol=atol)
+
+			for y in ys 
+				if !isapprox(extrema(y)...,atol=atol)
+					@warn "x identical but y different"
+					break
+				end 
+			end 
+
+			return (PS, xlabel, first.(ys), chlabels, fixedlab)
+
+		else 
+
+			y_ps = [SignalProcessing.Interp1D(x,y,1,PS) for y=ys] 
+
+			if any(isnan, y_ps) || any(isinf, y_ps) 
+
+				@show ys y_ps x PS 
+
+				error("NaN/Inf found in interpolated ys")
+
+			end 
+
+			return (PS, xlabel, y_ps, chlabels, fixedlab)
+
+		end 
 
 	end 
 
@@ -218,7 +241,7 @@ function plotdict_WCC(P::AbstractDict,
 
 	#yave = WLO.wcc_stat!(sum(eachrow(y0)),[0,0.5])[1] 
 
-	yave = y0[1]
+	yave = y0[2]
 
 #	@show yave 
 	ks ./= pi 
@@ -346,7 +369,9 @@ end
 
 
 function nr2str(x::Real,n::Int=3; fixedsize::Bool=true)::String 
-		
+
+	abs(x)<1e-10 && return "0.0"
+
 	d = Int(n-ceil(log10(abs(x))))
 
 	s = string(round(x, digits=d))[1:min(end,d+n)]
@@ -358,11 +383,9 @@ end
 
 function Wannier_gap_text(gap::Real)::String  
 
-	gap<1e-10 && return " (gap\$=0.0\$)"
+#	gap<1e-10 && return "(gap\$=0.0\$)"
 
-	gap = nr2str(gap, 3)[1:min(end,5)]
-
-	return "(gap\$=$gap\$)"
+	string("(gap\$=", nr2str(gap, 3)[1:min(end,5)], "\$)")
 
 end 
 
@@ -626,6 +649,13 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 
 	task, out_dict, = ComputeTasks.init_multitask(C, [X=>1])#, [1=>""])
 
+	if X==:nr_kPoints 
+		out_dict["x"] = 1.0 ./ out_dict["x"]
+		out_dict["xlabel"] = "1/("*out_dict["xlabel"]*")"
+		out_dict["xlim"] = [0,maximum(out_dict["x"])]
+	else 
+		out_dict["xlim"] = extrema(out_dict["x"])
+	end 
 
 	P1 = Dict{String,Any}("obs"=>first(observables_))
 
@@ -665,13 +695,14 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 																data[1][5], 
 																"PS="*nr2str(data[1][1],2),
 																						 )
-		return Dict{String,Any}(
+
+		out = Dict{String,Any}(
 
 							"xs" => [out_dict["x"] for y=ys],
 							
 							"ys" => ys,
 
-							"xlim" => extrema(out_dict["x"]),
+							"xlim" => out_dict["xlim"],
 
 							"ylim" => get_ylim(P, ys),
 
@@ -690,6 +721,9 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 #										transf_data=apply_log10abs!
 #										)
 
+		ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero
+
+		return out 
 	end
 
 	return PlotTask(task,  
@@ -718,6 +752,13 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(C, [X=>1, Y=>1])
 
+	if X==:nr_kPoints 
+		out_dict["x"] = 1.0 ./ out_dict["x"]
+		out_dict["xlabel"] = "1/("*out_dict["xlabel"]*")"
+		out_dict["xlim"] = [0,maximum(out_dict["x"])]
+	else 
+		out_dict["xlim"] = extrema(out_dict["x"])
+	end 
 
 	P0 = Dict{String,Any}("obs_group"=>"-") 
 
@@ -741,18 +782,41 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 	
 		for d in data
 			@assert length(d[3])==length(d[4])==1
-			@assert isempty(only(d[4]))
+#			@assert isempty(only(d[4])) 
+			@assert !isnothing(tryparse(Float64, only(d[4])))
 		end 
+
+		chlabels = [only(d[4]) for d in data] 
+
+		labels = string.(out_dict["y"]) 
+		
+		obs = P["obs"]
+
+		if length(chlabels)>1 && length(unique(chlabels))>1 
+			
+			for (i,l) in enumerate(labels)
+
+				labels[i] = myPlots.join_label(l,chlabels[i])
+
+			end 
+
+		elseif !(tryparse(Float64,chlabels[1])≈0)
+
+			obs = string("($obs-",chlabels[1],")")
+
+		end 
+
+
 
 
 		ys = collect.(eachcol(construct_Z(d3, data)["z"]))
 
 
-
-		ylabel = myPlots.join_label(transf_lab*P["obs"],
+		ylabel = myPlots.join_label(transf_lab*obs,#P["obs"],
 																data[1][5], 
 																"PS="*nr2str(data[1][1],2),
 																						 )
+
 
 		out = Dict{String,Any}(
 
@@ -762,7 +826,7 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 
 							"ys" => ys,
 
-							"xlim" => extrema(out_dict["x"]),
+							"xlim" => out_dict["xlim"],
 
 							"ylim" => get_ylim(P, ys),
 

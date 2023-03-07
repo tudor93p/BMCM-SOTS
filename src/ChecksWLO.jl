@@ -13,13 +13,15 @@ import myLibs: ReadWrite, Utils, SignalProcessing
 
 import myLibs.Parameters:UODict 
 
-import ..FILE_STORE_METHOD, ..WLO, ..MB, ..Helpers
+import ..FILE_STORE_METHOD, ..WLO, ..Helpers
+
+
 import ..Helpers: Symmetries
 
+import myPlots
 
-#import ..MB: parse_MB_params
 import ..WLO: nr_kPoints, kPoint_start
-import ..CalcWLO: preserved_symmetries, all_symms_preserved, get_perturb_on_mesh_
+import ..CalcWLO: preserved_symmetries, all_symms_preserved, get_perturb_on_mesh_, MODEL
 
 #===========================================================================#
 #
@@ -27,7 +29,7 @@ import ..CalcWLO: preserved_symmetries, all_symms_preserved, get_perturb_on_mesh
 #
 #---------------------------------------------------------------------------#
 
-Dependencies = [MB,WLO]
+Dependencies = [MODEL,WLO]
 
 
 usedkeys()::Vector{Symbol} = [
@@ -44,7 +46,7 @@ function usedkeys(P::UODict)::Vector{Symbol}
 	uk = usedkeys() 
 	
 	all_symms_preserved(P) && setdiff!(uk, [
-								:nr_perturb_strength,
+								:nr_perturb_strength, # don't disregard!!
 								:max_perturb_strength,
 								:nr_perturb_instances
 								]
@@ -70,7 +72,10 @@ function perturb_strengths(P::UODict)::Vector{Float64}
 
 	# the first must be zero 
 
-	LinRange(0,P[:max_perturb_strength],P[:nr_perturb_strength])
+	LinRange(0, P[:max_perturb_strength], P[:nr_perturb_strength]) 
+
+#	all_symms_preserved(P) && return zeros(P[:nr_perturb_strength])
+
 
 end  
 
@@ -350,6 +355,61 @@ function extract_data_and_lab(Y::AbstractArray{<:Number},
 
 end 
 
+function closest_periodic_iB(a::Real,
+														 B::AbstractArray{<:Real},
+														 T::Real)::Int
+
+	D = Float64[0.0, 0.0]  # [min_dist, current_dist] 
+
+	imin = 1 
+
+	Utils.dist_periodic_!(D, 1, a, B[imin], T)
+
+	for i=2:lastindex(B)
+
+		Utils.dist_periodic_!(D, 2, a, B[i], T)
+
+		D[2]<D[1] || continue 
+	
+		imin = i
+
+		D[1] = D[2] 
+
+	end 
+
+	return imin
+
+end 
+
+
+
+function closest_periodic_iB(A::AbstractArray{<:Real},
+														B::AbstractArray{<:Real},
+														T::Real
+														)::Int
+	
+	bcount = zeros(Int,length(B))
+
+	for a in A 
+
+		bcount[closest_periodic_iB(a,B,T)] += 1 
+
+	end 
+
+	return argmax(bcount)
+
+end 
+function closest_periodic_b(A::AbstractArray{<:Real},
+														B::AbstractArray{<:Real},
+														T::Real
+														)::Float64
+
+	B[closest_periodic_iB(A,B,T)]
+
+end  
+
+
+
 
 function extract_data_and_lab(Y::AbstractArray{<:Number,N},
 														 (axnames,axvars)::Tuple{
@@ -384,23 +444,29 @@ function extract_data_and_lab(Y::AbstractArray{<:Number,N},
 
 	chlabels = Vector{String}(undef,nr_curves)
 
-#
-#	println()
-#	@show I first.(I)
-#	(n1,i1),iter2e = Iterators.peel(enumerate(Iterators.product(I...)))
-#	@show n1 i1 collect(iter2e)
-#	println() 
-#
-#	transf_data(ys[n1], view(Y, :, i1...))
 
 
 	ys = [Vector{out_type}(undef,size(Y,1)) for i=1:nr_curves] 
 
-	for (n,i) in enumerate(Iterators.product(I...))
 
-		chlabels[n] = get_label(i[fullax], axvars[fullax])  
+	for (n,i) in enumerate(Iterators.product(I...)) 
 
-		transf_data(ys[n], view(Y,:,i...))
+		y0 = closest_periodic_b(view(Y,:,i...),[0,0.5],1)
+
+		chlabels[n] = myPlots.join_label(get_label(i[fullax], axvars[fullax]),
+																		 string(y0))
+
+#		chlabels[n] = get_label(i[fullax], axvars[fullax])  
+
+
+		if y0≈0 
+			transf_data(ys[n], view(Y,:,i...))
+		else 
+			transf_data(ys[n], Utils.closest_periodic_shifted_a.(view(Y,:,i...).-y0,0,1))
+
+		end 
+
+		y0count = 0 
 
 	end 
 
@@ -722,8 +788,8 @@ function set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
 
 	if any(in(keys(results)), obs_batch_1)
 
-		p1occup = MB.polariz_fromSubspaces1(eigW1_occup,dir1) # vector
-		p1unocc = MB.polariz_fromSubspaces1(eigW1_unocc,dir1) # vector 
+		p1occup = MODEL.polariz_fromSubspaces1(eigW1_occup,dir1) # vector
+		p1unocc = MODEL.polariz_fromSubspaces1(eigW1_unocc,dir1) # vector 
 
 
 		if haskey(results,"D110")
@@ -761,8 +827,8 @@ function set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
 		if haskey(results,"D125")||haskey(results,"D127") 
 
 
-			p1occup_ = MB.add_nupm(nus2pm,3-dir1)
-			p1unocc_ = MB.add_nupm(eta2pm,3-dir1)
+			p1occup_ = MODEL.add_nupm(nus2pm,3-dir1)
+			p1unocc_ = MODEL.add_nupm(eta2pm,3-dir1)
 
 
 			if haskey(results,"D127")
@@ -919,7 +985,8 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
-	parallel=nprocs()>=4
+	parallel=false#nprocs()>=4
+	parallel2=nprocs()>=4
 
 	strengths = perturb_strengths(P)
 
@@ -929,7 +996,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	@assert iszero(zero_strength)
 
 
-results = init_results(strengths, get_target(target; kwargs...))
+	results = init_results(strengths, get_target(target; kwargs...))
 
 
 #	return Dict{String,Any}(k=>v for (k,v)=pairs(results) if isauxfile(k)) 
@@ -942,8 +1009,8 @@ results = init_results(strengths, get_target(target; kwargs...))
 	# ------ no perturbation --------- #
 
 	set_results!(results, nk, k0, 1, s1,  
-										 get_data(MB.get_psiH(P, nk, k0), results;
-															parallel=parallel))
+										 get_data(MODEL.get_psiH(P, nk, k0), results;
+															parallel=parallel2))
 
 
 	if all_symms_preserved(P) 
@@ -973,7 +1040,7 @@ results = init_results(strengths, get_target(target; kwargs...))
 
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
-			get_data(MB.get_psiH(P, nk, k0, pert...), results)
+			get_data(MODEL.get_psiH(P, nk, k0, pert...), results)
 
 		end # get_data contains 4 jobs  
 
@@ -991,7 +1058,8 @@ results = init_results(strengths, get_target(target; kwargs...))
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				data = get_data(MB.get_psiH(P, nk, k0, perturb0, ps), results)
+				data = get_data(MODEL.get_psiH(P, nk, k0, perturb0, ps), results;
+												parallel=parallel2)
 	
 				set_results!(results, nk, k0, j, i, data)
 	

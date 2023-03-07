@@ -1,7 +1,7 @@
 import myLibs: ComputeTasks, Utils
 import myPlots 
 
-import LinearAlgebra
+import LinearAlgebra,Statistics
 
 import BMCMSOTS:WLO, CalcWLO, ChecksWLO ,BBH
 
@@ -123,23 +123,25 @@ for n in meshsizes
 
 	println() 
 
+	break 
+
 end 
 
 
 #
 #end 
 #
-error() 
 #
 tasks = [
 				 init(BMCMSOTS, :CheckZero), 
 				 
-				 init(BMCMSOTS, :WannierBands2),
-#				 init(BMCMSOTS, :WannierBands1),
+#				 init(BMCMSOTS, :WannierBands2),
+##				 init(BMCMSOTS, :WannierBands1),
 				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
-				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s_Hamilt),
-				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:b_Hamilt),
-				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s0_Hamilt),
+#				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s_Hamilt),
+#init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:preserved_symmetries),
+#				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:b_Hamilt),
+#				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s0_Hamilt),
 				 ];
 
 task0 = init(BMCMSOTS, :CheckZero);
@@ -148,22 +150,29 @@ pdata =map(tasks ) do task
 
 p = ComputeTasks.get_first_paramcomb(task0)
 
-@assert p[1]==task0.get_paramcombs()[1][1]
+#@assert p[1]==task0.get_paramcombs()[1][1]
 
-@show p[1]
+#@show p[1]
 
 target = rand(observables)
+target = "D48"
 
 P = task0.get_plotparams(p)
 
-P["perturb_strength"] = 0.3 
+#P["perturb_strength"] = 0.4
 
 P["obs_group"]= "dir1"
+P["obs_group"]= "sector"
 
 P["obs"] = target 
 P["obs_i"] = rand(1:10)
+P["obs_i"] = 1 
 
-task.plot(P)
+d = task.plot(P)
+
+@show Statistics.mean(Statistics.mean,d["ys"])
+@show d["ylabel"] d["labels"]
+return d 
 
 end  
 

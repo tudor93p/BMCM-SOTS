@@ -12,7 +12,10 @@ import myLibs.Parameters: UODict
 
 import ..FILE_STORE_METHOD
 
-import ..MB, ..WLO, ..Helpers
+import ..WLO, ..Helpers 
+
+import ..MB; MODEL=MB
+#import ..BBH; MODEL=BBH 
 
 import ..WLO: nr_kPoints, kPoint_start 
 import ..Helpers: Symmetries 
@@ -28,7 +31,7 @@ function perturb_strength end
 zero_perturb_strength = <(1e-12)∘perturb_strength   
 
 
-Dependencies = [MB,WLO]
+Dependencies = [MODEL,WLO]
 
 
 usedkeys()::Vector{Symbol} = [
@@ -45,6 +48,7 @@ function usedkeys(P::UODict)::Vector{Symbol}
 
 	zero_perturb_strength(P) && setdiff!(uk, [:preserved_symmetries, ])
 
+#	(all_symms_preserved(P)||zero_perturb_strength(P))&& return Symbol[]
 
 	return uk
 
@@ -83,7 +87,7 @@ end
 
 function perturb_strength(P::UODict)::Float64
 
-	P[:perturb_strength]
+	all_symms_preserved(P) ? get(P, :perturb_strength, 0) : P[:perturb_strength]
 
 end  
 
@@ -318,7 +322,7 @@ function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4},
 
 	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
 
-	MB.symmetrize_on_mesh!(pert, args...)
+	MODEL.symmetrize_on_mesh!(pert, args...)
 
 	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
 
@@ -546,7 +550,6 @@ end
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
 										kwargs...)::Dict{String,Any}
 
-#	MBparams = parse_MB_params(P) 
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
@@ -567,23 +570,23 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 #	@show symms 
 #
 #	println("Ham.: ",
-#					all(MB.has_symm_on_mesh(MBparams, symms, nk,k0)))
+#					all(MODEL.has_symm_on_mesh(MODELparams, symms, nk,k0)))
 #
 #	for s2 in symms2 
 #
 #		println("$s2:\t\t",
-#						all(MB.has_symm_on_mesh(MBparams, s2, nk,k0)))
+#						all(MODEL.has_symm_on_mesh(MODELparams, s2, nk,k0)))
 #
 #	end 
 #
 #
 #	println("\nPert.: ",
-#					all(MB.has_symm_on_mesh(perturb1, symms, nk,k0)))
+#					all(MODEL.has_symm_on_mesh(perturb1, symms, nk,k0)))
 #
 #	for s2 in symms2 
 #
 #		println("$s2:\t\t",
-#						all(MB.has_symm_on_mesh(perturb1, s2, nk,k0)))
+#						all(MODEL.has_symm_on_mesh(perturb1, s2, nk,k0)))
 #
 #	end 
 #
@@ -593,7 +596,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 #end 
 
 
-	psi = MB.get_psiH(P, nk, k0, perturb1, strength)
+	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
 
 	set_results!(results, nk, k0, get_data(psi, results))
 

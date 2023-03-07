@@ -2500,6 +2500,45 @@ function get_wlo_data_mesh(psiH::AbstractArray{ComplexF64,4},
 
 #	wlo1_on_mesh and wcc2mesh_fromSubspaces1 -- equally most costly
 
+#####################3
+##					(Matrix{T}(undef, n, m), Vector{Float64}(undef, m), 	Matrix{T}(undef, n, m), Vector{Float64}(undef, m),)
+#
+#	n = nr_kPoints_from_mesh(psi)
+#
+#	ov_pm = [1.0,0.0,0.0]
+#	ov_pp = [1.0,0.0,0.0]
+#
+#	for j=1:n-1,i=1:n-1 
+#
+##		wf_plus = select_mesh_point(eigW1[1],i,j)
+##		wf_minus = select_mesh_point(eigW1[3],i,j)
+#		wf_plus = Wannier_band_basis0((i,j),psi,eigW1[1])
+#		wf_minus = Wannier_band_basis0((i,j),psi,eigW1[3])
+#
+#		ov_pm[3] = abs(only(overlap(wf_plus,wf_minus)))
+#		ov_pp[3] = abs(only(overlap(wf_plus)))
+#
+#		ov_pm[1] = min(ov_pm[1],ov_pm[3])
+#		ov_pm[2] = max(ov_pm[2],ov_pm[3])
+#
+#		ov_pp[1] = min(ov_pp[1],ov_pp[3]) 
+#		ov_pp[2] = max(ov_pp[2],ov_pp[3]) 
+#
+#	end 
+#
+#	s = join(["min(+-)=$(ov_pm[1])",
+#	"max(+-)=$(ov_pm[2])",
+#	"min(++)=$(ov_pp[1])",
+#	"max(++)=$(ov_pp[2])",
+#	],"\n")*"\n"
+#
+#		open("wbb.dat","a") do f 
+#			write(f,s)
+#	
+#		end;
+#
+#
+###################
 	if get_wlo2 
 
 		return (eigW1, wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
@@ -2551,7 +2590,28 @@ function Wannier_band_basis0(ij::Tuple{Int,Int},
 														 W1wf_::AbstractArray{ComplexF64,4},
 														 )::Matrix{ComplexF64}
 
-	get_item_ij(ij, Bloch_WFs_) * get_item_ij(ij, W1wf_)
+	out = get_item_ij(ij, Bloch_WFs_) * get_item_ij(ij, W1wf_)
+
+
+#	n = size(out,2)
+#
+#	if n>1
+#
+#		ov = abs.(overlap(out))
+#	
+#		s = join(["($i,$j): $(ov[i,j])" for i=1:n for j=1:i],"\n")
+#	
+#		s*="\nov-1 = $(LinearAlgebra.norm(ov-one(ov)))\n"
+#	
+#		open("wbb.dat","a") do f 
+#			write(f,s)
+#	
+#		end;
+#
+#	end
+	
+
+	return out 
 
 end 
 

@@ -3,7 +3,9 @@ module BBH
 
 import LinearAlgebra 
 
-import myLibs: Groups
+import myLibs: Groups 
+import myLibs.Parameters: UODict
+
 import ..WLO#, ..MB  
 import ..Helpers:Symmetries 
 #import LinearAlgebra
@@ -13,6 +15,17 @@ import ..Helpers:Symmetries
 const MODEL_MATRICES_PAULI::Vector{String} = ["30","21","22","23","10"]  
 
 #const delta::Float64 = 1e-8
+
+import ..MB: polariz_fromSubspaces1, add_nupm
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+usedkeys::Vector{Symbol} = [:BBHtheta]
 
 #===========================================================================#
 #
@@ -27,6 +40,8 @@ function H(k::AbstractVector{<:Real},
 					 (lx, ly, gx, gy, delta)::AbstractVector{<:Real},
 					 aux::Real=0
 					 )::Matrix{ComplexF64}
+
+return 
 
 	sx,cx = sincos(k[1])
 	sy,cy = sincos(k[2])
@@ -101,11 +116,20 @@ end
 #---------------------------------------------------------------------------#
 
 
+function BBHparams((th,)::AbstractVector{<:Real})::Vector{Float64} 
+
+	BBHparams(th)
+
+end  
 
 
 function BBHparams(th::Real)::Vector{Float64} 
 
-	[1, 1, 1 + 0.5*cos(th), 1+0.5*sin(th), 1e-8]
+	BBHtheta = [-1, -0.04, 1.04, 2.04, 3, 3.96, 5, 6.04]/4
+
+	@assert any(≈(th), pi*BBHtheta) th 
+
+	[1, 1, 1 + 0.5*cos(th), 1+0.5*sin(th), 0]#1e-9]
 
 end  
 
@@ -140,59 +164,63 @@ end
 #---------------------------------------------------------------------------#
 
 
-function get_pertHdata(BBHtheta::Real; kwargs...
+function get_pertHdata(params::AbstractVector{<:Real}; kwargs...
 							 )
 	
-	(BBHparams(BBHtheta),)
+	(BBHparams(params),)
 
 end 
 
-function get_pertHdata(BBHtheta::Real, h::Function; kwargs...
+function get_pertHdata(params::AbstractVector{<:Real}, h::Function; kwargs...
 							 )
 	
-	(h, get_pertHdata(BBHtheta)...)
+	(h, get_pertHdata(params)...)
 
 end 
 
-function get_pertHdata(BBHtheta::Real, p::AbstractArray; kwargs...
+function get_pertHdata(params::AbstractVector{<:Real}, p::AbstractArray; kwargs...
 							 )
 	
-	(p, get_pertHdata(BBHtheta)...)
+	(p, get_pertHdata(params)...)
 
 end 
 
-function get_pertHdata(BBHtheta::Real, h::Function, p::AbstractArray; kwargs...
+function get_pertHdata(params::AbstractVector{<:Real}, h::Function, p::AbstractArray; kwargs...
 							 )
 	
-	(p, get_pertHdata(BBHtheta, h)...)
+	(p, get_pertHdata(params, h)...)
 
 end 
 
-function get_pertHdata(BBHtheta::Real, p::AbstractArray, s::Real;
+function get_pertHdata(params::AbstractVector{<:Real}, p::AbstractArray, s::Real;
 							 atol::Float64=1e-12
 							 )
 
-	isapprox(s,0,atol=atol) && return get_pertHdata(BBHtheta)  
+	isapprox(s,0,atol=atol) && return get_pertHdata(params)  
 
-	isapprox(s,1,atol=atol) && return get_pertHdata(BBHtheta, p)
+	isapprox(s,1,atol=atol) && return get_pertHdata(params, p)
 
-	return (get_pertHdata(BBHtheta, p)..., s)
+	return (get_pertHdata(params, p)..., s)
 
 end 
 
 
-function get_pertHdata(BBHtheta::Real, h::Function, p::AbstractArray, s::Real;
+function get_pertHdata(params::AbstractVector{<:Real}, h::Function, p::AbstractArray, s::Real;
 							 atol::Float64=1e-12
 							 )
 
-	isapprox(s,0,atol=atol) && return get_pertHdata(BBHtheta, h) 
+	isapprox(s,0,atol=atol) && return get_pertHdata(params, h) 
 
-	isapprox(s,1,atol=atol) && return get_pertHdata(BBHtheta, h, p)
+	isapprox(s,1,atol=atol) && return get_pertHdata(params, h, p)
 	
-	return (get_pertHdata(BBHtheta, h, p)..., s) 
+	return (get_pertHdata(params, h, p)..., s) 
 
 end 
 
+
+function symmetrize_on_mesh!(args...; kwargs...)
+#NOT IMPLEMENTED 
+end 
 
 #===========================================================================#
 #
@@ -201,22 +229,32 @@ end
 #---------------------------------------------------------------------------#
 
 
-function get_psiH(BBHtheta::Real, n::Int, k0::Real, args...;
+function get_psiH(params::AbstractVector{<:Real}, n::Int, k0::Real, args...;
 									atol::Float64=1e-12
 								 )::Array{ComplexF64,4}
 
-	WLO.psiH_on_mesh(n, k0, get_pertHdata(BBHtheta, H, args...; atol=atol)...)
+	WLO.psiH_on_mesh(n, k0, get_pertHdata(params, H, args...; atol=atol)...)
 
 end 
 
-function get_enpsiH(BBHtheta::Real, n::Int, k0::Real, args...;
+function get_enpsiH(params::AbstractVector{<:Real}, n::Int, k0::Real, args...;
 									atol::Float64=1e-12
 									)::Vector{Array}
 
-	WLO.enpsiH_on_mesh(n, k0, get_pertHdata(BBHtheta, H, args...; atol=atol)...)
+	WLO.enpsiH_on_mesh(n, k0, get_pertHdata(params, H, args...; atol=atol)...)
 
 end 
 
+function get_psiH(P::UODict, args...)::Array{ComplexF64,4}
+
+	get_psiH(params_fromP(P), args...)
+
+end  
+function params_fromP(P::UODict)::Vector{Float64}
+
+	[P[:BBHtheta]*pi, ]
+
+end 
 
 
 

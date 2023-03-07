@@ -5,7 +5,7 @@ host='horon'
 #host='plumpy'
 #host='nut'
 
-since='2023-03-02 05:45:00'
+since='2023-03-06 19:40:00'
 
 server=pahomit@$host.ethz.ch
 
@@ -54,17 +54,17 @@ echo $remotefolder
 #df -h $dest
 
 
-echo
-#
+#echo
 #echo "***** Receiving remote data *****"
 #rsync -azh $src $dest 
+#
 
-
+echo
 echo "***** Receiving remote data produced since $since *****"
+ssh $server "cd $remotefolder; find . -newermt '$since' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest 
 
 ##ssh $server "cd $remotefolder; find . -name '*.jld' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest
 
-ssh $server "cd $remotefolder; find . -newermt '$since' -print0 -not -empty" | rsync -upt -0 --files-from=- $src $dest 
 
 #echo 
 #echo 'Local disk usage in MB and GB'
@@ -78,10 +78,10 @@ echo "***** Done! *****"
 
 
 
-echo
-echo 'New local folder size' # in MB and GB'
-#du $dest -md 0
-du $dest -hd 0
+#echo
+#echo 'New local folder size' # in MB and GB'
+##du $dest -md 0
+#du $dest -hd 0
 
 #echo 'Number of .dat files'
 #find $dest -type f -name "*.dat" | wc -l

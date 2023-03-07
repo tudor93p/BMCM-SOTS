@@ -22,29 +22,34 @@ input_checks  = Dict{Symbol,Any}(
 		s0_Hamilt = [0.1],
 #		s0_Hamilt = 0:0.1:0.5,#Utils.uniqlinsp(1e-3,0.4,5,3; Trunc=true),
 		
-s_Hamilt = [1],#0.4:0.3:1.6, 
-#		s_Hamilt = 0.4:0.3:1.6, 
-		
-#		b_Hamilt = 0.4:0.3:1.6, 
-		b_Hamilt = [1],#0.4:0.3:1.6, 
+		s_Hamilt = [1],
+		b_Hamilt = [1],
 					
 #		nr_kPoints = vcat(10, 60, 70),
-		nr_kPoints = vcat(10:5:50, 60, 
-#											70, 95, 120, 145,
+		nr_kPoints = vcat(
+											10:5:50, 60, 
 											70:25:145, 
 											180:35:250, 
-											300,
-											400, 
-											600, 
-											800, 
-											1100, 
-											1500,2000,3000,#5000,
-											),
+											300, 
+#											400, 600, 
+#											800, 
+#											1100, 1500,
+#											2000,
+#											3000,
+
+#											5000, # 
+###											7000, # #											10000, #  
+#											15000,
+																																															 ),
 
 		kPoint_start = [-1], 
 
-#		preserved_symmetries = ["None"; join.(Combinatorics.powerset(["P", "Mx", "Ct", "Tt"],1,2),"+"); "All"],  
-		preserved_symmetries = ["All"],
+		preserved_symmetries = setdiff(["None"; join.(Combinatorics.powerset(["P", "Mx", "Ct", "Tt"],1,2),"+"); "All"], ["Ct+Tt","P+Tt","P+Ct"]),
+
+#		preserved_symmetries = ["None", "P", "Mx", "Ct", "Tt", "All"],
+
+
+#		preserved_symmetries = ["All"], 
 #		preserved_symmetries = ["None", "All"],
 
 		nr_perturb_strength = [11],
