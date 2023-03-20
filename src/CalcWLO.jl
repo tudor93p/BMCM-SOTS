@@ -202,10 +202,15 @@ function ylabels(obs::AbstractString, legend::AbstractString
 	if legend=="dir"   
 
 #		obs[end]=='1' && return ["\$\\nu_x\$","\$\\nu_y\$"]
-		obs[end]=='1' && return ["\\overline{x}","\\overline{y}"]
+		obs=="WannierBands1" && return ["\\overline{x}","\\overline{y}"]
 
 #		obs[end]=='2' && return ["\\tilde{\\nu}_x","\\tilde{\\nu}_y"]
-		obs[end]=='2' && return ["\\overline{x}_y","\\overline{y}_x"]
+		obs=="WannierBands2" && return ["\\overline{x}_y","\\overline{y}_x"]
+
+#		obs=="Polarization" && return ["p_x", "p_y"]
+		
+		obs=="WannierDensity" && return ["\\rho(R_y)", "\\rho(R_x)"]
+
 
 	end 
 	

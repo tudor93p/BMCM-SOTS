@@ -435,6 +435,177 @@ function CheckZero(init_dict::AbstractDict;
 									"Curves_yofx", plot∘add_default_obs(observables_))
 end 
 
+function get_eigval_number(P::AbstractDict,nmax::Int)::Int 
+
+	haskey(P,"k") ? min(nmax,max(1,Int(round(P["k"])))) : 1 
+
+end  
+
+#===========================================================================#
+#
+function RibbonWannierDensity(init_dict::AbstractDict;
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	obs = "WannierDensity"
+
+	@assert obs in observables 
+
+#	observables_ = filter(==(obs), observables)
+
+	task = CompTask(Calculation("Ribbon Wannier density",
+															RibbonWLO, init_dict; 
+															observables=observables, kwargs...))
+
+
+	function plot(P::AbstractDict)::Dict{String,Any} 
+
+		d = get_dir1(P) 
+
+		data = task.get_data(P; fromPlot=true, mute=false, target=obs,)
+
+
+		#x,xlabel = RibbonWLO.xxlabel(data)
+
+#		ylabel = data[RibbonWLO.fn_legend(obs)]["dir"][d]
+		
+
+		j = get_eigval_number(P, size(data[obs],2))
+		
+		ylabel = tex("\\rho \\;\\;[\\,j=$j\\,]")
+
+		y0 = copy(data[obs][:,j,d]) # Vector 
+
+		x = Vector(eachindex(y0))
+
+		xlabel = tex("R_"*"yx"[d])
+
+		xlim = [x[1]-1,x[end]+1]
+
+		
+#		ylim = [0,1]
+#		ylim .+= 0.5
+
+		xlim = Utils.extend_limits(x,1e-2) 
+
+		ylim = get_ylim(0,nothing,data[obs])
+
+
+		out = Dict{String,Any}(
+	
+					 "x" => x,
+	
+					 "y" => y0,
+						
+					 "label" => string(j),
+	
+						"xlim"=> xlim,
+	
+						"ylim"=> ylim,
+	
+						"xlabel" => xlabel,
+	
+						"ylabel" => ylabel,
+
+#						"yline" => 0,
+	
+						)
+	
+	
+			return out 
+	
+		end 
+
+		return PlotTask(task, [("obs_index", 2),("choose_k",),
+													 ], 
+										"Curves_yofx", plot,)
+end  
+
+function get_polariz(P::AbstractDict,
+										 rho::AbstractMatrix,
+										 nu::AbstractVector
+										 )::Tuple{Vector,String}
+
+	haskey(P,"k") || return (RibbonWLO.polarization(rho, nu),"")
+
+	j = get_eigval_number(P, size(rho,2))
+
+	return (RibbonWLO.polarization(selectdim(rho,2,j:j),selectdim(nu,1,j:j)),
+					string(j,":"))
+
+end 
+
+#===========================================================================#
+#
+function RibbonPolarization(init_dict::AbstractDict;
+#											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+#	obs = "Polarization"
+#
+#	observables_ = filter(==(obs), observables)
+
+	task = CompTask(Calculation("Ribbon polarization",
+															RibbonWLO, init_dict; 
+#															observables=observables_, 
+															kwargs...))
+
+
+	function plot(P::AbstractDict)::Dict{String,Any} 
+
+		data = task.get_data(P; fromPlot=true, mute=false, target=["WannierBands1","WannierDensity"])
+
+		d = get_dir1(P)   
+
+		y0,lab = get_polariz(P,
+													selectdim(data["WannierDensity"],3,d),
+													selectdim(data["WannierBands1"],2,d),
+													)
+
+#		ylabel = tex(data[RibbonWLO.fn_legend("Polarization")]["dir"][d])
+
+		ylabel = tex("p_"*"xy"[d])
+	 
+		x = Vector(eachindex(y0))
+
+		xlabel = tex("R_"*"yx"[d])
+
+		xlim = [x[1]-1,x[end]+1]
+
+		ylim = [-0.7, 0.7]
+
+
+		out = Dict{String,Any}(
+	
+					 "xs" => [x,x,x],
+	
+					 "ys" => [y0 .- 1, y0, y0 .+ 1],
+						
+					 "labels" => lab .* ["-1","0","+1"],
+	
+						"xlim"=> xlim,
+	
+						"ylim"=> ylim,
+	
+						"xlabel" => xlabel,
+	
+						"ylabel" => ylabel,
+
+						"yline" => 0,
+	
+						)
+	
+	
+			return out 
+	
+		end 
+
+	return PlotTask(task, ("obs_index", 2), "Scatter", plot,)
+end 
 #===========================================================================#
 #
 function RibbonWannierBands1(init_dict::AbstractDict;
@@ -445,11 +616,13 @@ function RibbonWannierBands1(init_dict::AbstractDict;
 
 	obs = "WannierBands1"
 
-	observables_ = filter(==(obs), observables)
+	@assert obs in observables 
+
+#	observables_ = filter(==(obs), observables)
 
 	task = CompTask(Calculation("Wannier bands ribbon",
 															RibbonWLO, init_dict; 
-															observables=observables_, kwargs...))
+															observables=observables, kwargs...))
 
 
 	function plot(P::AbstractDict)::Dict{String,Any} 
@@ -463,27 +636,29 @@ function RibbonWannierBands1(init_dict::AbstractDict;
 		legend = data[RibbonWLO.fn_legend(obs)] 
 	
 		y0 = selectdim(data[obs],2,d) #Vector
-	
+
+		n = length(y0)
+
 		gap = 1.0 
 
-		for i = 1:length(y0)-1 
+		for i = 1:n-1 
 			
 			gap = min(gap,
-								Utils.reduce_dist_periodic(min, y0[i], view(y0, i+1:length(y0)), 1)
+								Utils.reduce_dist_periodic(min, y0[i], view(y0, i+1:n), 1)
 								)
 
 		end 
 
-		xlim = Utils.extend_limits(extrema(x),1e-3)
+		xlim = Utils.extend_limits(x,1e-2)
 
 		xlim[2] = max(xlim[2],xlim[1]+1)
 
 		out = Dict{String,Any}(
 	
 					 "xs" => [x,x,x],
-	
+ 
 					 "ys" => [y0 .- 1, copy(y0), y0 .+ 1],
-						
+ 					
 					 "labels" => ["-1","0","+1"],
 	
 						"xlim"=> xlim,
@@ -494,11 +669,32 @@ function RibbonWannierBands1(init_dict::AbstractDict;
 	
 						"ylabel" => tex(legend["dir"][d]) * " " * Wannier_gap_text(gap),
 
-						"yline" => 0.5,
-	
+						"yline" => 0,
+
 						)
-	
-	
+
+		if haskey(P,"k")
+			
+			j = get_eigval_number(P, n)
+
+#			z = setindex!(zeros(length(y0)), 1, j)
+			z = setindex!(zeros(n), 1, n)
+
+			out["labels"] = string(j,":") .* out["labels"]
+
+			out["zs"] = [z,z,z]
+
+			for k in ["xs","ys"], i=1:3 
+
+				aux = out[k][i][n]
+				out[k][i][n] = out[k][i][j] 
+				out[k][i][j] = aux   # move last such that it's visible 
+
+			end 
+
+#			out["xline"] = j 
+
+		end 
 	
 			return out 
 	

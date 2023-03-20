@@ -1,6 +1,8 @@
 module RibbonWLO  
 #############################################################################
 
+import Statistics, LinearAlgebra, Random
+
 using OrderedCollections: OrderedDict 
 
 import myLibs: ReadWrite, Utils, Lattices, TBmodel
@@ -9,7 +11,7 @@ import myLibs.Parameters: UODict
 
 import ..FILE_STORE_METHOD
 
-import ..WLO, ..Helpers 
+import ..WLO, ..Helpers#, ..Symmetries
 
 import ..CalcWLO 
 import ..CalcWLO: MODEL 
@@ -30,7 +32,9 @@ Dependencies = [CalcWLO]
 usedkeys::Vector{Symbol} = [:width]
 									 
 
-calc_observables::Vector{String} = ["WannierBands1"]
+calc_observables::Vector{String} = ["WannierBands1",
+																		#"Polarization",
+																		"WannierDensity"]
 
 #===========================================================================#
 #
@@ -127,7 +131,29 @@ function init_results(w::Int,
 
 		add_legend!(results, a, ["dir"])
 
-	end 
+	end  
+	
+#	for a in ("Polarization",)
+#
+#		in(a,obs) || continue 
+#
+#		results[a] = zeros(w,2)
+#
+#		add_legend!(results, a, ["dir"])
+#
+#	end  
+
+	for a in ("WannierDensity",)
+
+		in(a,obs) || continue 
+
+		results[a] = zeros(w,2w,2)
+
+		add_legend!(results, a, ["dir"])
+
+	end  
+
+
 
 	return results
 
@@ -169,7 +195,62 @@ end
 #													get_data_args(psiH))
 #
 #end 
-#
+
+
+
+
+function check_nu_k_dep(nu::AbstractMatrix{T},
+												d::Int;
+												atol::Float64=1e-10,
+												onewarning::Bool=false,
+												assert::Bool=true,
+												)::Tuple{Bool,<:AbstractVector{T}} where T<:Real 
+
+	out = true 
+
+	for i=2:size(nu,d) 
+
+
+		D = Utils.reduce_dist_periodic(max, selectdim(nu,d,i), selectdim(nu,d,1), 1) 
+
+		D<atol &&  continue 
+
+		D = Utils.reduce_dist_periodic(max, selectdim(nu,d,i), circshift(selectdim(nu,d,1),1), 1)
+
+		D<atol &&  continue  
+
+		D = Utils.reduce_dist_periodic(max, selectdim(nu,d,i), circshift(selectdim(nu,d,1),-1),1)
+
+		D<atol &&  continue  
+
+		@warn "nux depends on kx | nuy depends on ky?" 
+
+		@show LinearAlgebra.norm(D)
+
+		out=false 
+
+		onewarning && break 
+
+	end   
+
+	assert && @assert out 
+
+	return (out,selectdim(nu,d,1))
+
+end  
+
+
+function cp_wcc_to_results(results::AbstractDict{<:AbstractString,<:Any},
+													obs::AbstractString,
+													wccs::AbstractMatrix{<:Real},
+													dir1::Int,
+													) 
+
+	copy!(selectdim(results[obs],2,dir1), 
+				check_nu_k_dep(wccs, 2)[2]
+				)
+
+end  
 
 
 #===========================================================================#
@@ -190,18 +271,169 @@ end
 #
 #end  
 #
+#function hWpd(
+#							 i_atom::Int, 
+#							 nr_orb::Int,
+#								wbb::AbstractMatrix{ComplexF64},
+#											 )
+#
+#	I = TBmodel.Hamilt_indices(1:nr_orb, i_atom, nr_orb)  
+#
+#	return sum(Statistics.mean(abs2, selectdim(wbb,1,I), dims=2))
+#
+#end 
+
+function Wannier_density(
+											 wbb::AbstractArray{ComplexF64,3},
+											 nr_at::Int
+											 )::Matrix{Float64}
+
+	Wannier_density!(zeros(nr_at, size(wbb,2)), wbb) 
+
+end 
+
+function Wannier_density!(
+											dest::AbstractMatrix{Float64},
+											 wbb::AbstractArray{ComplexF64,3},
+											 )::AbstractMatrix{Float64}
+
+	nr_at = size(dest,1)
+
+	nr_k = size(wbb,3)+1 
+
+	nr_wf = size(wbb,2) 
+
+	@assert size(dest,2)==nr_wf 
+
+	nr_orb, aux = divrem(size(wbb,1), nr_at) 
+
+	@assert aux==0 
+
+	rho0 = Statistics.mean(abs2, wbb, dims=3) 
+
+	dest .= 0  
+
+	for orbital=1:nr_orb 
+
+		dest .+= view(rho0, TBmodel.Hamilt_indices(orbital, 1:nr_at, nr_orb),:,1)
+
+	end 
+
+	return dest 
+
+end 
+
+function polarization(rho::AbstractMatrix{<:Real},
+											 nu_val::AbstractVector{<:Real},
+											 )::AbstractVector{Float64}
+
+
+#	nu = Utils.bring_periodic_to_interval.(nu_val, 0, 0.99999, 1)
+
+#	nu =nu_val
+
+	rho*nu_val 
+
+end 
+
+function polarization!(dest::AbstractVector{Float64},
+											 rho::AbstractMatrix{<:Real},
+											 nu_val::AbstractVector{<:Real},
+											 )::AbstractVector{Float64}
+
+
+#	nu = Utils.bring_periodic_to_interval.(nu_val, 0, 0.99999, 1)
+
+#	nu =nu_val
+
+	LinearAlgebra.mul!(dest, rho, nu_val) 
+
+	for f in (isnan,isinf,ismissing), p in dest 
+
+			if f(p) 
+
+				@show dest findall(f,wbb) findall(f,rho0) nu_val 
+
+				error() 
+
+			break  
+
+			end 
+
+	end 
+
+	return dest 
+
+end 
+
+
+function polarization!(dest::AbstractVector{Float64},
+											 wbb::AbstractArray{ComplexF64,3},
+											 nu_val::AbstractVector{<:Real}
+											 )
+
+	@assert length(nu_val)==size(wbb,2) 
+
+	polarization!(dest, Wannier_density(wbb, length(dest)), nu_val)
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function get_nr_at(results::AbstractDict)::Int 
+
+	@assert any(in(calc_observables),keys(results))
+
+#	haskey(results, "Polarization") && return size(results["Polarization"],1) 
+
+	haskey(results, "WannierDensity") && return size(results["WannierDensity"],1)
+
+	haskey(results, "WannierBands1") && return div(size(results["WannierBands1"],1),2)
+
+
+end 
+
 
 function set_results_onedir!(results::AbstractDict, 
 													dir1::Int,
-													nus1::AbstractVector{<:Real},
+												 (wbb,nu_val)::Tuple{
+														#				<:AbstractArray{ComplexF64,3},
+																		<:AbstractArray{ComplexF64,3},
+																		<:AbstractArray{Float64,2}}
 													)::Nothing
+
+	nu = check_nu_k_dep(nu_val, 2)[2]
+
+	rho = Wannier_density(wbb, get_nr_at(results))
 
 
 	if haskey(results, "WannierBands1") 
 
-		copy!(selectdim(results["WannierBands1"],2,dir1), nus1)
+		copy!(selectdim(results["WannierBands1"],2,dir1), nu)
+
+#		cp_wcc_to_results(results, "WannierBands1", nu_val, dir1)
 
 	end 
+
+	if haskey(results, "WannierDensity")
+
+		copy!(selectdim(results["WannierDensity"],3,dir1), rho)
+
+	end 
+
+
+#	if haskey(results, "Polarization")
+#
+#		polarization!(selectdim(results["Polarization"],2,dir1), rho, nu)
+#
+#	end 
+
 
 	return 
 
@@ -250,6 +482,44 @@ function lattice(w::Int, dir2::Int)::Lattices.Lattice
 	
 end 
 
+function add_perturb_wrapper(h0::Function)::Function 
+
+	function h(k::AbstractVector{<:Real})::Matrix{ComplexF64}
+		
+		h0(k)
+
+	end 
+
+	function h(i::Int, get_k::Function, perturb::AbstractArray{<:Number, 3}
+						 )::Matrix{ComplexF64}
+
+
+		out = h(WLO.get_item_ij(i, get_k)) 
+
+#		println(LinearAlgebra.norm(out), " ",LinearAlgebra.norm(WLO.get_item_ij(i, perturb)))
+
+		out .+= WLO.get_item_ij(i, perturb)
+
+		return out 
+
+	end 
+
+end 
+
+
+function Bloch_Hamilt(w::Int, dir1::Int,#latt::Lattices.Lattice,
+											P::UODict)::Function 
+	
+	latt = lattice(w, 3-dir1)
+
+	l3 = Lattices.NearbyUCs(latt)
+
+	h0 = TBmodel.Bloch_Hamilt(l3; nr_orb=4, Hopping=MODEL.get_hoppf(P))
+
+	return add_perturb_wrapper(h0) 
+
+end 
+
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
 										kwargs...)::Dict{String,Any}
 
@@ -259,19 +529,79 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	k0 = kPoint_start(P)
 
-	results = init_results(w, get_target(target; kwargs...))
+#	results = init_results(w, get_target(target; kwargs...))
+	results = init_results(w, get_target(calc_observables; kwargs...))
+
 
 	@assert all_symms_preserved(P)
 
-	for dir1 in 1:2 
 
-		latt = lattice(w, 3-dir1)
-	
-		h = Matrix∘TBmodel.Bloch_Hamilt(Lattices.NearbyUCs(latt); nr_orb=4, Hopping=MODEL.get_hoppf(P))
-	
-		nus = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, h))
 
-		set_results_onedir!(results, dir1, sort!(nus))
+
+############### test  
+
+#	perturb2 = CalcWLO.get_perturb_on_mesh("Ct", nk, k0, 1993)  
+
+	Random.seed!(1993)
+
+	s  = 1e-10 
+
+	perturb0 = rand(ComplexF64,4,4) 
+	perturb0 .+= perturb0' 
+
+	perturb1 = rand(ComplexF64,4,4) 
+
+	LinearAlgebra.normalize!(perturb0)
+	LinearAlgebra.normalize!(perturb1)
+
+	perturb0 .*= s 
+	perturb1 .*= s 
+
+	perturb = zeros(ComplexF64, 4w, 4w, nk-1)
+
+	for j=1:w 
+
+		J = TBmodel.Hamilt_indices(1:4,j,4)
+
+		for k=axes(perturb,3) 
+
+			setindex!(perturb, perturb0, J, J, k)
+
+			if j<w 
+				setindex!(perturb, perturb1, 
+								J, TBmodel.Hamilt_indices(1:4,j+1,4), k)
+
+				end 
+			if j>1
+
+				setindex!(perturb, perturb1', 
+								J, TBmodel.Hamilt_indices(1:4,j-1,4), k)
+
+			end 
+
+		end 
+
+	end 
+
+#	@show perturb0 ≈ perturb0'
+#
+#	for p in eachslice(perturb, dims=3)
+#
+#		@show LinearAlgebra.norm(p)
+#		
+#		@show LinearAlgebra.norm(p-p') 
+#
+#	end 
+
+#########################
+
+	for dir1 in 1:2
+
+		h = Bloch_Hamilt(w, dir1, P)
+
+		data = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, perturb, h))
+	
+		set_results_onedir!(results, dir1, data)
 
 	end 
 
