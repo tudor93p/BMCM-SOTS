@@ -20,8 +20,12 @@ import ..Helpers: Symmetries
 
 import myPlots
 
-import ..WLO: nr_kPoints, kPoint_start
-import ..CalcWLO: preserved_symmetries, all_symms_preserved, get_perturb_on_mesh_, MODEL
+import ..WLO: nr_kPoints, kPoint_start  
+
+import ..CalcWLO
+import ..CalcWLO: preserved_symmetries, all_symms_preserved, MODEL
+
+#get_perturb_on_mesh_, 
 
 #===========================================================================#
 #
@@ -104,36 +108,56 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function get_perturb_on_mesh(P::UODict, seed::Int...
+function get_perturb_on_mesh(P::UODict, seed::Int...;
+														 kwargs...
 														 )::Vector{Array{ComplexF64,4}} 
 	
 	get_perturb_on_mesh(preserved_symmetries(P), 
 											nr_kPoints(P),
 											kPoint_start(P),
 											nr_perturb_instances(P),
-											seed...)
+											seed...;
+											kwargs...)
 
 end 
 
 function get_perturb_on_mesh(
 										 symms::AbstractString, 
-										 n::Int, k0::Real,
-										 nr_pert::Int,
-										 seed::Int=3268
-										 )::Vector{Array{ComplexF64,4}}
-
+										 args...; kwargs...
+										 )::Vector{Array{ComplexF64,4}} 
 
 	all_symms_preserved(symms) && return [zeros(ComplexF64,4,4,n-1,n-1)] 
 
+	return get_perturb_on_mesh_(symms, args...; kwargs...)
+
+end  
+
+function get_perturb_on_mesh_(
+										 symms::AbstractString, 
+										 n::Int, k0::Real,
+										 nr_pert::Int,
+										 seed::Int
+										 )::Vector{Array{ComplexF64,4}} 
+
 	Random.seed!(seed)  
 
+	return get_perturb_on_mesh_(symms, n, k0, nr_pert)
 
-	randperts = [get_perturb_on_mesh_(symms,n,k0) for i=1:nr_pert] 
+end  
 
+function get_perturb_on_mesh_(
+										 symms::AbstractString, 
+										 n::Int, k0::Real,
+										 nr_pert::Int,
+										 )::Vector{Array{ComplexF64,4}}
 
-	for i=1:nr_pert 
+	@assert !all_symms_preserved(symms) # safety -- methods changed
+	
+	randperts = [CalcWLO.get_perturb_on_mesh_(symms,n,k0) for i=1:nr_pert] 
 
-		i>1 && @assert !isapprox(randperts[1][1], randperts[i][1], atol=1e-8) 
+	for i=2:nr_pert 
+
+		@assert !isapprox(randperts[1][1], randperts[i][1], atol=1e-8) 
 
 	end 
 
@@ -1004,12 +1028,24 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	all(isauxfile, keys(results)) && return results
 
+##################### test 
+#
+#	perturb2 = CalcWLO.get_perturb_on_mesh_("Ct", nk, k0, 1993)
+#
+#	perturb2 .*= 1e-10 
+#
+#	@show LinearAlgebra.norm(perturb2)
+#
+#######################
 
 
 	# ------ no perturbation --------- #
 
 	set_results!(results, nk, k0, 1, s1,  
-										 get_data(MODEL.get_psiH(P, nk, k0), results;
+										 get_data(MODEL.get_psiH(P, nk, k0, 
+#																						 perturb2, #### test 
+																						 ), 
+															results;
 															parallel=parallel2))
 
 
@@ -1038,6 +1074,8 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 	if parallel #---- parallel evaluation ---#
 
+		#error() #################### test 
+
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
 			get_data(MODEL.get_psiH(P, nk, k0, pert...), results)
@@ -1058,7 +1096,10 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				data = get_data(MODEL.get_psiH(P, nk, k0, perturb0, ps), results;
+				data = get_data(MODEL.get_psiH(P, nk, k0, 
+																			 perturb0, ps, 
+#																			perturb0*ps + perturb2 ####### test 
+																			), results;
 												parallel=parallel2)
 	
 				set_results!(results, nk, k0, j, i, data)

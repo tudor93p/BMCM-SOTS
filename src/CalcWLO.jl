@@ -302,19 +302,19 @@ end
 #---------------------------------------------------------------------------#
 
 
-function symmetrize_on_mesh(seed::AbstractArray{ComplexF64,4},
-														args...; kwargs...
-														 )::Array{ComplexF64,4}
-
-	A = copy(seed)
-
-	symmetrize_on_mesh!(A, args...; kwargs...)
-
-	return A
-
-end  
-
-
+#function symmetrize_on_mesh(seed::AbstractArray{ComplexF64,4},
+#														args...; kwargs...
+#														 )::Array{ComplexF64,4}
+#
+#	A = copy(seed)
+#
+#	symmetrize_on_mesh!(A, args...; kwargs...)
+#
+#	return A
+#
+#end  
+#
+#
 
 
 function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4}, 
@@ -554,11 +554,11 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
 	strength = perturb_strength(P)
-	#parallel=nprocs()>=2 # nothing to do in parallel...
+	#parallel=nprocs()>=2 # parallel 2 cores not worth it 
 
 	results = init_results(nk, k0, get_target(target; kwargs...))
 
-	perturb1 = get_perturb_on_mesh(P)#,3268)  
+	perturb1 = get_perturb_on_mesh(P)
 
 #
 #	if !in(symms ,["None","All"])
@@ -596,10 +596,24 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 #end 
 
 
+################## test 
+#
+#	perturb2 = get_perturb_on_mesh("Ct", nk, k0, 1993)
+#
+##	perturb1 = perturb1*strength + perturb2*1e-10 
+#
+#	LinearAlgebra.axpby!(1e-10, perturb2, strength, perturb1)
+#
+#	strength = 1
+#
+#	@show LinearAlgebra.norm(perturb1)
+#
+#########################
+
 	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
 
-	set_results!(results, nk, k0, get_data(psi, results))
 
+	set_results!(results, nk, k0, get_data(psi, results))
 
 	return results
 

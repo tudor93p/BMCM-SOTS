@@ -17,7 +17,7 @@ using myLibs.ComputeTasks: CompTask
 import myPlots
 using myPlots: PlotTask 
 
-import ..ChecksWLO, ..Helpers, ..CalcWLO, ..WLO 
+import ..ChecksWLO, ..Helpers, ..CalcWLO, ..WLO, ..RibbonWLO
 
 using ..Helpers.hParameters: Calculation  
 
@@ -435,6 +435,77 @@ function CheckZero(init_dict::AbstractDict;
 									"Curves_yofx", plot∘add_default_obs(observables_))
 end 
 
+#===========================================================================#
+#
+function RibbonWannierBands1(init_dict::AbstractDict;
+											observables::AbstractVector{<:AbstractString},
+											kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	obs = "WannierBands1"
+
+	observables_ = filter(==(obs), observables)
+
+	task = CompTask(Calculation("Wannier bands ribbon",
+															RibbonWLO, init_dict; 
+															observables=observables_, kwargs...))
+
+
+	function plot(P::AbstractDict)::Dict{String,Any} 
+
+		d = get_dir1(P) 
+
+		data = task.get_data(P; fromPlot=true, mute=false, target=obs)  
+	
+		x,xlabel = RibbonWLO.xxlabel(data)
+	
+		legend = data[RibbonWLO.fn_legend(obs)] 
+	
+		y0 = selectdim(data[obs],2,d) #Vector
+	
+		gap = 1.0 
+
+		for i = 1:length(y0)-1 
+			
+			gap = min(gap,
+								Utils.reduce_dist_periodic(min, y0[i], view(y0, i+1:length(y0)), 1)
+								)
+
+		end 
+
+		xlim = Utils.extend_limits(extrema(x),1e-3)
+
+		xlim[2] = max(xlim[2],xlim[1]+1)
+
+		out = Dict{String,Any}(
+	
+					 "xs" => [x,x,x],
+	
+					 "ys" => [y0 .- 1, copy(y0), y0 .+ 1],
+						
+					 "labels" => ["-1","0","+1"],
+	
+						"xlim"=> xlim,
+	
+						"ylim"=> (-0.7, 0.7),
+	
+						"xlabel" => xlabel,
+	
+						"ylabel" => tex(legend["dir"][d]) * " " * Wannier_gap_text(gap),
+
+						"yline" => 0.5,
+	
+						)
+	
+	
+	
+			return out 
+	
+		end 
+
+	return PlotTask(task, ("obs_index", 2), "Scatter", plot,)
+end 
 
 #===========================================================================#
 #

@@ -218,8 +218,34 @@ function get_pertHdata(params::AbstractVector{<:Real}, h::Function, p::AbstractA
 end 
 
 
-function symmetrize_on_mesh!(args...; kwargs...)
-#NOT IMPLEMENTED 
+function symmetrize_on_mesh!(
+														 A::AbstractArray{ComplexF64,4},
+														 opers::AbstractString, 
+														 n::Int, k0::Real; kwargs...)
+
+	if opers=="All" 
+
+		@assert iszero(A) LinearAlgebra.norm(A)
+	
+	elseif opers=="None"
+
+		return 
+
+	elseif opers=="R2"
+
+
+	WLO.symmetrize_on_mesh!(A,
+													uniqueInds_operR2(n,k0),
+													(operR2, fij_operR2(n,k0))
+														)
+
+
+	else 
+
+		error("NOT IMPLEMENTED")
+
+	end 
+
 end 
 
 #===========================================================================#
@@ -313,28 +339,6 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function get_perturb_on_mesh(
-										 symms::AbstractString, 
-										 n::Int, k0::Real,
-										 )::Array{ComplexF64,4}
-
-	@assert symms=="R2" 
-
-	pert = rand(ComplexF64,4,4,n-1,n-1)
-	
-	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
-		
-	WLO.symmetrize_on_mesh!(pert,
-													uniqueInds_operR2(n,k0),
-													(operR2, fij_operR2(n,k0))
-														)
-
-#	MB.symmetrize_on_mesh!(pert, args...)
-
-	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
-	
-	return  pert 
-end   
 
 
 

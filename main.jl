@@ -7,7 +7,7 @@ import myLibs: ComputeTasks
 import BMCMSOTS  
 
 
-include("input_file_8.jl")
+include("input_file_9.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
@@ -17,9 +17,9 @@ tasks = [
 
 ComputeTasks.missing_data.(tasks,show_missing=false)#true)
 
-error() 
+#error() 
 
-ComputeTasks.get_data_one.(tasks, mute=false) 
+ComputeTasks.get_data_one.(tasks, mute=false);
 
 #shuffle = gethostname()=="tudor-HP"
 
@@ -32,16 +32,24 @@ ComputeTasks.get_data_one.(tasks, mute=false)
 
 t1 = Dates.DateTime("2023-02-27T18:11:46.870")
 
-println("Calculations start at: ",t1)
+if Dates.now()<t1 
 
-while Dates.now() < t1 #< Dates.Minute(9)
+	println("Calculations start at: ",t1)
 
-	sleep(0.1)
+	while Dates.now() < t1 
+	
+		sleep(0.1)
+	
+	end 
 
 end 
 
 
-ComputeTasks.get_data_all.(tasks, shuffle=true, seed=4, mute=false)
+ComputeTasks.get_data_all.(tasks, 
+													 #shuffle=true, seed=4, 
+													 mute=false,
+													 check_data=false)
+
 
 
 

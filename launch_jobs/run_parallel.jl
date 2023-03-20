@@ -1,7 +1,7 @@
 #!/home/tudor/apps/julia/julia-1.8.5/bin/julia
 
 path = [
-				"/media/tudor/Tudor/Work/2018_Higher-Order-Topology/BMCMSOTS/",
+				"/media/tudor/Tudor/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/",
 				"/net/horon/scratch/pahomit/BMCM-SOTS"
 				]
 Pkg.activate(path[1]) 

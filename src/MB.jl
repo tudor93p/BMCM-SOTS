@@ -20,10 +20,62 @@ const quantized_wcc2_values = [0,0.5]
 #---------------------------------------------------------------------------#
 
 
+function delta(a::Real,b::Real)::Bool
+
+	isapprox(a,b,atol=1e-5)
+
+end 
+
+function FT1(x::Real)::ComplexF64
+
+	delta(x,0)
+
+end 
+
+function FTcos(x::Real)::ComplexF64
+	 
+	0.5*delta(abs(x),1)
+
+end 
+
+function FTsin(x::Real)::ComplexF64
+
+	FTcos(x)*sign(x)*im 
+
+end 
+
+
+function applyFT(f::Function, R::AbstractVector{<:Real})::ComplexF64
+
+	prod(f, R; init=1)
+
+end 
+
+function applyFT(f::Function, R::AbstractVector{<:Real}, d::Int)::ComplexF64 
+
+	f(R[d]) * applyFT(FT1, view(R,1:d-1)) * applyFT(FT1, view(R, d+1:length(R)))
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
 function dispersion((kx,ky)::AbstractVector{<:Real})::Float64
 
 	1 - cos(kx) - cos(ky)
 
+end 
+
+function dispersion_xy(R::AbstractVector{<:Real})::Float64
+
+	applyFT(FT1, R) - applyFT(FTcos, R, 1) - applyFT(FTcos, R, 2)
+	
 end 
 
 
@@ -34,10 +86,26 @@ function Delta((kx,ky)::AbstractVector{<:Real},
 
 end 
 
+function Delta_xy(R::AbstractVector{<:Real},
+							 sigma::Real)::ComplexF64
+
+	sigma*applyFT(FTsin,R,1) - im*applyFT(FTsin,R,2)
+
+end 
+
+
+
 function singlet((s0,sx,sy)::AbstractVector{<:Real},
 								 (kx,ky)::AbstractVector{<:Real})::Float64
 
 	s0 + sx*cos(kx) + sy*cos(ky)
+
+end 
+
+function singlet_xy((s0,sx,sy)::AbstractVector{<:Real},
+								 R::AbstractVector{<:Real})::Float64
+
+	s0*applyFT(FT1,R) + sx*applyFT(FTcos,R,1) + sy*applyFT(FTcos,R,2)
 
 end 
 
@@ -48,11 +116,19 @@ function complex_b((bx,by)::AbstractVector{<:Real},
 
 end 
 
+function complex_b_xy(b::AbstractVector{<:Real},
+											sigma::Real,R::AbstractVector{<:Real})::ComplexF64
+
+	complex_b(b,sigma)*applyFT(FT1,R)
+
+end 
+
 function H(k::AbstractVector{<:Real},
 					 bs::AbstractVector{<:Real},
 					 aux::Real=0
 					 )::Matrix{ComplexF64}
 
+#	return 
 
 	xi = dispersion(k) 
 
@@ -71,6 +147,34 @@ function H(k::AbstractVector{<:Real},
 				 [bp xi sk Dm];
 				 [conj(Dp) sk -xi bp];
 				 [sk conj(Dm) bm -xi]]
+
+end 
+
+function H_xy(R::AbstractVector{<:Real},
+					 bs::AbstractVector{<:Real},
+					 aux::Real=0
+					 )::Matrix{ComplexF64}
+
+#	return 
+
+	xi = dispersion_xy(R) 
+
+	Dp = Delta_xy(R,1)
+	
+	Dm = Delta_xy(R,-1)
+	
+	bp = complex_b_xy(view(bs,1:2),1,R)
+	
+	bm = complex_b_xy(view(bs, 1:2),-1,R)
+
+	sk = singlet_xy(view(bs, 3:5), R)
+
+	# extra minus bottom-left block!
+
+	return [[xi bm Dp sk];
+				 [bp xi sk Dm];
+				 [-conj(Dp) sk -xi bp];
+				 [sk -conj(Dm) bm -xi]]
 
 end 
 
@@ -339,6 +443,22 @@ function get_enpsiH(MBparams::AbstractVector{<:Real}, n::Int, k0::Real, args...;
 	WLO.enpsiH_on_mesh(n, k0, get_pertHdata(MBparams, H, args...; atol=atol)...)
 
 end 
+
+function get_hoppf(P::UODict)::Function 
+
+	data = get_pertHdata(params_fromP(P))
+
+	function f(ri::AbstractVector{<:Real},
+						 rj::AbstractVector{<:Real}
+						 )::Matrix{ComplexF64}
+
+		H_xy(ri-rj, data...)
+
+	end 
+
+#	return WLO.psiH_on_mesh1(n, k0, get_pertHdata(MBparams, H)...)
+
+end  
 
 
 #===========================================================================#
