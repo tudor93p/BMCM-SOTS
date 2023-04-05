@@ -8,6 +8,7 @@ module TasksPlots
 #import myLibs.Parameters:UODict 
 
 
+import LsqFit 
 
 
 import myLibs: Utils, ComputeTasks, SignalProcessing 
@@ -84,7 +85,7 @@ end
 #---------------------------------------------------------------------------#
 
 function init_sliders_obs(observables::AbstractVector{<:AbstractString}
-												 )::Vector
+													)::Vector{Tuple}
 													
 	[ ("observables", observables), ("obs_index", 8), ]
 
@@ -295,8 +296,7 @@ function plotdict_checkzero(
 
 		"ylabel" => myPlots.join_label(transf_lab*P["obs"], fixedlab),
 
-		"xlabel" => xlabel,
-
+		"xlabel" => xlabel * " " * tex("\\lambda"),
 		)
 
 	ComputeTasks.add_line!(out, P, "perturb_strength", "x")
@@ -413,8 +413,6 @@ function CheckZero(init_dict::AbstractDict;
 
 
 	observables_ = intersect(observables, ChecksWLO.calc_observables)
-
-
 
 	task = CompTask(Calculation("Check zeros",
 															ChecksWLO, init_dict; 
@@ -1180,8 +1178,122 @@ end
 
 
 
+F_ifXisN = log10∘inv 
+
+Flab_ifXisN = "\$\\log_{10}(1/N)\$"
 
 
+function processConv_ifXisN!(out_dict::AbstractDict,
+														 X::Symbol)::AbstractDict
+
+
+
+
+	if X==:nr_kPoints 
+
+		out_dict["x"] = F_ifXisN.(out_dict["x"])
+
+		out_dict["xlabel"] = Flab_ifXisN 
+
+#		out_dict["xlim"] = [0,maximum(out_dict["x"])] 
+
+	end 
+
+	out_dict["xlim"] = extrema(out_dict["x"]) 
+
+	return out_dict 
+
+end 
+
+function xline_ifXisN!(out::AbstractDict, X::Symbol)::AbstractDict
+
+
+	if X==:nr_kPoints && haskey(out,"xline")
+
+		out["xline"] = F_ifXisN(out["xline"])
+
+	end 
+
+	return out 
+
+end 
+
+function line(x::Real, (a,b)::AbstractVector{<:Real})::Float64
+
+	a*x+b 
+
+end 
+function line(x::AbstractVector{<:Real}, (a,b)::AbstractVector{<:Real}
+						 )::Vector{Float64}
+
+	a*x .+ b 
+
+end 
+
+
+
+function fit_line_conv(xdata::AbstractVector{<:Real},
+											 ydata::AbstractVector{<:Real},
+											 )::Tuple{Vector{Float64},String}
+
+
+	if (length(xdata)!=length(ydata)) | (length(xdata)<2)
+		
+		return (zeros(2),"no fit")
+
+	end 
+												 
+	fit = LsqFit.curve_fit(line, xdata, ydata, rand(2))
+
+	return (LsqFit.coef(fit),
+					string("slope=",nr2str(LsqFit.coef(fit)[1])))
+
+end 
+
+function fit_line_conv(xdata::AbstractVector{<:Real},
+											 ydata::AbstractVector{<:Real},
+											 start::Int,stop::Int 
+											 )::Tuple{Vector{Float64},String}
+
+#	start>0 || return (zeros(2),"no fit")
+
+#	i = start:length(xdata) 
+@show start stop 
+
+	return fit_line_conv(
+											 view(xdata,start:stop),
+											 view(ydata,start:stop),
+											 )
+end 
+
+
+function fit_line_conv(x::AbstractVector{<:Real},
+											 y::AbstractVector{<:Real},
+											 smooth::Float64
+											 )::Tuple{Vector{Float64},String}
+
+	0<=smooth<=1 || return (zeros(2),"no fit")
+
+#	i = start:length(xdata) 
+	#start = Int(round(smooth*(length(x)-2)+1))
+	stop  = Int(round(length(x)*(1-smooth)+2*smooth))
+
+	return fit_line_conv(x,y,
+#											 start, length(x),
+												1, stop,
+											 )
+
+end 
+
+#function ys_lab_conv(xdata::AbstractVector{<:Real},
+#										 args...
+#										 )::Tuple{Vector{Float64},String}
+#
+#	ab,lab = fit_line_conv(xdata, args...)
+#
+#	return line(xdata,ab), string("slope=",nr2str(ab[1]))
+#
+#end 
 
 
 #===========================================================================#
@@ -1201,13 +1313,7 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 
 	task, out_dict, = ComputeTasks.init_multitask(C, [X=>1])#, [1=>""])
 
-	if X==:nr_kPoints 
-		out_dict["x"] = 1.0 ./ out_dict["x"]
-		out_dict["xlabel"] = "1/("*out_dict["xlabel"]*")"
-		out_dict["xlim"] = [0,maximum(out_dict["x"])]
-	else 
-		out_dict["xlim"] = extrema(out_dict["x"])
-	end 
+	processConv_ifXisN!(out_dict, X)
 
 	P1 = Dict{String,Any}("obs"=>first(observables_))
 
@@ -1229,7 +1335,14 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 		
 		chlabs = data[1][4] 
 
-		ys = [zeros(length(data)) for l=chlabs]
+		n = length(chlabs)
+
+		nr_curves = n* (1+(X==:nr_kPoints))
+
+		labels = vcat((chlabs for i=0:(X==:nr_kPoints))...)
+
+
+		ys = [zeros(length(data)) for i=1:nr_curves]
 
 		for (i,d) in enumerate(data)
 			for (j,y) in enumerate(d[3])
@@ -1245,26 +1358,46 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 
 		ylabel = myPlots.join_label(transf_lab*P["obs"],
 																data[1][5], 
-																"PS="*nr2str(data[1][1],2),
+																tex("\\lambda="*nr2str(data[1][1],2)),
 																						 )
+
+		if X==:nr_kPoints 
+
+
+			for j=1:n
+	
+				ab,lab = fit_line_conv(out_dict["x"], ys[j], 
+															 Float64(get(P,"smooth",0)))
+
+#				y,lab = ys_lab_conv(out_dict["x"], ys[j], s)
+
+				setindex!(ys, line(out_dict["x"],ab), j+n)
+				
+				labels[j+n] = myPlots.join_label(labels[j+n], lab)
+	
+			end 
+
+		end 
+
+
+
+
 
 		out = Dict{String,Any}(
 
-							"xs" => [out_dict["x"] for y=ys],
+							"xs" => [out_dict["x"] for i=1:nr_curves],
 							
 							"ys" => ys,
 
 							"xlim" => out_dict["xlim"],
 
-							"ylim" => get_ylim(P, ys),
+							"ylim" => get_ylim(P, view(ys, 1:n)),
 
-
-							"labels" => chlabs,
+							"labels" => labels,
 
 							"ylabel" => ylabel,
 
 							"xlabel" => out_dict["xlabel"],
-
 
 						)
 
@@ -1275,18 +1408,17 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 
 		ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero
 
-		if X==:nr_kPoints && haskey(out,"xline")
+		return xline_ifXisN!(out, X)
 
-			out["xline"] = 1/out["xline"]
-
-		end 
-
-		return out 
 	end
 
 	return PlotTask(task,  
-									[init_sliders_obs(observables_);
-									 [("obs_group", ChecksWLO.combs_groups()),	("ylim",)]], 
+									Tuple[init_sliders_obs(observables_);
+									 [("obs_group", ChecksWLO.combs_groups()),	
+									 ("ylim",), 
+									 (X==:nr_kPoints ? (("smoothen",),) : ())...,
+									 ]
+									 ], 
 									"Curves_yofx", 
 									plot)
 
@@ -1310,13 +1442,7 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 
 	task, out_dict, construct_Z, = ComputeTasks.init_multitask(C, [X=>1, Y=>1])
 
-	if X==:nr_kPoints 
-		out_dict["x"] = 1.0 ./ out_dict["x"]
-		out_dict["xlabel"] = "1/("*out_dict["xlabel"]*")"
-		out_dict["xlim"] = [0,maximum(out_dict["x"])]
-	else 
-		out_dict["xlim"] = extrema(out_dict["x"])
-	end 
+	processConv_ifXisN!(out_dict, X)
 
 	P0 = Dict{String,Any}("obs_group"=>"-") 
 
@@ -1372,7 +1498,7 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 
 		ylabel = myPlots.join_label(transf_lab*obs,#P["obs"],
 																data[1][5], 
-																"PS="*nr2str(data[1][1],2),
+																tex("\\lambda="*nr2str(data[1][1],2)),
 																						 )
 
 
@@ -1394,14 +1520,9 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 
 							)
 
-	ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero
-		if X==:nr_kPoints && haskey(out,"xline")
+	ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero 
 
-			out["xline"] = 1/out["xline"]
-
-		end 
-
-	return out 
+	return xline_ifXisN!(out, X)
 
 #										transf_lab="\$\\log_{10}\$",
 #										transf_data=apply_log10abs!

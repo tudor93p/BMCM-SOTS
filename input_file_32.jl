@@ -34,6 +34,7 @@ input_checks  = Dict{Symbol,Any}(
 											215, 
 											300, 
 											600,
+											1000,
 																																															 ),
 
 
@@ -41,13 +42,12 @@ input_checks  = Dict{Symbol,Any}(
 
 #		preserved_symmetries = ["All"],
 
-		preserved_symmetries = setdiff(["None"; join.(Combinatorics.powerset(["P", "Mx", "Ct"],1,3),"+"); "All"], ["Ct+Tt","P+Tt","P+Ct"]),
+#		preserved_symmetries = setdiff(["None"; join.(Combinatorics.powerset(["P", "Mx", "Ct"],1,3),"+"); "All"], ["Ct+Tt","P+Tt","P+Ct"]),
+
+		preserved_symmetries = ["None";join.(Combinatorics.powerset(["P", "Mx", "Ct", "Tt"],1),"+");"All"],
 
 #		preserved_symmetries = ["None", "P", "Mx", "Ct", "Tt", "All"],
 
-
-#		preserved_symmetries = ["All"], 
-#		preserved_symmetries = ["None", "All"],
 
 		nr_perturb_strength = [11],
 		

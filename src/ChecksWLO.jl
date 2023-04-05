@@ -40,6 +40,8 @@ usedkeys()::Vector{Symbol} = [
 
 						:preserved_symmetries, 
 
+						:perturb_strength,  # only for plotting 
+
 						:nr_perturb_strength,
 						:max_perturb_strength,
 						:nr_perturb_instances,
@@ -47,7 +49,7 @@ usedkeys()::Vector{Symbol} = [
 
 function usedkeys(P::UODict)::Vector{Symbol} 
 
-	uk = usedkeys() 
+	uk = setdiff!(usedkeys(),[:perturb_strength])
 	
 	all_symms_preserved(P) && setdiff!(uk, [
 								:nr_perturb_strength, # don't disregard!!

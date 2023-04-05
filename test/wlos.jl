@@ -134,10 +134,12 @@ end
 #
 tasks = [
 				 init(BMCMSOTS, :CheckZero), 
-				init(BMCMSOTS, :CheckZero_atYs; Y=:preserved_symmetries),
+#				init(BMCMSOTS, :CheckZero_atYs; Y=:preserved_symmetries),
 #				 init(BMCMSOTS, :WannierBands2),
 ##				 init(BMCMSOTS, :WannierBands1),
-#				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
+#				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:s_Hamilt),
+#				init(BMCMSOTS, :WannierGap_vsX; X=:nr_kPoints),
+				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
 #				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s_Hamilt),
 #init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:preserved_symmetries),
 #				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:b_Hamilt),
@@ -168,6 +170,7 @@ P["obs"] = target
 P["obs_i"] = rand(1:10)
 P["obs_i"] = 1 
 
+P["smooth"]=0.3
 d = task.plot(P)
 
 @show Statistics.mean(Statistics.mean,d["ys"])

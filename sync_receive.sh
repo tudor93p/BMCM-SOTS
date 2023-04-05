@@ -5,7 +5,7 @@ host='horon'
 #host='plumpy'
 #host='nut'
 
-since='2023-03-06 19:40:00'
+since='2023-04-04 19:40:00'
 
 server=pahomit@$host.ethz.ch
 
@@ -20,7 +20,7 @@ subfolder=""
 remotefolder="/net/horon/scratch/pahomit/BMCM-SOTS/Data/${subfolder}"
 
 
-localfolder="/media/tudor/Tudor/Work/2018_Higher-Order-Topology/BMCMSOTS/Data/${subfolder}"
+localfolder="/media/tudor/Tudor/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/Data/${subfolder}"
 
 
 src="${server}:${remotefolder}"
@@ -57,7 +57,7 @@ echo $remotefolder
 #echo
 #echo "***** Receiving remote data *****"
 #rsync -azh $src $dest 
-#
+
 
 echo
 echo "***** Receiving remote data produced since $since *****"
