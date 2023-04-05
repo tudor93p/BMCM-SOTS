@@ -1,4 +1,4 @@
-include("../input_file_9.jl") 
+include("../input_file_32.jl") 
 
 import BMCMSOTS 
 
@@ -12,9 +12,10 @@ for fn in [
 #"symms",
 
 #"overlap_matmul",
-#"wlos",
+"wlos",
 
-"ribbon",
+#"ribbon",
+#
 
 #"wlos_MBvBBH",
 

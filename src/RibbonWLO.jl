@@ -18,7 +18,7 @@ import ..CalcWLO: MODEL
 
 import ..WLO: nr_kPoints, kPoint_start 
 
-import ..CalcWLO: all_symms_preserved, fn_legend, fn_nolegend, add_legend!
+import ..CalcWLO: all_symms_preserved, fn_legend, fn_nolegend, add_legend!, perturb_strength
 
 #===========================================================================#
 #
@@ -104,6 +104,11 @@ get_target = prep_obs ∘ Helpers.f_get_target(:observables)
 #
 #---------------------------------------------------------------------------#
 
+function no_symms_preserved(P::UODict)::Bool 
+
+	P[:preserved_symmetries] == "None" 
+
+end 
 
 
 #===========================================================================#
@@ -118,7 +123,7 @@ function init_results(w::Int,
 
 
 	results = Dict{String,Any}("x" => Vector(1:2w),
-														 "xlabel" => "Eigenvalue number",
+														 "xlabel" => "Eigenvalue index",
 														 )
 
 	@assert Set(keys(results))==Set(xxlabel())
@@ -327,12 +332,7 @@ function polarization(rho::AbstractMatrix{<:Real},
 											 nu_val::AbstractVector{<:Real},
 											 )::AbstractVector{Float64}
 
-
-#	nu = Utils.bring_periodic_to_interval.(nu_val, 0, 0.99999, 1)
-
-#	nu =nu_val
-
-	rho*nu_val 
+	Utils.bring_periodic_to_interval.(rho*nu_val, -0.5, 0.5) 
 
 end 
 
@@ -346,7 +346,7 @@ function polarization!(dest::AbstractVector{Float64},
 
 #	nu =nu_val
 
-	LinearAlgebra.mul!(dest, rho, nu_val) 
+	LinearAlgebra.mul!(dest, rho, nu_val)  
 
 	for f in (isnan,isinf,ismissing), p in dest 
 
@@ -359,6 +359,12 @@ function polarization!(dest::AbstractVector{Float64},
 			break  
 
 			end 
+
+	end  
+
+	for (i,p) in enumerate(dest)
+
+		setindex!(dest, Utils.bring_periodic_to_interval(p, -0.5, 0.5), i)
 
 	end 
 
@@ -440,36 +446,62 @@ function set_results_onedir!(results::AbstractDict,
 end 
 
 
+function get_perturb_on_mesh1(nr_at::Int, #nr_orb::Int,
+														 nk::Real, 
+														 s::Real,
+														 seed::Int=1993)::Array{ComplexF64,3}
+
+
+	Random.seed!(seed)
+
+	perturb0 = rand(ComplexF64,4,4) 
+	perturb0 .+= perturb0' 
+
+	perturb1 = rand(ComplexF64,4,4) 
+
+	LinearAlgebra.normalize!(perturb0)
+	LinearAlgebra.normalize!(perturb1)
+
+	perturb0 .*= s 
+	perturb1 .*= s 
+
+	perturb = zeros(ComplexF64, 4nr_at, 4nr_at, nk-1)
+
+	for j=1:nr_at  
+
+		J = TBmodel.Hamilt_indices(1:4,j,4)
+
+		for k=axes(perturb,3) 
+
+			setindex!(perturb, perturb0, J, J, k)
+
+			if j<nr_at 
+				setindex!(perturb, perturb1, 
+								J, TBmodel.Hamilt_indices(1:4,j+1,4), k)
+
+				end 
+			if j>1
+
+				setindex!(perturb, perturb1', 
+								J, TBmodel.Hamilt_indices(1:4,j-1,4), k)
+
+			end 
+
+		end 
+
+	end 
+
+	return perturb 
+
+end 
+
+
 #===========================================================================#
 #
-# Compute 
+#
 #
 #---------------------------------------------------------------------------#
 
-
-
-
-function Compute(P::UODict; get_fname=nothing, target=nothing,
-								 kwargs...)::Dict  
-
-	Compute_(P, target, get_fname; kwargs...)
-
-end   
-
-
-
-function Compute_(P::UODict, target, get_fname::Function;
-									kwargs...)::Dict{String,Any}
-
-	obs = get_target(target; kwargs...) 
-	
-	results = Compute_(P, obs; kwargs...)
-
-	ReadWrite.Write_PhysObs(get_fname(P), FILE_STORE_METHOD, results)
-
-	return isnothing(target) ? results : Utils.dict_keepkeys(results, obs) 
-
-end 
 
 
 function lattice(w::Int, dir2::Int)::Lattices.Lattice 
@@ -520,6 +552,36 @@ function Bloch_Hamilt(w::Int, dir1::Int,#latt::Lattices.Lattice,
 
 end 
 
+#===========================================================================#
+#
+# Compute 
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+function Compute(P::UODict; get_fname=nothing, target=nothing,
+								 kwargs...)::Dict  
+
+	Compute_(P, target, get_fname; kwargs...)
+
+end   
+
+
+function Compute_(P::UODict, target, get_fname::Function;
+									kwargs...)::Dict{String,Any}
+
+
+	obs = get_target(target; kwargs...) 
+	
+	results = Compute_(P, obs; kwargs...)
+
+	ReadWrite.Write_PhysObs(get_fname(P), FILE_STORE_METHOD, results)
+
+	return isnothing(target) ? results : Utils.dict_keepkeys(results, obs) 
+
+end 
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
 										kwargs...)::Dict{String,Any}
 
@@ -533,67 +595,13 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	results = init_results(w, get_target(calc_observables; kwargs...))
 
 
-	@assert all_symms_preserved(P)
+	@assert all_symms_preserved(P)|no_symms_preserved(P)
+
+	strength = 1e-10 + (all_symms_preserved(P) ? 0 : perturb_strength(P))
 
 
+	perturb = get_perturb_on_mesh1(w, nk, strength)
 
-
-############### test  
-
-#	perturb2 = CalcWLO.get_perturb_on_mesh("Ct", nk, k0, 1993)  
-
-	Random.seed!(1993)
-
-	s  = 1e-10 
-
-	perturb0 = rand(ComplexF64,4,4) 
-	perturb0 .+= perturb0' 
-
-	perturb1 = rand(ComplexF64,4,4) 
-
-	LinearAlgebra.normalize!(perturb0)
-	LinearAlgebra.normalize!(perturb1)
-
-	perturb0 .*= s 
-	perturb1 .*= s 
-
-	perturb = zeros(ComplexF64, 4w, 4w, nk-1)
-
-	for j=1:w 
-
-		J = TBmodel.Hamilt_indices(1:4,j,4)
-
-		for k=axes(perturb,3) 
-
-			setindex!(perturb, perturb0, J, J, k)
-
-			if j<w 
-				setindex!(perturb, perturb1, 
-								J, TBmodel.Hamilt_indices(1:4,j+1,4), k)
-
-				end 
-			if j>1
-
-				setindex!(perturb, perturb1', 
-								J, TBmodel.Hamilt_indices(1:4,j-1,4), k)
-
-			end 
-
-		end 
-
-	end 
-
-#	@show perturb0 ≈ perturb0'
-#
-#	for p in eachslice(perturb, dims=3)
-#
-#		@show LinearAlgebra.norm(p)
-#		
-#		@show LinearAlgebra.norm(p-p') 
-#
-#	end 
-
-#########################
 
 	for dir1 in 1:2
 

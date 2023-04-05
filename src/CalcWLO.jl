@@ -46,7 +46,7 @@ function usedkeys(P::UODict)::Vector{Symbol}
 	
 	all_symms_preserved(P) && setdiff!(uk, [ :perturb_strength, ]) 
 
-	zero_perturb_strength(P) && setdiff!(uk, [:preserved_symmetries, ])
+	zero_perturb_strength(P) && setdiff!(uk, [:preserved_symmetries, :perturb_strength])
 
 #	(all_symms_preserved(P)||zero_perturb_strength(P))&& return Symbol[]
 

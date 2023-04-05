@@ -7,7 +7,9 @@ P = (width=10,
 			braiding_time = 0.25, 
 			s0_Hamilt = 0.1, s_Hamilt = 1, b_Hamilt = 1, 
 			kPoint_start = -1, nr_kPoints = 10, 
-			preserved_symmetries = "All",#Ct",#"None",#"Ct", 
+#			preserved_symmetries = "All",#Ct",#"None",#"Ct",  
+#			preserved_symmetries = "Ct",
+			preserved_symmetries = "None",
 			nr_perturb_strength = 3, max_perturb_strength = 0.4, 
 			nr_perturb_instances = 1, perturb_strength = 0.2,) 
 
@@ -40,17 +42,39 @@ data = RibbonWLO.Compute(P; observables=observables)
 #
 #end  
 
-t = init(BMCMSOTS, :RibbonPolarization) 
-
-pdata = t.plot(t.get_plotparams(P)) 
-
-t2 = init(BMCMSOTS, :RibbonWannierBands1); 
-
-pdata2 = t2.plot(t2.get_plotparams(P)) 
-
-t3 = init(BMCMSOTS, :RibbonWannierDensity);
-
-pdata3 = t3.plot(t3.get_plotparams(P)) 
 
 
-myPlots.plot(t2, t3, t)
+#
+#tasks = [
+# init(BMCMSOTS, :RibbonWannierBands1),
+# init(BMCMSOTS, :RibbonWannierDensityCenters),
+# init(BMCMSOTS, :RibbonWannierDensity),
+#init(BMCMSOTS, :RibbonPolarization) 
+#]
+#
+##myPlots.plot(t2, t4, t3, t) 
+#
+#pdata = map(tasks) do t 
+#
+#map([merge(t.get_plotparams(P),Dict("k"=>2.3)),
+#		 delete!(t.get_plotparams(P),"k")]) do P1 
+#
+#t.plot(P1)
+#
+#	end 
+#end 
+
+t0 = init(BMCMSOTS, :RibbonPolarization)  
+
+mt = init(BMCMSOTS, :RibbonPolarization_vsX; X=:braiding_time)
+
+pdata = map([merge(t0.get_plotparams(P),Dict("k"=>2.3)),
+		 delete!(t0.get_plotparams(P),"k")]) do P1 
+
+mt.plot(t0.get_plotparams(P))
+
+end 
+
+
+
+#myPlots.plot(tasks)

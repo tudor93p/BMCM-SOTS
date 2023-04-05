@@ -239,17 +239,17 @@ end
 
 function bsss_cycle((theta,s0,s,b)::AbstractVector{<:Real})::Vector{Float64}
 
-	if !(theta≈pi/2)
+	#if !(theta≈pi/2)
 
-		@show theta 
+	#	@show theta 
 
-		0<=theta<=1 && @warn "Perhaps braiding_time given as parameter?"
+	#	0<=theta<=1 && @warn "Perhaps braiding_time given as parameter?"
 
-		theta>2pi && @warn "Theta outside [0,2pi]. Perhaps theta*2pi given?"
+	#	theta>2pi && @warn "Theta outside [0,2pi]. Perhaps theta*2pi given?"
 
-		@assert theta≈pi/2 
+	#	@assert theta≈pi/2 
 
-	end 
+	#end 
 
 	bs = Float64[-sin(theta), 
 								cos(theta),

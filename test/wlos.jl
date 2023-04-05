@@ -134,10 +134,10 @@ end
 #
 tasks = [
 				 init(BMCMSOTS, :CheckZero), 
-				 
+				init(BMCMSOTS, :CheckZero_atYs; Y=:preserved_symmetries),
 #				 init(BMCMSOTS, :WannierBands2),
 ##				 init(BMCMSOTS, :WannierBands1),
-				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
+#				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
 #				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s_Hamilt),
 #init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:preserved_symmetries),
 #				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:b_Hamilt),

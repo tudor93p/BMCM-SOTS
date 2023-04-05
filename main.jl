@@ -7,7 +7,7 @@ import myLibs: ComputeTasks
 import BMCMSOTS  
 
 
-include("input_file_9.jl")
+include("input_file_32.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
@@ -46,7 +46,7 @@ end
 
 
 ComputeTasks.get_data_all.(tasks, 
-													 #shuffle=true, seed=4, 
+													 shuffle=true, seed=4, 
 													 mute=false,
 													 check_data=false)
 
