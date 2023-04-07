@@ -10,6 +10,7 @@ include("Algebra.jl")
 
 include("Symmetries.jl")
 
+include("AdaptiveMesh.jl")
 
 #===========================================================================#
 #

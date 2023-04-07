@@ -253,8 +253,10 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	@show LinearAlgebra.norm(perturb1)
 
+	nk_unif = max(5,div(nk,3))
 
-#	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
+	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
+
 
 
 #	set_results!(results, nk, k0, get_data(psi, results))
