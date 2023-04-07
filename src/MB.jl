@@ -1110,7 +1110,7 @@ end
 function sepSymmString(opers_::AbstractString, 
 											 prefix::AbstractString="")::Vector{String}
 
-	opers  = filter(!isempty, split(opers_,"+"))
+	opers = filter(!isempty, split(opers_,"+"))
 	
 	(isempty(opers) ||	in("None",opers)) && return String[]
 

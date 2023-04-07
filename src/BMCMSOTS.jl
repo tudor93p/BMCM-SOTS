@@ -48,6 +48,7 @@ include("BBH.jl")
 
 
 include("CalcWLO.jl")
+include("CalcWLOadapt.jl")
 include("RibbonWLO.jl")
 
 include("ChecksWLO.jl")

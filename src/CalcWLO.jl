@@ -244,10 +244,8 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function init_results(n::Int, k0::Real,
-											obs::AbstractVector{<:AbstractString}
+function init_results(n::Int, obs::AbstractVector{<:AbstractString}
 										 )::Dict{String,Any}
-
 
 	if "WannierBands2" in obs 
 
@@ -257,13 +255,9 @@ function init_results(n::Int, k0::Real,
 
 #		union!(obs, ["WannierGap"])
 
-	end 
+	end  
 
-	results = Dict{String,Any}("ks" => WLO.get_kij(n, k0; restricted=false)(1:n),
-														 "klabels" => ["k_y","k_x"],
-														 )
-
-	@assert Set(keys(results))==Set(xxlabel())
+	results = Dict{String,Any}("klabels" => ["k_y","k_x"])
 
 	for w in ("WannierBands1","WannierBands2")
 
@@ -281,6 +275,22 @@ function init_results(n::Int, k0::Real,
 #		results[w] = zeros(2) 
 #
 #	end 
+
+
+
+	return results
+
+end 
+
+function init_results(n::Int, k0::Real,
+											obs::AbstractVector{<:AbstractString}
+													 )::AbstractDict{String,Any}
+
+	results = init_results(n, obs) 
+
+	results["ks"] = WLO.get_kij(n, k0; restricted=false)(1:n)
+	
+	@assert Set(keys(results))==Set(xxlabel())
 
 	return results
 
