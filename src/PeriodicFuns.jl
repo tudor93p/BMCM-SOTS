@@ -94,7 +94,7 @@ import myLibs:Utils
 function cycseldim(A::AbstractArray{T,N}, d::Int, i::Int
 									 )::AbstractArray{T,N-1} where {N,T<:Number}
 
-	selectdim(A, d, Utils.reduce_index(i, size(A,d)))
+	selectdim(A, d, mod1(i, size(A,d)))
 
 end 
 

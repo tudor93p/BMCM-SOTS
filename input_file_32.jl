@@ -10,6 +10,20 @@ import myLibs: Utils
 #
 #---------------------------------------------------------------------------#
 
+interdep_symms = Set{String}[Set(["Tt", "P", "Ct"]), Set(["Mx", "TC2y", "Tt"]), Set(["Mx", "TC2y", "P", "Ct"])] 
+
+function good_comb(c::AbstractVector{<:AbstractString})::Bool 
+
+	for s in interdep_symms
+
+		issubset(s,c) && return false 
+
+	end 
+
+	return true 
+
+end 
+
 
 
 
@@ -29,22 +43,20 @@ input_checks  = Dict{Symbol,Any}(
 		nr_kPoints = vcat(
 											10,
 											50,
-											95,
-											145, 
-											215, 
-											300, 
-											600,
-											1000,
+#											95,
+#											145, 
+#											215, 
+#											300, 
+#											600,
+#											1000,
 																																															 ),
 
 
 		kPoint_start = [-1], 
 
-#		preserved_symmetries = ["All"],
-
-#		preserved_symmetries = setdiff(["None"; join.(Combinatorics.powerset(["P", "Mx", "Ct"],1,3),"+"); "All"], ["Ct+Tt","P+Tt","P+Ct"]),
-
-		preserved_symmetries = ["None";join.(Combinatorics.powerset(["P", "Mx", "Ct", "Tt"],1),"+");"All"],
+		preserved_symmetries = ["None";
+														[join(c,"+") for c=Combinatorics.powerset(["P", "Mx", "Ct", "Tt","TC2y"],1) if good_comb(c)][13:end];
+														"All"],
 
 #		preserved_symmetries = ["None", "P", "Mx", "Ct", "Tt", "All"],
 
@@ -56,9 +68,9 @@ input_checks  = Dict{Symbol,Any}(
 		nr_perturb_instances = [1],
 
 #		perturb_strength = 0:0.2:0.8,
-		
 		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true),
-														 0.4:0.2:0.6),
+														 0.3:0.1:0.6),
+
 
   		), 
 
@@ -154,6 +166,8 @@ end
 
 
 function pr_in(f::AbstractString) 
+
+	println()
 	
 	@info "********  $f  ********"
 
@@ -164,7 +178,7 @@ end
 
 
 
-
+println("Input file loaded\n")
 
 
 nothing 

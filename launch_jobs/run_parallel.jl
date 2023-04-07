@@ -46,10 +46,10 @@ tiers2 = [
 							),
 				 Dict(
 #							"nut"=>23, 
-							"nut"=>5, 
-#							"taranis"=>5,
+							"nut"=>20,
+							"taranis"=>12,
 #							"spaceml4"=>10,
-#							"kis"=>5,
+							"kis"=>8,
 #							"yoshi"=>5
 
 				),
@@ -58,9 +58,23 @@ tiers2 = [
 #							)
 				] 
 
+tiers3 = [Dict(
+#							 "nut"=>20,
+#							 "kis"=>8,
+#							"taranis"=>12,
+#							"sia"=>4,
+							"horon"=>4,
+							"re"=>4,
+							"uneg"=>4,
+							"neper"=>4,
+							"shu"=>4,
+							 )
+					]
 
 tiers = tiers1 
 #tiers = tiers2
+tiers=tiers3 
+
 
 LaunchJobs.getrun_commands(ARGS, tiers, path)
 

@@ -695,7 +695,7 @@ function check_kMirror_possible(n::Int, k0::Real)::Int
 
 	end  
 
-	return Utils.reduce_index(m1,n-1)
+	return mod1(m1,n-1)
 
 end 
 
@@ -707,14 +707,14 @@ function uniqueInds_kMirror(n::Int, k0::Real)::Vector{Int}
 #m odd => origin not contained 
 
 #	start = div(m,2) + isodd(m)
-#out = Utils.reduce_index.(start+1:start+nr, n-1)
+#out = mod1.(start+1:start+nr, n-1)
 
 #	@show start=div(m,2)+1+isodd(m)
 #	@show div(n,2)+iseven(m)*isodd(n)
 #
 	out = range(start=div(m,2)+1+isodd(m),length=div(n,2)+iseven(m)*isodd(n))
 
-	return sort!(Utils.reduce_index.(out,n-1))
+	return sort!(mod1.(out,n-1))
 
 end 
 
@@ -813,7 +813,7 @@ end
 
 function ind_minusk(i::Int, n::Int, k0::Real)::Int 
 
-	Utils.reduce_index(Int(round(k0*(n-1)/pi))+2-i, n-1)
+	mod1(Int(round(k0*(n-1)/pi))+2-i, n-1)
 
 end 
 
@@ -823,7 +823,7 @@ function ind_minusk(n::Int, k0::Real)::Function
 
 	return function ind_minusk_(i::Int)::Int 
 
-		Utils.reduce_index(i0-i, n-1)
+		mod1(i0-i, n-1)
 
 	end 
 
@@ -1473,44 +1473,42 @@ function matmulpairs!(aux::AbstractArray{T,3},
 
 end 
 
+function matmulpairs!(dst::AbstractArray{T,3},
+											src::AbstractArray{T,3},
+											inds_src::AbstractVector{Int},
+											i0::Int...
+											)::AbstractMatrix{T} where T<:Number  
+
+	matmulpairs!(dst, selectdim(src,3,inds_src), i0...)
+
+end 
+
 
 function matmulpairs!(dst::AbstractArray{T,3},
 											src::AbstractArray{T,3},
 											i0::Int=1,
 											)::AbstractMatrix{T} where T<:Number 
-
-	size(src,3) == 1 && return selectdim(src,3,1)
 	
-	offset = isodd(size(src,3))
+	Npairs,offset = divrem(size(src,3),2)
 
+	Npairs==0 && return selectdim(src,3,1)
 
-	Npairs = div(size(src,3),2)
+	offset==1 && copy!(selectdim(dst,3,i0), selectdim(src,3,1)) 
+									# not touched at this iteration 
 
+# dst[i0:imax] will contain the results 
+	imax = i0+Npairs+offset-1
 
-	for (i,i2) in zip(1+offset:Npairs+offset,2+offset:2:size(src,3))
+	for (i,i2) in zip(i0+offset:imax, 2+offset:2:size(src,3))
 
-		LinearAlgebra.mul!(selectdim(dst,3,i+i0-1),
+		LinearAlgebra.mul!(selectdim(dst,3,i),
 											 selectdim(src,3,i2-1),
 											 selectdim(src,3,i2)
 											 )
 	end 
 
-	if offset 
-		
-		copy!(selectdim(dst,3,i0), selectdim(src,3,1))
+	return matmulpairs!(dst, dst, i0:imax, 1+imax*(size(dst,3)-i0+1>imax))
 
-		return matmulpairs!(dst,
-												selectdim(dst,3,i0:i0+Npairs),
-												size(dst,3)+1>2i0+Npairs ? i0+Npairs+1 : 1
-											)
-
-	else 
-
-		return matmulpairs!(dst,
-												selectdim(dst,3,i0:i0+Npairs-1),
-												size(dst,3)+2>2i0+Npairs ? i0+Npairs : 1
-												)
-	end 
 end 
 
 
@@ -1552,29 +1550,36 @@ function matmulpairs!(data::AbstractArray{T,3},
 end  
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
-#
-#function matmulpairs!(dst::AbstractArray{T,3},
-#											src::AbstractArray{T,3},
-#											N::Int=size(src,3)
-#											)::AbstractMatrix{T} where T<:Number 
-#
-#	N == 1 && return selectdim(src,3,1)
-#
-#	isodd(N) && copy!(selectdim(dst,3,div(N+1,2)), selectdim(src,3,N))
-#
-#	for (i,i2) in enumerate(1:2:N-1)
-#
-#		LinearAlgebra.mul!(selectdim(dst,3,i),
-#											 selectdim(src,3,i2),
-#											 selectdim(src,3,i2+1)
-#											 )
-#	end 
-#
-#	return matmulpairs!(src, dst, div(N+1,2))
-#
-#end 
+
+function unitary_overlaps_on_mesh!(
+												overlaps::AbstractArray{ComplexF64,3},
+												nmesh::Int,
+												args...
+												#dir::Int,
+												#start::Union{AbstractVector{Int},Tuple{Int,Int}},
+#											 wfs::AbstractArray{ComplexF64,4},
+											 )::AbstractArray{ComplexF64,3}
+
+
+	for k = 1:nmesh-1  
+
+		unitary_overlap!(selectdim(overlaps,3,k),
+										 get_item_ij(k, args...),
+										 get_item_ij(k+1, args...),
+										 )
+
+	end  
+
+	return overlaps 
+
+end 
 
 
 function wlo_from_mesh!(dst::AbstractMatrix{ComplexF64},
@@ -1585,27 +1590,7 @@ function wlo_from_mesh!(dst::AbstractMatrix{ComplexF64},
 											 aux::AbstractArray{ComplexF64,3},
 											 )::Nothing 
 
-
-	for k = 1:n-1  
-
-		unitary_overlap!(
-										 selectdim(aux,3,k),
-										 get_item_ij(k, dir, IJ0, wfs),
-										 get_item_ij(k+1, dir, IJ0, wfs),
-										 )
-
-	end  
-
-	copy!(dst, matmulpairs!(aux))
-
-#	@assert 1<=dir<=2 "Direction must be 1=='x' or 2=='y'"
-#
-#	return mapreduce(*, 1:nr_kPoints_from_mesh(wfs)-1) do k 
-#
-#		unitary_overlap(get_item_ij(k, dir, IJ0, wfs),
-#										get_item_ij(k+1, dir, IJ0, wfs))
-#
-#
+	copy!(dst, matmulpairs!(unitary_overlaps_on_mesh!(aux, n, dir, IJ0, wfs)))
 
 	return  
 
@@ -1899,6 +1884,12 @@ function wlo1_on_mesh(dir1::Int, Bloch_WFs::AbstractArray,
 end  
 
 
+function orderinds(dir1::Int, (i,j)::NTuple{2,Int})::NTuple{2,Int}
+
+	orderinds(dir1, i, j)
+
+end 
+
 function orderinds(dir1::Int, i::Int, j::Int)::NTuple{2,Int}
 
 	dir1==1 && return (i,j)
@@ -1964,58 +1955,37 @@ function wlo1_on_mesh1_inplace(Bloch_WFs::AbstractArray{ComplexF64,3}
 end 
 
 
-
-
-function wlo1_on_mesh_inplace(dir1::Int, Bloch_WFs::AbstractArray,
-											)::Array
-
-	nmesh = nr_kPoints_from_mesh(Bloch_WFs) 
+function wlo1_on_mesh_inplace(dir1::Int, 
+															Bloch_WFs::AbstractArray{ComplexF64,4},
+															)::Array{ComplexF64,4}
 
 	nwf = size(Bloch_WFs,2) 
 
-	dest = Array{ComplexF64,4}(undef, nwf, nwf, nmesh-1, nmesh-1)
+	n1, n2 = orderinds(dir1, size(Bloch_WFs)[3:4])
 
-	aux = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1)
+	dest = Array{ComplexF64,4}(undef, nwf, nwf, size(Bloch_WFs)[3:4]...)
 
-	overlaps = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1) 
+	aux = Array{ComplexF64,3}(undef, nwf, nwf, n1)
 
-#	ovinds = Vector{Int}(undef, nmesh-1)
+	overlaps = Array{ComplexF64,3}(undef, nwf, nwf, n1)
 
+	ovinds = Vector{Int}(undef, n1)
 
-	for n=1:nmesh-1 
+	
+	for k2=1:n2  # each perpendicular momentum 
 
-		for k = 1:nmesh-1  
-
-			unitary_overlap!(selectdim(overlaps,3,k),
-											 get_item_ij(k, dir1, orderinds(dir1,1,n), Bloch_WFs),
-											 get_item_ij(k+1, dir1, orderinds(dir1,1,n), Bloch_WFs),
-											 )
-
-#			ovinds[k] = k 
-
-		end  
-
-		copy!(select_mesh_point(dest, orderinds(dir1,1,n)), 
-					matmulpairs!(aux, overlaps))
+		unitary_overlaps_on_mesh!(overlaps, n1+1, dir1, 
+															orderinds(dir1,1,k2),
+															Bloch_WFs)
 
 
-		for m=2:nmesh-1
+		for k1=1:n1 # momentum along dir1 
 
-#			ovinds .+= 1 
+			ovinds[1:n1-k1+1] .= k1:n1 
+			ovinds[n1-k1+2:n1] .= 1:k1-1 
 
-#			ovinds[end-m+2] -= nmesh-1
-
-#			copy!(select_mesh_point(dest, orderinds(dir1,m,n)), 
-#						matmulpairs!(aux, selectdim(overlaps,3,ovinds)))
-# equivalent 
-
-			copy!(select_mesh_point(dest, orderinds(dir1,m,n)),
-						matmulpairs!(aux,
-												 inv(selectdim(overlaps, 3, m-1)),
-												 select_mesh_point(dest, orderinds(dir1,m-1,n)),
-												 selectdim(overlaps, 3, m-1)
-												 ))
-									
+			copy!(select_mesh_point(dest, orderinds(dir1,k1,k2)), 
+						matmulpairs!(aux, overlaps, ovinds))
 
 		end 
 
@@ -2027,6 +1997,63 @@ function wlo1_on_mesh_inplace(dir1::Int, Bloch_WFs::AbstractArray,
 
 end 
 
+
+#
+#function wlo1_on_mesh_inplace_2(dir1::Int, Bloch_WFs::AbstractArray,
+#											)::Array
+#
+#	nmesh = nr_kPoints_from_mesh(Bloch_WFs) 
+#
+#	nwf = size(Bloch_WFs,2) 
+#
+#	dest = Array{ComplexF64,4}(undef, nwf, nwf, nmesh-1, nmesh-1)
+#
+#	aux = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1)
+#
+#	overlaps = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1) 
+#
+##	ovinds = Vector{Int}(undef, nmesh-1)
+#
+#
+#	for n=1:nmesh-1 
+#
+#		for k = 1:nmesh-1  
+#
+#			unitary_overlap!(selectdim(overlaps,3,k),
+#											 get_item_ij(k, dir1, orderinds(dir1,1,n), Bloch_WFs),
+#											 get_item_ij(k+1, dir1, orderinds(dir1,1,n), Bloch_WFs),
+#											 )
+#
+##			ovinds[k] = k 
+#
+#		end  
+#
+#		copy!(select_mesh_point(dest, orderinds(dir1,1,n)), 
+#					matmulpairs!(aux, overlaps))
+#
+#
+#		for m=2:nmesh-1
+#
+#			copy!(select_mesh_point(dest, orderinds(dir1,m,n)),
+#						matmulpairs!(aux,
+#												 inv(selectdim(overlaps, 3, m-1)),
+#												 select_mesh_point(dest, orderinds(dir1,m-1,n)),
+#												 selectdim(overlaps, 3, m-1)
+#												 ))
+#									
+#
+#		end 
+#
+#
+#	end 
+#
+#	@assert dest≈wlo1_on_mesh_inplace(dir1,Bloch_WFs)
+#
+#
+#	return dest 
+#
+#end 
+#
 
 
 

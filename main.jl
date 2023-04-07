@@ -11,11 +11,13 @@ include("input_file_32.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
-#				 init(BMCMSOTS,:WannierBands2),
+				 init(BMCMSOTS,:WannierBands1),
 				 ];
 
 
-ComputeTasks.missing_data.(tasks,show_missing=false)#true)
+ComputeTasks.missing_data.(tasks,show_missing=false);
+
+
 
 #error() 
 
@@ -48,7 +50,7 @@ end
 ComputeTasks.get_data_all.(tasks, 
 													 shuffle=true, seed=4, 
 													 mute=false,
-#													 check_data=false,
+													 check_data=false,
 													 )
 
 

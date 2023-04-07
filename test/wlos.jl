@@ -14,7 +14,7 @@ P = (braiding_time = 0.25,
 		 b_Hamilt = 1,
 		 kPoint_start = -1, 
 		 nr_kPoints = 10,
-		 preserved_symmetries = "All",#Ct",#"None",#"Ct",
+		 preserved_symmetries = "None",#"All",#Ct",#"None",#"Ct",
 		 nr_perturb_strength = 3, 
 		 max_perturb_strength = 0.4, 
 		 nr_perturb_instances = 1, 
@@ -119,7 +119,7 @@ for n in meshsizes
 
 	p1 = Utils.adapt_merge(P, :nr_kPoints=>n)
 
-	data1 = ChecksWLO.Compute(p1; observables=observables) 
+#	data1 = ChecksWLO.Compute(p1; observables=observables) 
 
 	println() 
 
@@ -136,10 +136,10 @@ tasks = [
 				 init(BMCMSOTS, :CheckZero), 
 #				init(BMCMSOTS, :CheckZero_atYs; Y=:preserved_symmetries),
 #				 init(BMCMSOTS, :WannierBands2),
-##				 init(BMCMSOTS, :WannierBands1),
+				 init(BMCMSOTS, :WannierBands1),
 #				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:s_Hamilt),
 #				init(BMCMSOTS, :WannierGap_vsX; X=:nr_kPoints),
-				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
+#				init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
 #				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:s_Hamilt),
 #init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:preserved_symmetries),
 #				init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:b_Hamilt),
