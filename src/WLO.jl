@@ -787,7 +787,7 @@ end
 
 
 function get_kij_constrained(n::Int, k0::Real,
-									dim::Int, fixed_k::Real, fixed_dir::Int;
+									dim::Int, fixed_k::Float64, fixed_dir::Int;
 									kwargs...
 								)::Function 
 
@@ -1629,15 +1629,59 @@ end
 #
 #---------------------------------------------------------------------------#
 
+# too many methods, cannot easily simplify because both dir and nmesh are Int 
 
+function unitary_overlaps_on_mesh!(
+												overlaps::AbstractArray{ComplexF64,3},
+												dir::Int,
+												start::Tuple{Vararg{Int}},
+												wfs::AbstractArray{ComplexF64},
+											 )::AbstractArray{ComplexF64,3} 
+
+	unitary_overlaps_on_mesh!(overlaps, nr_kPoints_from_mesh1(overlaps),
+														dir, start, wfs)
+
+end 
+
+function unitary_overlaps_on_mesh!(
+												overlaps::AbstractArray{ComplexF64,3},
+												wfs::AbstractArray{ComplexF64,3},
+											 )::AbstractArray{ComplexF64,3} 
+
+	unitary_overlaps_on_mesh!(overlaps, nr_kPoints_from_mesh1(overlaps), wfs)
+
+end 
 
 function unitary_overlaps_on_mesh!(
 												overlaps::AbstractArray{ComplexF64,3},
 												nmesh::Int,
+												wfs::AbstractArray{ComplexF64,3},
+											 )::AbstractArray{ComplexF64,3} 
+
+	unitary_overlaps_on_mesh_!(overlaps, nmesh, wfs)
+
+end 
+
+function unitary_overlaps_on_mesh!(
+												overlaps::AbstractArray{ComplexF64,3},
+												nmesh::Int,
+												dir::Int,
+												start::Tuple{Vararg{Int}},
+												wfs::AbstractArray{ComplexF64},
+											 )::AbstractArray{ComplexF64,3}
+
+	unitary_overlaps_on_mesh_!(overlaps, nmesh, dir, start, wfs)
+
+end 
+
+
+
+
+
+function unitary_overlaps_on_mesh_!(
+												overlaps::AbstractArray{ComplexF64,3},
+												nmesh::Int,
 												args...
-												#dir::Int,
-												#start::Union{AbstractVector{Int},Tuple{Int,Int}},
-#											 wfs::AbstractArray{ComplexF64,4},
 											 )::AbstractArray{ComplexF64,3}
 
 
@@ -1653,6 +1697,15 @@ function unitary_overlaps_on_mesh!(
 	return overlaps 
 
 end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
 
 
 function wlo_from_mesh!(dst::AbstractMatrix{ComplexF64},
@@ -2003,17 +2056,72 @@ function loop_inds!(inds::AbstractVector{Int},
 end  
 
 
-function wlo_from_ov!(
-							dest::AbstractMatrix,												#
-							overlaps::AbstractArray{ComplexF64,3},
-							aux_matmul::AbstractArray{ComplexF64,3}, 		#
-							ovinds::AbstractVector{Int},								# 
-							start::Int		
-							)
+#function wlo_from_ov!(
+#							dest::AbstractMatrix{ComplexF64},						# mod 
+#							args...,
+#							)::AbstractMatrix{ComplexF64}
+#
+#	copy!(dest, wlo_from_ov!(args...))
+#
+#end   
 
-	copy!(dest, matmulpairs!(aux_matmul, overlaps, loop_inds!(ovinds, start)))
+function wlo_from_ov!(
+							overlaps::AbstractArray{ComplexF64,3},
+							ov_aux::AbstractArray{ComplexF64,3},		 		# mod
+							ov_inds::AbstractVector{Int},								# mod 
+							start::Int		
+							)::AbstractMatrix{ComplexF64}
+
+	wlo_from_ov!(#dest, 
+							 overlaps, ov_aux, loop_inds!(ov_inds, start))
 
 end 
+
+function wlo_from_ov!(
+							overlaps::AbstractArray{ComplexF64,3},
+							ov_aux::AbstractArray{ComplexF64,3}, 				# mod 
+							ov_inds::AbstractVector{Int}...
+							)::AbstractMatrix{ComplexF64}
+
+	matmulpairs!(ov_aux, overlaps, ov_inds...)
+
+end  
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+
+
+
+
+function wlo1_one_inplace!(
+#													 			dest::AbstractMatrix{ComplexF64},					#
+																overlaps::AbstractArray{ComplexF64,3},		#
+																ov_aux::AbstractArray{ComplexF64,3},			#
+																ov_inds::AbstractVector{Int},							# 
+
+																Bloch_WFs::AbstractArray{ComplexF64,3},
+
+																start::Int=1,
+
+																)::AbstractMatrix{ComplexF64}
+
+	wlo_from_ov!(#dest,
+							 unitary_overlaps_on_mesh!(overlaps, Bloch_WFs), ov_aux,
+							 ov_inds, start)
+
+end 
+
+
+
+
 
 
 
@@ -2031,23 +2139,36 @@ function wlo1_on_mesh1_inplace!(
 
 	@assert 3<=N<=4 
 
-	nmesh = nr_kPoints_from_mesh1(overlaps)
-
-	unitary_overlaps_on_mesh!(overlaps, nmesh, 
+	unitary_overlaps_on_mesh!(overlaps, 
 														dir, orderinds(dir,1,k_perp...),
 														Bloch_WFs)
 
-	for m=1:nmesh-1
+	for m=1:nr_kPoints_from_mesh1(overlaps)-1
 
-		wlo_from_ov!(select_mesh_point(dest, 
-																	 orderinds(dir,m,k_perp...),
-																	 ), overlaps, ov_aux, ov_inds, m)
+		copy!(
+#		wlo_from_ov!(
+								 select_mesh_point(dest, orderinds(dir,m,k_perp...),), 
+								 wlo_from_ov!(
+								 overlaps, ov_aux, ov_inds, m)
+								 )
 									
 	end 
 
 	return dest 
 
 end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
 
 function init_overlaps_line(nwf::Int, nmesh::Int)::Vector{Array}
 	
@@ -2059,6 +2180,13 @@ function init_overlaps_line(nwf::Int, nmesh::Int)::Vector{Array}
 
 end 
 
+
+function init_overlaps_line(wfs::AbstractArray{ComplexF64,3},
+											 )::Vector{Array} 
+
+	init_overlaps_line(wfs,1)
+
+end  
 
 function init_overlaps_line(wfs::AbstractArray{ComplexF64,N},
 														dir::Int
@@ -2105,7 +2233,7 @@ function wlo1_on_mesh1_inplace(Bloch_WFs::AbstractArray{ComplexF64,3}
 
 	dest = init_wlo_mesh(Bloch_WFs)
 
-	overlaps = init_overlaps_line(Bloch_WFs, 1)
+	overlaps = init_overlaps_line(Bloch_WFs)
 
 	wlo1_on_mesh1_inplace!(dest, overlaps..., Bloch_WFs)
 
@@ -2482,6 +2610,11 @@ end
 
 
 
+function get_periodic_eigvals!(W::AbstractMatrix)::Vector{Float64}
+
+	get_periodic_eigvals(LinearAlgebra.eigvals!(W))
+
+end  
 
 
 function get_periodic_eigvals(W::AbstractMatrix)::Vector{Float64}
