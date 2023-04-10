@@ -726,38 +726,27 @@ function check_nr_kPoints(n::Int)
 end 
 
 
-		
-function get_kij(n::Int, k0::Real; 
+
+
+function get_kij!(n::Int, k0::Real; 
 								 restricted::Bool=true
 								)::Function 
 
-
-#
-#	function restrict_to_period(inds::T)::T where T<:Union{Tuple{Vararg{Int}}, <:AbstractVector{Int}}
-#
-#		for i in inds 
-#			@assert 1<=i<n
-#		end 
-#
-#		return inds 
-#
-#
-#	end 
-
-
 	dk = 2pi/(n-1)
+	kmax = 2pi+k0+dk 
 
-	function get_kij_(inds::Union{Tuple{Vararg{Int}},
+	function get_kij_!(k::AbstractVector{Float64},
+										 inds::Union{Tuple{Vararg{Int}},
 																			<:AbstractVector{Int}}
-													 )::Vector{Float64} 
-	
-		k = fill(2pi+k0+dk,length(inds))
-		
+													 )::AbstractVector{Float64} 
+
+		@assert length(k)==length(inds) 
+
 		for (i,ind)=enumerate(inds)
 
 			restricted && @assert 1<=ind<n
 
-			k[i] -= dk*ind 
+			setindex!(k, kmax - dk*ind, i)
 
 		end 
 
@@ -765,30 +754,76 @@ function get_kij(n::Int, k0::Real;
 
 	end  
 
+	function get_kij_!(k::AbstractVector, inds::Int...
+										 )::AbstractVector{Float64}
+		get_kij_(inds)
+
+	end 
+
+	return get_kij_!
+
+end    
+
+		
+function get_kij(n::Int, k0::Real; 
+								 kwargs...
+								)::Function 
+
+	kij! = get_kij!(n,k0; kwargs...)
+
+	function get_kij_(inds::Union{Tuple{Vararg{Int}},
+																			<:AbstractVector{Int}}
+													 )::Vector{Float64} 
+
+		kij!(Vector{Float64}(undef, length(inds)), inds)
+
+	end  
 
 	get_kij_(inds::Int...)::Vector{Float64} = get_kij_(inds)
 
 	return get_kij_ 
 
-#	if restricted   
-#
-#		return function get_kij_(inds::Union{Tuple{Vararg{Int}}, <:AbstractVector{Int}}
-#														 )::Vector{Float64} 
-#			
-#			get_kij_unsafe_(restrict_to_period(inds))
-#	
-#		end  
-#
-#	end  
-#		
-#	return function get_kij_(inds::Union{Tuple{Vararg{Int}}, <:AbstractVector{Int}}
-#														 )::Vector{Float64} 
-#			
-#		get_kij_unsafe_(inds)
-#	
-#	end  
+end    
 
-end  
+
+function get_kij_constrained(n::Int, k0::Real,
+									dim::Int, fixed_k::Real, fixed_dir::Int;
+									kwargs...
+								)::Function 
+
+	kij! = get_kij!(n,k0; kwargs...)
+
+	inds_k = setdiff(1:2, fixed_dir) 
+
+
+	function get_kij_line_(inds::Union{Tuple{Vararg{Int}},
+																			<:AbstractVector{Int}}
+													 )::Vector{Float64} 
+
+		k = Vector{Float64}(undef, dim)
+
+		kij!(view(k,inds_k), inds) 
+
+		setindex!(k, fixed_k, fixed_dir)
+
+
+	end  
+
+	get_kij_line_(inds::Int...)::Vector{Float64} = get_kij_line_(inds)
+
+	return get_kij_line_ 
+
+
+end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
 
 
 #function get_ik(n::Int, k0::Real)::Function 
@@ -850,6 +885,18 @@ function select_mesh_point(data::AbstractArray{T,M},
 end
 
 function select_mesh_point(data::AbstractArray{T,M},
+													 k1::Int,
+													 dir1::Int,
+													 k2::Int,
+													 )::AbstractArray{T,M-2} where {T<:Number,M}
+
+	@assert 1<=dir1<=2 
+
+	select_mesh_point(data,orderinds(dir1,k1,k2))
+
+end   
+
+function select_mesh_point(data::AbstractArray{T,M},
 													 i::Int,
 													 j::Int,
 													 )::AbstractArray{T,M-2} where {T<:Number,M}
@@ -859,10 +906,10 @@ function select_mesh_point(data::AbstractArray{T,M},
 end  
 
 function select_mesh_point(data::AbstractArray{T,M},
-													 (i,j)::NTuple{2,Int}
-													 )::AbstractArray{T,M-2} where {T<:Number,M}
+													 ij::NTuple{N,Int}
+													 )::AbstractArray{T,M-N} where {T<:Number,M,N}
 
-	select_mesh_point(data, i, j)
+	select_mesh_point(data, ij...)
 
 end 
 
@@ -968,16 +1015,39 @@ end
 #
 #---------------------------------------------------------------------------#
 
+function init_storage(T::DataType, 
+											ns::Int...; kwargs...
+																	)::AbstractArray{<:Number}
+
+	init_storage(T, (), ns...)
+
+end 
+
+function init_storage(T::DataType, 
+											s::Tuple{Vararg{Int}},
+											ns::Int...; kwargs...
+																	)::AbstractArray{<:Number}
+
+	zeros(T, s..., (n-1 for n=ns)...)
+
+end 
+
+
+
 function init_storage1(item1::AbstractArray{T,N}, n::Int; kwargs...
 											)::AbstractArray{T,N+1} where T<:Number where N
 
-	repeat(zero(item1), ones(Int, N)..., n-1)
+	init_storage(T, size(item1), n; kwargs...)
 
 end 
+
+
 function init_storage(item1::AbstractArray{T,N}, n::Int; kwargs...
 											)::AbstractArray{T,N+2} where T<:Number where N
 
-	repeat(zero(item1), ones(Int, N)..., n-1, n-1)
+	#repeat(zero(item1), ones(Int, N)..., n-1, n-1) 
+	
+	init_storage(T, size(item1), n, n; kwargs...)
 
 end 
 
@@ -985,7 +1055,7 @@ function init_storage1(item1::Union{Tuple{Vararg{<:AbstractArray}},
 																	 AbstractVector{<:AbstractArray}},
 											args...; kwargs...)::Vector
 
-	[init_storage1(it, args...) for it in item1]
+	[init_storage1(it, args...; kwargs...) for it in item1]
 
 end 
 
@@ -1288,7 +1358,8 @@ end
 #---------------------------------------------------------------------------#
 
 
-function get_item_ij(ij::Union{AbstractVector{Int}, Int, NTuple{2,Int}},
+function get_item_ij(ij::Union{#AbstractVector{Int}, 
+															 Int, NTuple{2,Int}},
 										 get_item_::Function,
 										 )::AbstractArray
 
@@ -1296,12 +1367,12 @@ function get_item_ij(ij::Union{AbstractVector{Int}, Int, NTuple{2,Int}},
 
 end 
 
-function get_item_ij((i,j)::Union{AbstractVector{Int},
-																	Tuple{Int,Int}},
+function get_item_ij(#(i,j)::Union{AbstractVector{Int}, Tuple{Int,Int}},
+										 ij::NTuple{M,Int},
 										 storage::AbstractArray{T,N}
-										 )::AbstractArray{T,N-2} where T<:Number where N
+										 )::AbstractArray{T,N-M} where {M,N,T<:Number}
 
-	get_item_ij(i,j, storage)
+	get_item_ij(ij..., storage)
 
 end 
 function get_item_ij(j::Int,
@@ -1329,11 +1400,13 @@ end
 
 
 function get_item_ij(k::Int, dir::Int,
-										 start_ij::Union{AbstractVector{Int},NTuple{2,Int}},
+#										 start_ij::Union{AbstractVector{Int},NTuple{2,Int}},
+										 start::NTuple{M,Int},
 										 storage::AbstractArray{T,N}
-										 )::AbstractArray{T,N-2} where T<:Number where N
+										 )::AbstractArray{T,N-M} where {T<:Number,N,M}
 
-	get_item_ij([d==dir ? s+k-1 : s for (d,s)=enumerate(start_ij)], storage)
+
+	get_item_ij(Tuple(d==dir ? s+k-1 : s for (d,s)=enumerate(start)), storage)
 
 end 
 
@@ -1884,6 +1957,15 @@ function wlo1_on_mesh(dir1::Int, Bloch_WFs::AbstractArray,
 end  
 
 
+function orderinds(dir1::Int, i::Union{Int,NTuple{1,Int}})::NTuple{1,Int}
+
+	@assert dir1==1 
+
+	Tuple(i)
+
+end 
+
+	
 function orderinds(dir1::Int, (i,j)::NTuple{2,Int})::NTuple{2,Int}
 
 	orderinds(dir1, i, j)
@@ -1907,46 +1989,59 @@ end
 #
 #
 #---------------------------------------------------------------------------#
+function loop_inds!(inds::AbstractVector{Int},
+										start::Int,
+										nmesh::Int=length(inds)+1,
+										)::AbstractVector{Int}
+
+	setindex!(inds, start:nmesh-1, 1:nmesh-start)
+
+	setindex!(inds,1:start-1, nmesh-start+1:nmesh-1)
+
+	return inds 
+
+end  
 
 
-function wlo1_on_mesh1_inplace(Bloch_WFs::AbstractArray{ComplexF64,3}
-															 )::Array{ComplexF64,3}
+function wlo_from_ov!(
+							dest::AbstractMatrix,												#
+							overlaps::AbstractArray{ComplexF64,3},
+							aux_matmul::AbstractArray{ComplexF64,3}, 		#
+							ovinds::AbstractVector{Int},								# 
+							start::Int		
+							)
 
-	nmesh = size(Bloch_WFs,3)+1 
+	copy!(dest, matmulpairs!(aux_matmul, overlaps, loop_inds!(ovinds, start)))
 
-	nwf = size(Bloch_WFs,2) 
-
-	dest = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1)
-
-	aux = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1)
-
-	overlaps = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1) 
-
-#	ovinds = Vector{Int}(undef, nmesh-1)
+end 
 
 
 
-	for k = 1:nmesh-1  
+function wlo1_on_mesh1_inplace!(
+																dest::AbstractArray{ComplexF64,N},				#
+																overlaps::AbstractArray{ComplexF64,3},		#
+																ov_aux::AbstractArray{ComplexF64,3},			#
+																ov_inds::AbstractVector{Int},							# 
 
-		unitary_overlap!(selectdim(overlaps,3,k),
-											 get_item_ij(k, Bloch_WFs),
-											 get_item_ij(k+1, Bloch_WFs),
-											 )
+																Bloch_WFs::AbstractArray{ComplexF64,N},
 
+																dir::Int=1, k_perp::Int...,
 
-	end  
+																)::AbstractArray{ComplexF64,N} where N 
 
-	copy!(select_mesh_point(dest, 1), matmulpairs!(aux, overlaps))
+	@assert 3<=N<=4 
 
+	nmesh = nr_kPoints_from_mesh1(overlaps)
 
-	for m=2:nmesh-1
+	unitary_overlaps_on_mesh!(overlaps, nmesh, 
+														dir, orderinds(dir,1,k_perp...),
+														Bloch_WFs)
 
-		copy!(select_mesh_point(dest, m),
-						matmulpairs!(aux,
-												 inv(selectdim(overlaps, 3, m-1)),
-												 select_mesh_point(dest, m-1),
-												 selectdim(overlaps, 3, m-1)
-												 ))
+	for m=1:nmesh-1
+
+		wlo_from_ov!(select_mesh_point(dest, 
+																	 orderinds(dir,m,k_perp...),
+																	 ), overlaps, ov_aux, ov_inds, m)
 									
 	end 
 
@@ -1954,41 +2049,92 @@ function wlo1_on_mesh1_inplace(Bloch_WFs::AbstractArray{ComplexF64,3}
 
 end 
 
+function init_overlaps_line(nwf::Int, nmesh::Int)::Vector{Array}
+	
+	[
+	 init_storage(ComplexF64, (nwf,nwf), nmesh),
+	 init_storage(ComplexF64, (nwf,nwf), nmesh),
+	 init_storage(Int, nmesh),
+	 ]
+
+end 
+
+
+function init_overlaps_line(wfs::AbstractArray{ComplexF64,N},
+														dir::Int
+											 )::Vector{Array} where N 
+
+	@assert 3<=N<=4
+
+	init_overlaps_line(size(wfs,2), nr_kPoints_from_mesh(wfs,dir,N-2))
+
+
+end  
+
+
+
+function init_wlo_mesh(nwf::Int, nmesh::Vararg{Int,N}
+											)::Array{ComplexF64,N+2} where N
+
+	init_storage(ComplexF64, (nwf,nwf), nmesh...)
+
+end 
+
+function init_wlo_mesh(wfs::AbstractArray{ComplexF64,3}
+											)::Array{ComplexF64,3}
+
+	init_wlo_mesh(size(wfs,2), nr_kPoints_from_mesh1(wfs))
+
+end 
+function init_wlo_mesh(dir::Int,
+											 wfs::AbstractArray{ComplexF64,4}
+											)::Array{ComplexF64,4}
+
+	init_wlo_mesh(size(wfs,2), 
+								nr_kPoints_from_mesh(wfs,1),
+								nr_kPoints_from_mesh(wfs,2),
+								)
+
+end 
+
+
+
+
+function wlo1_on_mesh1_inplace(Bloch_WFs::AbstractArray{ComplexF64,3}
+															 )::Array{ComplexF64,3}
+
+	dest = init_wlo_mesh(Bloch_WFs)
+
+	overlaps = init_overlaps_line(Bloch_WFs, 1)
+
+	wlo1_on_mesh1_inplace!(dest, overlaps..., Bloch_WFs)
+
+	return dest 
+
+end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
 
 function wlo1_on_mesh_inplace(dir1::Int, 
 															Bloch_WFs::AbstractArray{ComplexF64,4},
 															)::Array{ComplexF64,4}
 
-	nwf = size(Bloch_WFs,2) 
 
-	n1, n2 = orderinds(dir1, size(Bloch_WFs)[3:4])
+	dest = init_wlo_mesh(dir1, Bloch_WFs)
 
-	dest = Array{ComplexF64,4}(undef, nwf, nwf, size(Bloch_WFs)[3:4]...)
+	overlaps = init_overlaps_line(Bloch_WFs, dir1)
 
-	aux = Array{ComplexF64,3}(undef, nwf, nwf, n1)
+	for k2=1:nr_kPoints_from_mesh(Bloch_WFs, 3-dir1)-1
+															# each perpendicular momentum -> parameter 
 
-	overlaps = Array{ComplexF64,3}(undef, nwf, nwf, n1)
-
-	ovinds = Vector{Int}(undef, n1)
-
-	
-	for k2=1:n2  # each perpendicular momentum 
-
-		unitary_overlaps_on_mesh!(overlaps, n1+1, dir1, 
-															orderinds(dir1,1,k2),
-															Bloch_WFs)
-
-
-		for k1=1:n1 # momentum along dir1 
-
-			ovinds[1:n1-k1+1] .= k1:n1 
-			ovinds[n1-k1+2:n1] .= 1:k1-1 
-
-			copy!(select_mesh_point(dest, orderinds(dir1,k1,k2)), 
-						matmulpairs!(aux, overlaps, ovinds))
-
-		end 
-
+		wlo1_on_mesh1_inplace!(dest, overlaps..., Bloch_WFs, dir1, k2)
 
 	end 
 
@@ -1998,65 +2144,40 @@ function wlo1_on_mesh_inplace(dir1::Int,
 end 
 
 
-#
-#function wlo1_on_mesh_inplace_2(dir1::Int, Bloch_WFs::AbstractArray,
-#											)::Array
-#
-#	nmesh = nr_kPoints_from_mesh(Bloch_WFs) 
-#
-#	nwf = size(Bloch_WFs,2) 
-#
-#	dest = Array{ComplexF64,4}(undef, nwf, nwf, nmesh-1, nmesh-1)
-#
-#	aux = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1)
-#
-#	overlaps = Array{ComplexF64,3}(undef, nwf, nwf, nmesh-1) 
-#
-##	ovinds = Vector{Int}(undef, nmesh-1)
-#
-#
-#	for n=1:nmesh-1 
-#
-#		for k = 1:nmesh-1  
-#
-#			unitary_overlap!(selectdim(overlaps,3,k),
-#											 get_item_ij(k, dir1, orderinds(dir1,1,n), Bloch_WFs),
-#											 get_item_ij(k+1, dir1, orderinds(dir1,1,n), Bloch_WFs),
-#											 )
-#
-##			ovinds[k] = k 
-#
-#		end  
-#
-#		copy!(select_mesh_point(dest, orderinds(dir1,1,n)), 
-#					matmulpairs!(aux, overlaps))
-#
-#
-#		for m=2:nmesh-1
-#
-#			copy!(select_mesh_point(dest, orderinds(dir1,m,n)),
-#						matmulpairs!(aux,
-#												 inv(selectdim(overlaps, 3, m-1)),
-#												 select_mesh_point(dest, orderinds(dir1,m-1,n)),
-#												 selectdim(overlaps, 3, m-1)
-#												 ))
-#									
-#
-#		end 
-#
-#
-#	end 
-#
-#	@assert dest≈wlo1_on_mesh_inplace(dir1,Bloch_WFs)
-#
-#
-#	return dest 
-#
-#end 
-#
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
+
+function nr_kPoints_from_mesh(W::AbstractArray{<:Number,N})::Int where N
+
+	@assert N>=2 
+
+	@assert size(W,N)==size(W,N-1)
+
+	return size(W,N)+1
+
+end 
+
+function nr_kPoints_from_mesh(W::AbstractArray{<:Number,N},
+															dir::Int,
+															meshdim::Int=2)::Int where N
+
+	@assert N>=meshdim && 1<=dir<=meshdim
+
+	return size(W, N-meshdim+dir) + 1 
+
+end 
+
+function nr_kPoints_from_mesh1(W::AbstractArray{<:Number,N})::Int where N
+
+	nr_kPoints_from_mesh(W, 1, 1)
+
+end 
 
 
 #===========================================================================#
@@ -2077,16 +2198,7 @@ function Wannier_subspace_on_mesh_one(ij::NTuple{2,Int},
 
 end 
 
-	
-function nr_kPoints_from_mesh(W::AbstractArray{<:Number,N})::Int where N
 
-	@assert N>=2 
-
-	@assert size(W,N)==size(W,N-1)
-
-	return size(W,N)+1 
-
-end 
 
 
 function Wannier_subspace_on_mesh(W::AbstractArray,

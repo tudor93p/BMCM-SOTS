@@ -244,18 +244,22 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	symms = preserved_symmetries(P)
 	strength = perturb_strength(P)
 
-	results = init_results(nk, k0, get_target(target; kwargs...))
+#	results = init_results(nk, k0, get_target(target; kwargs...))
 
-	@show results
+	results = Dict{String,Any}()
+	
+#	@show results
+#
+#
+#	perturb1 = get_perturb_on_mesh(P)
+#
+#	@show LinearAlgebra.norm(perturb1)
 
 
-	perturb1 = get_perturb_on_mesh(P)
 
-	@show LinearAlgebra.norm(perturb1)
+#	nk_unif = max(5,div(nk,3))
 
-	nk_unif = max(5,div(nk,3))
-
-	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
+#	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
 
 
 
