@@ -12,7 +12,7 @@ import PyPlot
 import BMCMSOTS:WLO, CalcWLOadapt, ChecksWLO ,BBH
 
 
-import .CalcWLOadapt: fill_gaps_ks!, sum_kSteps_dist2pi!, rescaling_factor_dk, sum_kSteps 
+import .CalcWLOadapt: fill_gaps_ks!, sum_kSteps_dist2pi!, rescaling_factor_dk, sum_kSteps ,init_gaps_ks, verify_dk_bounds 
 
 
 P = (
@@ -22,6 +22,8 @@ P = (
 		 s_Hamilt = 1,
 		 b_Hamilt = 1,
 		 kPoint_start = -1, 
+		 kMesh_type="Adaptive",
+		 kMesh_model="line",
 		 nr_kPoints = 21,
 		 preserved_symmetries = "All",
 #		 nr_perturb_strength = 3, 
@@ -137,7 +139,9 @@ results = CalcWLOadapt.Compute(P; observables=input_checks[:observables])
 #end
 
 
-nk,kij,data_gap = results["data"];
+nk,kij,data_gap, data_2,dk_from_gap_1= results["data"];
+
+#error()
 
 #gap_at_k(k) = CalcWLOadapt.calc_gap!(data, k)
 gap_at_k = CalcWLOadapt.calc_gap! 

@@ -6,7 +6,7 @@ import Random, LinearAlgebra, Optim
 
 using OrderedCollections: OrderedDict 
 
-import myLibs: ReadWrite, Utils
+import myLibs: ReadWrite, Utils, SignalProcessing
 
 import myLibs.Parameters: UODict 
 
@@ -42,7 +42,47 @@ import ..CalcWLO: all_symms_preserved, preserved_symmetries,
 
 Dependencies = [MODEL,WLO,CalcWLO]
 
-usedkeys::Vector{Symbol} = [:kMesh_type]
+function adaptive_kMesh end 
+
+
+usedkeys()::Vector{Symbol} = [:kMesh_type, :kMesh_model]
+
+function usedkeys(P::UODict)::Vector{Symbol} 
+
+	adaptive_kMesh(P) ? usedkeys() : Symbol[]
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
+
+function adaptive_kMesh(P::UODict)::Bool 
+
+	haskey(P, :kMesh_type) && lowercase(P[:kMesh_type]) == "adaptive"
+
+end 
+
+
+function kMesh_model(P::UODict)::Function 
+
+	@assert adaptive_kMesh(P)
+
+	n = P[:kMesh_model]
+
+	getf = getproperty(@__MODULE__, Symbol("f_"*n))
+
+	getp = getproperty(@__MODULE__, Symbol(n*"_par_from_vals"))
+
+	return getf∘getp 
+
+end 
+
 
 
 #===========================================================================#
@@ -61,19 +101,10 @@ function init_results(n::Int, k0::Real,
 
 	@warn "'ks' not yet in 'results'"
 
-		#@assert Set(keys(results))==Set(xxlabel())
 
 	return results
 
-end  
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
+end   
 
 
 
@@ -434,7 +465,9 @@ function sum_kSteps_dist2pi!(
 	function ssi2p(alpha::Union{AbstractVector{<:Real},<:Real})::Float64 
 	
 		fill_gaps_ks!(gaps, ks, args..., only(alpha))
-		
+	
+#		println(only(alpha),"\t",sum_kSteps(ks))
+
 		return abs2(2pi-sum_kSteps(ks))
 
 	end 
@@ -442,13 +475,12 @@ function sum_kSteps_dist2pi!(
 end  
 
 
-
-function rescaling_factor_dk(args...)
-
-	2pi/sum_kSteps(args...)
-
-end 
-
+#
+#function rescaling_factor_dk(args...)
+#
+#	2pi/sum_kSteps(args...)
+#
+#end 
 
 
 function init_gaps_ks(nk::Int)::NTuple{2,Vector{Float64}}
@@ -465,6 +497,49 @@ function fill_gaps_ks(nk::Int,
 
 	fill_gaps_ks!(init_gaps_ks(nk)..., nk, args...)
 
+
+end 
+
+# merge methods 
+function fill_gaps_ks!(
+											 gaps::AbstractVector{Float64},
+											 ks::AbstractVector{Float64},
+
+												 nk::Int, k0::Real,
+
+												 get_gap_at_k::Union{Function,
+																						 SignalProcessing.Dierckx.Spline1D},
+
+											get_dk_for_gap::Function,
+
+											br_args...
+
+											)::Tuple{<:AbstractVector{Float64},
+															 <:AbstractVector{Float64}
+															 }
+
+	@assert length(gaps)==length(ks)==nk 
+
+
+	setindex!(ks, 2pi+k0, 1)
+
+	for i=2:nk
+
+		setindex!(gaps, get_gap_at_k(ks[i-1]), i-1)
+
+		setindex!(ks, get_dk_for_gap(gaps[i-1]), i) # ks[i] = temporary dk[i-1]
+
+		setindex!(ks, 
+							ks[i-1] - bound_rescale_kStep(ks[i], br_args...),
+							i)
+# k decreasing  as in WLO 
+#
+
+	end 
+		
+	setindex!(gaps, get_gap_at_k(ks[nk]), nk)
+
+	return gaps, ks
 
 end 
 
@@ -499,9 +574,8 @@ function fill_gaps_ks!(
 
 		setindex!(ks, 
 							ks[i-1] - bound_rescale_kStep(ks[i], br_args...),
-#							ks[i-1] + softBound_rescale_kStep(ks[i], br_args...),
 							i)
-# k decreasing 
+# k decreasing  as in WLO 
 #
 
 	end 
@@ -512,8 +586,10 @@ function fill_gaps_ks!(
 
 end 
 
-function find_rescaling_factor_dk(
-																	nk::Int, args...) 
+
+
+
+function find_rescaling_factor_dk(nk::Int, args...) 
 
 	find_rescaling_factor_dk!(init_gaps_ks(nk)..., nk, args...)
 
@@ -526,7 +602,7 @@ function find_rescaling_factor_dk!(
 
 												 nk::Int, k0::Real, 
 
-											get_gap_at_k::Tuple,
+												 get_gap_at_k,
 											get_dk_for_gap::Function,
 
 																	bounds::AbstractVector{<:Real}, 
@@ -537,16 +613,21 @@ function find_rescaling_factor_dk!(
 
 	bounds_new = verify_dk_bounds(bounds, nk)
 
-	fill_gaps_ks!(
-								gaps, ks, 
-								nk, k0,
-								get_gap_at_k,
-								get_dk_for_gap, 
-								bounds_new,
-								)
+	#fill_gaps_ks!(
+	#							gaps, ks, 
+	#							nk, k0,
+	#							get_gap_at_k,
+	#							get_dk_for_gap, 
+	#							bounds_new,
+	#							)
 
-	alpha0 = rescaling_factor_dk(ks)
+	#@show ks 
 
+	#alpha0 = rescaling_factor_dk(ks)
+
+	alpha0 = 1.0 
+
+#	@show alpha0 
 
 	sksd2p = sum_kSteps_dist2pi!(
 								gaps, ks, 
@@ -556,15 +637,63 @@ function find_rescaling_factor_dk!(
 								bounds_new,
 								)
 
-	sol = Optim.optimize(sksd2p, [alpha0])
+	sol = Optim.optimize(sksd2p, 
+											 #[1e-10], [1e10], 
+											 [alpha0])
 
 	alpha = only(Optim.minimizer(sol))
 
+#	@show alpha Optim.minimum(sol)
+
+	get_dk_for_gap_new = bound_rescale_kStep(get_dk_for_gap, bounds_new, alpha)
+
 	return (
-					fill_gaps_ks!(gaps, ks, nk, k0, 
-												get_gap_at_k, get_dk_for_gap, bounds_new, alpha),
-					bound_rescale_kStep(get_dk_for_gap, bounds_new, alpha)
+					fill_gaps_ks!(gaps, ks, nk, k0, get_gap_at_k, get_dk_for_gap_new),
+					get_dk_for_gap_new,
 					)
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function init_arrays_gap(nk::Int, Hdata...)::Tuple
+
+	WF = WLO.init_storage1(WLO.init_eigH(rand(2), Hdata...)[1], nk)
+
+	WF_occ = WLO.psi_sorted_energy(WF; halfspace=true, occupied=true) 
+						# only to init the right size 
+
+	return (WF, WLO.init_overlaps_line(WF_occ))
+
+end 
+ 
+
+function find_largest_step(ks::AbstractVector{<:Real},
+													 )::Tuple{Float64,Int}
+
+	i0::Int = 0 
+	dk0::Float64 = 0.0
+	dk::Float64 = 0.0
+
+	for i = 2:length(ks)
+
+		dk = abs(ks[i-1]-ks[i]) 
+
+		if dk > dk0
+
+			i0 = i
+			dk0 = dk 
+
+		end
+	end 
+
+	return dk0,i0 
 
 end 
 
@@ -578,7 +707,7 @@ end
 
 
 function calc_gap!(
-							((WF, overlaps), (nk,k0,occupied,dir1,Hdata)),
+						 ((WF, overlaps), (occupied,dir1,Hdata), (nk,k0)),
 							k2::Float64
 							)::Float64
 
@@ -592,8 +721,19 @@ function calc_gap!(
 
 	return WLO.Wannier_min_gap(WLO.get_periodic_eigvals!(w1))
 
+end  
 
-end 
+function calc_gap!(data)::NTuple{2,Vector{Float64}}
+
+	nk,k0 = data[3]
+
+	ks = WLO.get_kij(nk,k0)(1:nk-1)
+
+	return [calc_gap!(data, k) for k=ks], ks 
+
+end  
+
+
 
 
 
@@ -635,13 +775,22 @@ end
 
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
 										kwargs...)::Dict{String,Any}
+	
+	
+	@assert adaptive_kMesh(P) # otherwise CalcWLO.Compute 
+
+
 
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
 	symms = preserved_symmetries(P)
 	strength = perturb_strength(P)
 
+
 	results = init_results(nk, k0, get_target(target; kwargs...))
+
+	model = kMesh_model(P)
+
 
 #	results = Dict{String,Any}()
 	
@@ -673,39 +822,92 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	dir1 = 1 
 	occupied = true 
 
+		extr_gaps = [0.02, 0.5]
+		extr_dk = [1e-7, pi/10]
+
 #### initialize storage  
 
-	WF = WLO.init_storage1(WLO.init_eigH(rand(2),Hdata...)[1], nk)
 
-	WF_occ = WLO.psi_sorted_energy(WF; halfspace=true, occupied=true) 
-						# only to init the right size 
 
-	overlaps = WLO.init_overlaps_line(WF_occ)
+#	arrays_gap = init_arrays_gap(nk, Hdata...) 
 
 
 
 #	for dir1=1:2 
 
-		### pack data 
-		data = ((WF,overlaps),(nk, k0, occupied, dir1, Hdata))  #
+		### pack data  
+		
+		Hdata_gap = (occupied, dir1, Hdata)
+
+#		data = (arrays_gap, Hdata_gap, (nk,k0))  #
 	
-		ks = WLO.get_kij(nk,k0;restricted=false)(1:nk)
-	
-		results["ks"] = ks 
-	
-		for (i,k) in enumerate(ks)
-	
-			results["WannierBands1"][i,dir1,1] = calc_gap!(data, k)
-	
-		end 
-	
+nks = [17,71,1000]
+
+		data_1 = (init_arrays_gap(nks[1], Hdata...),
+							Hdata_gap, 
+							(nks[1], k0)
+							)
+
+		gaps_1, ks_1 = calc_gap!(data_1)
+		
+		extr_gaps[1] = minimum(gaps_1) 
+
+		@show extr_gaps 
+
+		@show sum_kSteps(ks_1)
+
+
+		dk_from_gap_1 = model(extr_gaps, extr_dk)
+
+		data_2 = (init_arrays_gap(nks[2], Hdata...), Hdata_gap, (nks[2],k0)) 
+
+		(gaps_2, ks_2),dk_from_gap_2 = find_rescaling_factor_dk(nks[2], k0, 
+																														(calc_gap!,data_2),
+																								dk_from_gap_1, extr_dk)
+
+
+		reverse!(ks_2)
+		reverse!(gaps_2)
+
+
+		interp_gap = SignalProcessing.Interp1D(ks_2, gaps_2, 3) 
+		@show interp_gap isa Function 
+
+		@show typeof(interp_gap)
+
+
+		(gaps_3, ks_3),dk_from_gap_3 = find_rescaling_factor_dk(nks[3], k0, 
+																														interp_gap,
+																								dk_from_gap_2, extr_dk)
+
+
+		dk = sum_kSteps(ks_3)
+
+		eps = ks_3[1]>ks_3[end] ? dk-2pi : 2pi-dk
+
+		dkmax,imax = find_largest_step(ks_3)
+
+		dkmax > 10eps || @warn string("Large deviation from 2pi ",dkmax/eps)
+
+
+		ks_3[imax:end] .+= eps 
+
+		@show extrema(abs.(diff(ks_3)))
+
+		@assert sum_kSteps(ks_3)≈2pi 
+		
+
+
 #	end 
 
 ### 
 
 
-results["data"]=[nk,WLO.get_kij(nk,k0;restricted=false),data]
-
+results["data"]=[nk,WLO.get_kij(nk,k0;restricted=false),
+								 (init_arrays_gap(nk, Hdata...), Hdata_gap, (nk,k0)),
+								 data_2,
+								 dk_from_gap_1
+								 ]
 
 
 

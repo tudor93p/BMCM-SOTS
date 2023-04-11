@@ -289,8 +289,8 @@ function init_results(n::Int, k0::Real,
 	results = init_results(n, obs) 
 
 	results["ks"] = WLO.get_kij(n, k0; restricted=false)(1:n)
-	
-	@assert Set(keys(results))==Set(xxlabel())
+
+	@assert issubset(xxlabel(), keys(results))
 
 	return results
 
