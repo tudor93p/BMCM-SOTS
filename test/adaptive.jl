@@ -1,14 +1,18 @@
 import myLibs: ComputeTasks, Utils
-import myPlots 
+#import myPlots 
 
-import LinearAlgebra,Statistics
-
-import BMCMSOTS:WLO, CalcWLOadapt, ChecksWLO ,BBH
+import LinearAlgebra,Statistics,Optim
 
 import BMCMSOTS.WLO: select_mesh_point
 
 import BMCMSOTS: MB
 
+import PyPlot 
+
+import BMCMSOTS:WLO, CalcWLOadapt, ChecksWLO ,BBH
+
+
+import .CalcWLOadapt: fill_gaps_ks!, sum_kSteps_dist2pi!, rescaling_factor_dk, sum_kSteps 
 
 
 P = (
@@ -123,6 +127,7 @@ end
 
 results = CalcWLOadapt.Compute(P; observables=input_checks[:observables])
 
+
 #import PyPlot  
 #
 #PyPlot.close()
@@ -132,11 +137,93 @@ results = CalcWLOadapt.Compute(P; observables=input_checks[:observables])
 #end
 
 
+nk,kij,data_gap = results["data"];
+
+#gap_at_k(k) = CalcWLOadapt.calc_gap!(data, k)
+gap_at_k = CalcWLOadapt.calc_gap! 
+
+gaps = [CalcWLOadapt.calc_gap!(data_gap, k) for k=kij(1:nk-1)]
+
+
+#for k in kij(1:nk)
+
+
+#end 
+
+#gaps[1]=1
+
+X=[0.02,0.5]
+Y=[1e-8,pi/10]
+
+X1 = LinRange(extrema(gaps)...,200)
+
+
+
+PyPlot.close()
+
+fig,ax=PyPlot.subplots(2,2,sharex=true,sharey=true)
+
+#xs = LinRange(1e-10,1e-8,500);
+#xs = LinRange(1e-10,0.3,500);
+#
+#
+#
+#PyPlot.plot(xs,[CalcWLOadapt.hardbound(x, Y...) for x=xs],label="hard")
+#PyPlot.plot(xs,[CalcWLOadapt.softbound(x, Y...) for x=xs],label="soft")
+#
+#PyPlot.legend()
+#
 
 
 
 
+pdata = map(["square","sin", "line","expminv"],ax) do n,a
 
+#	n=="line"||return 0 
+
+
+	getf = getproperty(CalcWLOadapt, Symbol("f_"*n))
+
+	getp = getproperty(CalcWLOadapt, Symbol(n*"_par_from_vals"))
+
+	dk_from_gap = getf(getp(X,Y))
+
+#	PyPlot.plot(X1, dk_from_gap.(X1), label=n)
+
+
+
+	N=2nk 
+
+println()
+
+
+	gaps_new, ks_new = CalcWLOadapt.find_rescaling_factor_dk( N, k0, 
+																													 (gap_at_k,data_gap), dk_from_gap , Y, )[1] 
+
+
+	a.plot(ks_new, gaps_new, label=n, marker="o", markersize=2)
+
+#	@show alpha 
+#
+##	PyPlot.plot(X1,f3.(X1),label=n)
+##
+##	PyPlot.scatter(gaps,f3.(gaps))
+##
+
+
+
+	a.legend()
+
+
+end  
+#
+#for y in Y
+#	PyPlot.plot(X,[y,y],c="gray")
+#end 
+#
+
+#PyPlot.xlim(extrema(gaps))
+#PyPlot.ylim(Y)
 
 
 

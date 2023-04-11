@@ -59,7 +59,7 @@ function new_timestep_failure(
 					 desired_ts::AbstractVector{<:Real},
 					 )
 
-	foo(tjimestep(timevalues, n, 0.5))
+	foo(timestep(timevalues, n, 0.5))
 
 end 
 
@@ -86,13 +86,16 @@ err::Real, tol::Real,
 
 	end 
 
-
 end 
 
+function baz(f::Function, 
+						 data,
+						 x0::Float64
+						 )
 
+	f(data, x)
 
-
-
+end 
 
 
 function step_selection( err::Real, tol::Real )

@@ -1,7 +1,7 @@
 module CalcWLOadapt
 #############################################################################
 
-import Random, LinearAlgebra
+import Random, LinearAlgebra, Optim
 
 
 using OrderedCollections: OrderedDict 
@@ -20,7 +20,8 @@ import ..MB; MODEL=MB
 import ..WLO 
 import ..WLO: nr_kPoints, kPoint_start  
 
-import ..Helpers: Symmetries, AdaptiveMesh
+import ..Helpers: Symmetries 
+#..AdaptiveMesh
 
 
 import ..CalcWLO
@@ -190,6 +191,382 @@ end
 #
 #---------------------------------------------------------------------------#
 
+function f_line(p::AbstractVector{<:Real}
+								)::Function 
+
+	f(x::Real)::Float64 = p[1]*x+p[2] 
+
+end 
+
+function line_par_from_vals(X::AbstractVector{<:Real},
+														Y::AbstractVector{<:Real},
+														)::Vector{Float64}
+
+#	@assert all(>(0),X)&&all(>(0),Y) "Non-negative values expected"
+
+	@assert !(X[1]≈X[2]) "X values to close from eachother"
+
+	Y[1]≈Y[2] && return zeros(2) 
+
+	@assert !xor(X[1]<X[2],Y[1]<Y[2]) "The function must increase"
+
+	return inv(hcat(X,ones(2)))*Y
+
+end 
+
+function f_square(p::AbstractVector{<:Real}
+								)::Function 
+
+	abs2∘f_line(p)
+
+end 
+
+function f_sin(p::AbstractVector{<:Real})::Function 
+
+	l = f_line(view(p,1:2))
+
+	f(x::Real)::Float64 = p[3]*sinpi(l(x))
+
+	return f 
+
+end 
+
+#function f_cos(p::AbstractVector{<:Real})::Function 
+#
+#	l = f_line(view(p,1:2))
+#
+#	f(x::Real)::Float64 = p[3]*(1-cospi(l(x)))
+#
+#	return f 
+#
+#end 
+
+
+function f_exp(p::AbstractVector{<:Real})::Function 
+
+	exp∘f_line(p)
+
+end 
+
+function exp_par_from_vals(X::AbstractVector{<:Real},
+														Y::AbstractVector{<:Real},
+														)::Vector{Float64}
+
+	line_par_from_vals(X,log.(Y))
+
+end 
+function sin_par_from_vals(X::AbstractVector{<:Real},
+														Y::AbstractVector{<:Real},
+														)::Vector{Float64}
+
+	ym,yM = sort(Y)
+
+	return vcat(line_par_from_vals(X, [asin(ym/yM)/pi,0.5]), yM)
+
+end  
+#function cos_par_from_vals(X::AbstractVector{<:Real},
+#														Y::AbstractVector{<:Real},
+#														)::Vector{Float64}
+#
+#	ym,yM = sort(Y)
+#
+#	return vcat(line_par_from_vals(X, [1/pi-acos(ym/yM)/pi,0.5]), yM)
+#
+#end  
+
+
+function expminv_par_from_vals(X::AbstractVector{<:Real},
+														Y::AbstractVector{<:Real},
+														)::Vector{Float64}
+
+	line_par_from_vals(X,-inv.(log.(Y)))
+
+end 
+
+function square_par_from_vals(X::AbstractVector{<:Real},
+														Y::AbstractVector{<:Real},
+														)::Vector{Float64}
+
+	line_par_from_vals(X,sqrt.(Y))
+
+
+end 
+
+function f_expminv(p::AbstractVector{<:Real})::Function 
+
+	∘(exp, -, inv, f_line(p))
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+bound_rescale_kStep(dk::Real)::Float64 = dk 
+
+
+
+function bound_rescale_kStep(dk::Real,
+											(dk_min,dk_max)::AbstractVector{<:Real},
+											alpha::Real=1
+											)::Float64
+
+	max(min(alpha*dk,dk_max),dk_min)
+
+end 
+
+
+#function smoothmax(a::Real,b::Real)::Float64 
+#
+#	@assert !xor(a<0, b<0)
+#	
+#	
+#	v = [a,b] 
+#
+##	sign(argmax(abs, v))
+#
+#	return sign(a)*LinearAlgebra.norm(v,6)
+#
+#end 
+#
+#function smoothmin(a::Real,b::Real)::Float64 
+#
+#	a+b-smoothmax(a,b) 
+#
+#end 
+#
+#softbound(dk::Real, dk_min::Real, dk_max::Real)::Float64 = smoothmin(smoothmax(dk,dk_min),dk_max)
+#
+#hardbound(dk::Real, dk_min::Real, dk_max::Real)::Float64 = max(min(dk,dk_max),dk_min)
+#
+#
+#
+#
+#function softBound_rescale_kStep(dk::Real,
+#											bounds::AbstractVector{<:Real},
+#											alpha::Real=1
+#											)::Float64
+#
+#	softbound(dk*alpha, bounds...)
+#
+#end 
+#
+#softBound_rescale_kStep(dk::Real,)::Float64 = dk 
+#
+#
+#function softBound_rescale_kStep(get_dk::Function,
+#														 br_args...
+#											)::Function 
+#
+#	function get_dk_(args...)::Float64
+#	
+#		softBound_rescale_kStep(get_dk(args...), br_args...)
+#
+#	end 
+#
+#end 
+#softBound_rescale_kStep = bound_rescale_kStep
+
+
+function bound_rescale_kStep(get_dk::Function,
+														 br_args...
+											)::Function 
+
+	function get_dk_(args...)::Float64
+		
+		bound_rescale_kStep(get_dk(args...), br_args...)
+
+	end 
+
+end 
+	
+
+function verify_dk_bounds(
+											(dk_min,dk_max)::AbstractVector{<:Real},
+											N::Int
+											)::Vector{Float64}
+
+	K = [dk_min, dk_max]
+
+	if dk_min*(N-1)>2pi 
+		@warn "dk_min too large. Using 2pi/(N-1)"
+
+		K[1] = 2pi/(N-1)
+
+	end 
+
+	if dk_max*(N-1)<2pi 
+
+		@warn "dk_max too small. Using 2pi/(N-1)"
+
+		K[2] = 2pi/(N-1)
+	end 
+
+	return K
+
+end 
+
+#sum_kSteps(s::Real)::Float64 = s
+
+function sum_kSteps(ks::AbstractVector{<:Real},
+										 )::Float64
+
+	abs(ks[end]-ks[1])
+
+end 
+
+function sum_kSteps_dist2pi!(
+											 gaps::AbstractVector{Float64},
+												 ks::AbstractVector{Float64},
+												 args...
+													 )::Function 
+
+	function ssi2p(alpha::Union{AbstractVector{<:Real},<:Real})::Float64 
+	
+		fill_gaps_ks!(gaps, ks, args..., only(alpha))
+		
+		return abs2(2pi-sum_kSteps(ks))
+
+	end 
+
+end  
+
+
+
+function rescaling_factor_dk(args...)
+
+	2pi/sum_kSteps(args...)
+
+end 
+
+
+
+function init_gaps_ks(nk::Int)::NTuple{2,Vector{Float64}}
+
+	zeros(nk), zeros(nk)
+
+end 
+
+
+
+function fill_gaps_ks(nk::Int, 
+											args...
+											)::NTuple{2,Vector{Float64}}
+
+	fill_gaps_ks!(init_gaps_ks(nk)..., nk, args...)
+
+
+end 
+
+
+
+function fill_gaps_ks!(
+											 gaps::AbstractVector{Float64},
+											 ks::AbstractVector{Float64},
+
+												 nk::Int, k0::Real,
+
+												 (get_gap_at_k,data_gap)::Tuple{Function,<:Any},
+
+											get_dk_for_gap::Function,
+
+											br_args...
+
+											)::Tuple{<:AbstractVector{Float64},
+															 <:AbstractVector{Float64}
+															 }
+
+	@assert length(gaps)==length(ks)==nk 
+
+
+	setindex!(ks, 2pi+k0, 1)
+
+	for i=2:nk
+
+		setindex!(gaps, get_gap_at_k(data_gap, ks[i-1]), i-1)
+
+		setindex!(ks, get_dk_for_gap(gaps[i-1]), i) # ks[i] = temporary dk[i-1]
+
+		setindex!(ks, 
+							ks[i-1] - bound_rescale_kStep(ks[i], br_args...),
+#							ks[i-1] + softBound_rescale_kStep(ks[i], br_args...),
+							i)
+# k decreasing 
+#
+
+	end 
+		
+	setindex!(gaps, get_gap_at_k(data_gap, ks[nk]), nk)
+
+	return gaps, ks
+
+end 
+
+function find_rescaling_factor_dk(
+																	nk::Int, args...) 
+
+	find_rescaling_factor_dk!(init_gaps_ks(nk)..., nk, args...)
+
+end 
+
+
+function find_rescaling_factor_dk!(
+											 gaps::AbstractVector{Float64},
+												ks::AbstractVector{Float64}, 
+
+												 nk::Int, k0::Real, 
+
+											get_gap_at_k::Tuple,
+											get_dk_for_gap::Function,
+
+																	bounds::AbstractVector{<:Real}, 
+
+														 )#::Tuple{Float64,Vector{Float64}}
+
+	@assert length(gaps)==length(ks)==nk  
+
+	bounds_new = verify_dk_bounds(bounds, nk)
+
+	fill_gaps_ks!(
+								gaps, ks, 
+								nk, k0,
+								get_gap_at_k,
+								get_dk_for_gap, 
+								bounds_new,
+								)
+
+	alpha0 = rescaling_factor_dk(ks)
+
+
+	sksd2p = sum_kSteps_dist2pi!(
+								gaps, ks, 
+								nk, k0,
+								get_gap_at_k,
+								get_dk_for_gap, 
+								bounds_new,
+								)
+
+	sol = Optim.optimize(sksd2p, [alpha0])
+
+	alpha = only(Optim.minimizer(sol))
+
+	return (
+					fill_gaps_ks!(gaps, ks, nk, k0, 
+												get_gap_at_k, get_dk_for_gap, bounds_new, alpha),
+					bound_rescale_kStep(get_dk_for_gap, bounds_new, alpha)
+					)
+
+end 
 
 
 
@@ -327,10 +704,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 ### 
 
 
-#	AdaptiveMesh
-
-
-
+results["data"]=[nk,WLO.get_kij(nk,k0;restricted=false),data]
 
 
 
