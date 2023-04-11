@@ -30,7 +30,7 @@ import ..CalcWLO: all_symms_preserved, preserved_symmetries,
 									 islegend, fn_legend, xxlabel,
 									 get_target, FoundFiles, Read,
 									 cp_wcc_to_results,
-									 get_data_args,
+									 get_data,
 									 set_results!
 
 
@@ -91,16 +91,16 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function init_results(n::Int, k0::Real,
+function init_results(n::Int,
+											(kx,ky)::AbstractVector{<:AbstractVector{<:Real}},
 											obs::AbstractVector{<:AbstractString}
 										 )::Dict{String,Any}
 
 	results = CalcWLO.init_results(n, obs) 
 
-# "ks" => WLO.get_kij(n, k0; restricted=false)(1:n)
+	results["ks"] = hcat(ky,kx) # consistent: klabels=["k_y","k_x"],W=zeros(n,2)
 
-	@warn "'ks' not yet in 'results'"
-
+	@assert issubset(xxlabel(), keys(results))
 
 	return results
 
@@ -200,19 +200,6 @@ end
 #
 #---------------------------------------------------------------------------#
 
-
-
-function get_data(psiH::AbstractArray{ComplexF64,4}, 
-									results::AbstractDict;
-									parallel::Bool=false
-									)::Vector
-
-	error("'get_data' not implemented")
-
-	#(parallel ? pmap : map)(Base.splat(WLO.get_wlo_data_mesh), 
-	#												get_data_args(psiH, results))
-
-end 
 
 
 
@@ -647,10 +634,12 @@ function find_rescaling_factor_dk!(
 
 	get_dk_for_gap_new = bound_rescale_kStep(get_dk_for_gap, bounds_new, alpha)
 
-	return (
-					fill_gaps_ks!(gaps, ks, nk, k0, get_gap_at_k, get_dk_for_gap_new),
-					get_dk_for_gap_new,
-					)
+	fill_gaps_ks!(gaps, ks, nk, k0, get_gap_at_k, get_dk_for_gap_new)
+
+	correct_sum_kSteps!(ks)
+
+	return (gaps, ks), get_dk_for_gap_new 
+
 
 end 
 
@@ -661,18 +650,6 @@ end
 #
 #
 #---------------------------------------------------------------------------#
-
-function init_arrays_gap(nk::Int, Hdata...)::Tuple
-
-	WF = WLO.init_storage1(WLO.init_eigH(rand(2), Hdata...)[1], nk)
-
-	WF_occ = WLO.psi_sorted_energy(WF; halfspace=true, occupied=true) 
-						# only to init the right size 
-
-	return (WF, WLO.init_overlaps_line(WF_occ))
-
-end 
- 
 
 function find_largest_step(ks::AbstractVector{<:Real},
 													 )::Tuple{Float64,Int}
@@ -699,15 +676,67 @@ end
 
 
 
+function correct_sum_kSteps!(ks_3::AbstractVector{Float64}
+														 )::AbstractVector{Float64}
+
+	dk = sum_kSteps(ks_3)
+
+	eps = ks_3[1]>ks_3[end] ? dk-2pi : 2pi-dk
+
+	dkmax,imax = find_largest_step(ks_3)
+
+	dkmax > 10eps || @warn string("Large deviation from 2pi: dk=$dkmax, eps=$eps")
+
+
+	ks_3[imax:end] .+= eps 
+
+	return ks_3 
+
+end 
+
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
 
+function init_arrays_gap(nk::Int, Hdata...)::Tuple
 
+	WF = WLO.init_storage1(WLO.init_eigH(rand(2), Hdata...)[1], nk)
+
+	WF_occ = WLO.psi_sorted_energy(WF; halfspace=true, occupied=true) 
+						# only to init the right size 
+
+	return (WF, WLO.init_overlaps_line(WF_occ))
+
+end 
+ 
+function pack_data_gap(Hdata, (nk,k0), sector)
+
+		(
+							Hdata,
+							(nk, k0),
+							init_arrays_gap(nk, Hdata...),
+							sector,
+							)
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+""" 
+Calculate the gap of W_dir1 for parameter k[dir2]=k2
+"""
 function calc_gap!(
-						 ((WF, overlaps), (occupied,dir1,Hdata), (nk,k0)),
+									 (Hdata,
+										(nk,k0),
+										(WF, overlaps), 
+										(occupied,dir1),
+										),
 							k2::Float64
 							)::Float64
 
@@ -725,7 +754,7 @@ end
 
 function calc_gap!(data)::NTuple{2,Vector{Float64}}
 
-	nk,k0 = data[3]
+	nk,k0 = data[2]
 
 	ks = WLO.get_kij(nk,k0)(1:nk-1)
 
@@ -735,6 +764,97 @@ end
 
 
 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+"""
+sector = (occupied,dir1)
+nks = (rough_nk, decent_nk, dense_nk)
+
+Compute the gap of W_dir1 for k_dir1 uniform and k_dir2 adaptive.
+
+Find the parameter vector ks_dir2 which is more dense for small gaps
+"""
+function threestep_find_ks(Hdata, (nks,k0), 
+													 sector,
+						(extrema_gaps, extrema_dk),
+						model::Function
+						)
+
+	@assert length(nks)==3 
+
+	gaps_1, ks_1 = calc_gap!(pack_data_gap(Hdata, (nks[1],k0), sector))
+	
+	dk_from_gap_1 = model([minimum(gaps_1), extrema_gaps[2]], extrema_dk)
+
+
+	gap_at_k_1 = (calc_gap!,pack_data_gap(Hdata, (nks[2],k0), sector))
+
+	(gaps_2, ks_2),dk_from_gap_2 = find_rescaling_factor_dk(nks[2], k0, 
+																													gap_at_k_1,
+																							dk_from_gap_1, extrema_dk)
+	if ks_2[2]<ks_2[1] 
+
+		reverse!(ks_2)
+		reverse!(gaps_2)
+
+	end 
+
+	gap_at_k_2 = SignalProcessing.Interp1D(ks_2, gaps_2, 3) 
+
+
+	(gaps_3, ks_3),dk_from_gap_3 = find_rescaling_factor_dk(nks[3], k0, 
+																													gap_at_k_2,
+																							dk_from_gap_2, extrema_dk)
+
+	return (gaps_3, ks_3, dk_from_gap_3,
+					(nks[3],k0), sector,
+					)
+
+end 	
+
+function mesh_from_threestep(
+														 (gaps, precomp_ks, get_dk,
+															nkk0, (occ, perp_dir)
+															),
+														 ;
+														 kwargs...
+														 )::Function 
+
+	WLO.get_kij(nkk0..., precomp_ks, 3-perp_dir; kwargs...)
+
+end 
+
+function kxy_from_threestep(
+														 (gaps_1, precomp_ks_1, get_dk_1,
+															(nk_1,k0_1), (occ_1, perp_dir_1)
+															),
+														 (gaps_2, precomp_ks_2, get_dk_2,
+															(nk_2,k0_2), (occ_2, perp_dir_2)
+															),
+														 ;
+														 kwargs...
+														 )::Vector{Vector{Float64}}
+
+
+	@assert perp_dir_1!=perp_dir_2 
+
+	perp_dir_1==2 ? [precomp_ks_1,precomp_ks_2] : [precomp_ks_2,precomp_ks_1]
+
+end 
+
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 #===========================================================================#
@@ -787,133 +907,40 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	strength = perturb_strength(P)
 
 
-	results = init_results(nk, k0, get_target(target; kwargs...))
 
 	model = kMesh_model(P)
 
 
-#	results = Dict{String,Any}()
-	
-#	@show results
-#
-#
 #	perturb1 = get_perturb_on_mesh(P)
-#
+
 #	@show LinearAlgebra.norm(perturb1)
 
 
 
-#	nk_unif = max(5,div(nk,3))
 
-#	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
+#	Hdata = MODEL.get_args_psi(P, perturb1, strength)
+
+	Hdata = MODEL.get_args_psi(P) 
+
+	extrema_gaps_dk = ([0.02, 0.5],[1e-7, pi/15])
+	nks = [min(17,nk),min(71,nk),nk]
 
 
+	out_1 = threestep_find_ks(Hdata, (nks,k0), (true,1), extrema_gaps_dk, model) 
+	out_2 = threestep_find_ks(Hdata, (nks,k0), (true,2), extrema_gaps_dk, model) 
+
+
+#	mesh = mesh_from_threestep(out_1, out_2)
+
+	kxy = kxy_from_threestep(out_1, out_2)
+
+#
+#	psi = MODEL.get_psiH(P, nk, kxy)
+##	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
+#
+	results = init_results(nk, kxy, get_target(target; kwargs...))
+#
 #	set_results!(results, nk, k0, get_data(psi, results))
-
-
-
-## Hamiltonian from P 
-
-	Hdata = MODEL.get_pertHdata(MODEL.params_fromP(P), MODEL.H);
-
-###  
-# choose a sector 
-
-	dir1 = 1 
-	occupied = true 
-
-		extr_gaps = [0.02, 0.5]
-		extr_dk = [1e-7, pi/10]
-
-#### initialize storage  
-
-
-
-#	arrays_gap = init_arrays_gap(nk, Hdata...) 
-
-
-
-#	for dir1=1:2 
-
-		### pack data  
-		
-		Hdata_gap = (occupied, dir1, Hdata)
-
-#		data = (arrays_gap, Hdata_gap, (nk,k0))  #
-	
-nks = [17,71,1000]
-
-		data_1 = (init_arrays_gap(nks[1], Hdata...),
-							Hdata_gap, 
-							(nks[1], k0)
-							)
-
-		gaps_1, ks_1 = calc_gap!(data_1)
-		
-		extr_gaps[1] = minimum(gaps_1) 
-
-		@show extr_gaps 
-
-		@show sum_kSteps(ks_1)
-
-
-		dk_from_gap_1 = model(extr_gaps, extr_dk)
-
-		data_2 = (init_arrays_gap(nks[2], Hdata...), Hdata_gap, (nks[2],k0)) 
-
-		(gaps_2, ks_2),dk_from_gap_2 = find_rescaling_factor_dk(nks[2], k0, 
-																														(calc_gap!,data_2),
-																								dk_from_gap_1, extr_dk)
-
-
-		reverse!(ks_2)
-		reverse!(gaps_2)
-
-
-		interp_gap = SignalProcessing.Interp1D(ks_2, gaps_2, 3) 
-		@show interp_gap isa Function 
-
-		@show typeof(interp_gap)
-
-
-		(gaps_3, ks_3),dk_from_gap_3 = find_rescaling_factor_dk(nks[3], k0, 
-																														interp_gap,
-																								dk_from_gap_2, extr_dk)
-
-
-		dk = sum_kSteps(ks_3)
-
-		eps = ks_3[1]>ks_3[end] ? dk-2pi : 2pi-dk
-
-		dkmax,imax = find_largest_step(ks_3)
-
-		dkmax > 10eps || @warn string("Large deviation from 2pi ",dkmax/eps)
-
-
-		ks_3[imax:end] .+= eps 
-
-		@show extrema(abs.(diff(ks_3)))
-
-		@assert sum_kSteps(ks_3)≈2pi 
-		
-
-
-#	end 
-
-### 
-
-
-results["data"]=[nk,WLO.get_kij(nk,k0;restricted=false),
-								 (init_arrays_gap(nk, Hdata...), Hdata_gap, (nk,k0)),
-								 data_2,
-								 dk_from_gap_1
-								 ]
-
-
-
-
-
-
 
 
 

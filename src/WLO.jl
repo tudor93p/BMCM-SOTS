@@ -786,6 +786,70 @@ function get_kij(n::Int, k0::Real;
 end    
 
 
+function get_kij(n::Int, k0::Real,
+								 precomp_ks::AbstractVector{<:Real},precomp_dir::Int; 
+								 kwargs...
+								)::Function 
+
+	kij = get_kij(n,k0; kwargs...)
+
+	function get_kij_(inds::Union{Tuple{Vararg{Int}},
+																			<:AbstractVector{Int}}
+													 )::Vector{Float64} 
+
+		k = kij(inds) 
+
+		i,m = fldmod1(inds[precomp_dir], n-1)
+
+#		main period : i=1
+#		ind smaller than 0: i=0, -1, ... # nr periods outside 
+#    2pi*(1-i) = 2pi, 4pi, etc
+# 	ind >= n: i=2, 3, .... # nr periods outside 
+#  2pi * (1-i) = -2pi, -4pi, ...
+	
+		k[precomp_dir] = precomp_ks[m] - 2pi*(i-1) 
+
+		return k
+
+	end 
+
+	get_kij_(inds::Int...)::Vector{Float64} = get_kij_(inds)
+
+	return get_kij_ 
+
+end    
+function get_kij(n::Int, 
+								 precomp_ks::AbstractVector{<:AbstractVector{<:Real}};
+								 kwargs...
+								)::Function 
+
+	kij = get_kij(n,0; kwargs...)
+
+	function get_kij_(inds::Union{Tuple{Vararg{Int}},
+																			<:AbstractVector{Int}}
+													 )::Vector{Float64} 
+
+		k = kij(inds) 
+
+		for (precomp_dir,ks) in enumerate(precomp_ks)
+
+			i,m = fldmod1(inds[precomp_dir], n-1)
+
+			k[precomp_dir] = ks[m] - 2pi*(i-1) 
+
+		end 
+
+		return k
+
+	end 
+
+	get_kij_(inds::Int...)::Vector{Float64} = get_kij_(inds)
+
+	return get_kij_ 
+
+end    
+
+
 function get_kij_constrained(n::Int, k0::Real,
 									dim::Int, fixed_k::Float64, fixed_dir::Int;
 									kwargs...
@@ -1769,28 +1833,81 @@ function psiH_on_mesh1(n::Int, k0::Real,
 end  
 
 
-function psiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function psiH_on_mesh(n::Int, k0::Real, 
+											perturb::AbstractArray{ComplexF64,4},
+											H::Function, Hdata...; kwargs...
 											)::Array{ComplexF64,4}
 
 	kij = get_kij(n,k0)  
 
-	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; 
-													 kwargs...)
+	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
 
-	store_on_mesh!!(eigH!, kij, Bloch_WFs, H, Hdata...; kwargs...)
+
+	store_on_mesh!!(eigH!, tuple, Bloch_WFs, H, kij, perturb, Hdata...; kwargs...) 
+
+##
+#	store_on_mesh!!(eigH!, source=tuple, dest=Bloch_WFs,  rest...)
+#	rest= (H,kij,perturb,Hdata...)
+#	Hdata = (bs,pert_strength)
+#
+#	store_one!!(eigh!, source=tuple, i, j, dest=Bloch_WFs, rest...)
+#
+#	get_one_wrapper!(Bloch_WFs[i,j], eigH!, tuple, i, j, rest...)
+#
+#	eigH!(Bloch_WFs[i,j], (i,j), rest...) 
+#	
+#	eigH!(Bloch_WFs[i,j], (i,j), H, rest...) 
+#	rest= (kij,perturb,Hdata...)
+#
+# eigH(Bloch_WFs[i,j], H(ij, rest...); kwargs...)
+#
+# H(ij, kij, perturb, bs, pert_strength)
+#
+##
 
 	return Bloch_WFs 
+
+end 
+
+
+function psiH_on_mesh(n::Int, 
+											k::Union{<:Real,
+															 <:AbstractVector{<:AbstractVector{<:Real}}
+															 },
+											H::Function, Hdata...; kwargs...
+											)::Array{ComplexF64,4}
+
+	psiH_on_mesh(n, get_kij(n,k), H, Hdata...; kwargs...)
+
+end 
+
+function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; kwargs...
+											)::Array{ComplexF64,4}
+
+	WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; 
+													 kwargs...)
+
+	store_on_mesh!!(eigH!, kij, WFs, H, Hdata...; kwargs...)
+
+	return WFs 
 ##
-#	store_on_mesh!!(eigH!, source=kij, dest=Bloch_WFs,  H, Hdata...) 
+#	store_on_mesh!!(eigH!, source=kij, dest=WFs,  H, Hdata...) 
 #	Hdata = (bs,)
 #
-#	store_one!!(eigH!, source=kij, i, j, dest=Bloch_WFs, H, Hdata...)
+#	store_one!!(eigH!, source=kij, i, j, dest=WFs, H, Hdata...)
 #
-#	get_one_wrapper!(Bloch_WFs[i,j], eigH!, kij, i, j, H, Hdata...)
+#	get_one_wrapper!(WFs[i,j], eigH!, kij, i, j, H, Hdata...)
 #
-#	eigH!(Bloch_WFs[i,j], k, H, Hdata...)
+#	eigH!(WFs[i,j], k, H, Hdata...)
 #
-# eigH(Bloch_WFs[i,j], H(k, Hdata...); kwargs...) OK 
+# eigH(WFs[i,j], H(k, Hdata...); kwargs...) OK 
  
 ##
 
@@ -1824,42 +1941,6 @@ function enpsiH_on_mesh(n::Int, k0::Real,
 end 
 
 
-function psiH_on_mesh(n::Int, k0::Real, 
-											perturb::AbstractArray{ComplexF64,4},
-											H::Function, Hdata...; kwargs...
-											)::Array{ComplexF64,4}
-
-	kij = get_kij(n,k0)  
-
-
-	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
-
-
-	store_on_mesh!!(eigH!, tuple, Bloch_WFs, H, kij, perturb, Hdata...; kwargs...) 
-
-##
-#	store_on_mesh!!(eigH!, source=tuple, dest=Bloch_WFs,  rest...)
-#	rest= (H,kij,perturb,Hdata...)
-#	Hdata = (bs,pert_strength)
-#
-#	store_one!!(eigh!, source=tuple, i, j, dest=Bloch_WFs, rest...)
-#
-#	get_one_wrapper!(Bloch_WFs[i,j], eigH!, tuple, i, j, rest...)
-#
-#	eigH!(Bloch_WFs[i,j], (i,j), rest...) 
-#	
-#	eigH!(Bloch_WFs[i,j], (i,j), H, rest...) 
-#	rest= (kij,perturb,Hdata...)
-#
-# eigH(Bloch_WFs[i,j], H(ij, rest...); kwargs...)
-#
-# H(ij, kij, perturb, bs, pert_strength)
-#
-##
-
-	return Bloch_WFs 
-
-end 
 
 
 #===========================================================================#
@@ -3045,7 +3126,8 @@ function get_wlo_data_mesh1(psiH::AbstractArray{ComplexF64,3},
 																		}
 
 
-	nk = size(psiH,3)+1
+
+	nk = nr_kPoints_from_mesh1(psiH)
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
@@ -3081,56 +3163,8 @@ function get_wlo_data_mesh(psiH::AbstractArray{ComplexF64,4},
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
-#@assert wlo1_on_mesh_inplace(dir1, psi)≈wlo1_on_mesh(dir1, psi) 
-#println()
-#@time wlo1_on_mesh_inplace(dir1, psi) 
-#@time wlo1_on_mesh(dir1, psi) 
-##println()
-
-
 	eigW1 = Wannier_subspaces_on_mesh!(wlo1_on_mesh_inplace(dir1, psi)) 
 
-#	wlo1_on_mesh and wcc2mesh_fromSubspaces1 -- equally most costly
-
-#####################3
-##					(Matrix{T}(undef, n, m), Vector{Float64}(undef, m), 	Matrix{T}(undef, n, m), Vector{Float64}(undef, m),)
-#
-#	n = nr_kPoints_from_mesh(psi)
-#
-#	ov_pm = [1.0,0.0,0.0]
-#	ov_pp = [1.0,0.0,0.0]
-#
-#	for j=1:n-1,i=1:n-1 
-#
-##		wf_plus = select_mesh_point(eigW1[1],i,j)
-##		wf_minus = select_mesh_point(eigW1[3],i,j)
-#		wf_plus = Wannier_band_basis0((i,j),psi,eigW1[1])
-#		wf_minus = Wannier_band_basis0((i,j),psi,eigW1[3])
-#
-#		ov_pm[3] = abs(only(overlap(wf_plus,wf_minus)))
-#		ov_pp[3] = abs(only(overlap(wf_plus)))
-#
-#		ov_pm[1] = min(ov_pm[1],ov_pm[3])
-#		ov_pm[2] = max(ov_pm[2],ov_pm[3])
-#
-#		ov_pp[1] = min(ov_pp[1],ov_pp[3]) 
-#		ov_pp[2] = max(ov_pp[2],ov_pp[3]) 
-#
-#	end 
-#
-#	s = join(["min(+-)=$(ov_pm[1])",
-#	"max(+-)=$(ov_pm[2])",
-#	"min(++)=$(ov_pp[1])",
-#	"max(++)=$(ov_pp[2])",
-#	],"\n")*"\n"
-#
-#		open("wbb.dat","a") do f 
-#			write(f,s)
-#	
-#		end;
-#
-#
-###################
 	if get_wlo2 
 
 		return (eigW1, wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))

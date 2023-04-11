@@ -415,36 +415,48 @@ end
 
 
 
-function get_psiH(P::UODict, args...)::Array{ComplexF64,4}
 
-	get_psiH(params_fromP(P), args...)
+function get_args_psi(P::UODict, args...; kwargs...)
 
-end  
-
-function get_enpsiH(P::UODict, args...)::Vector{Array}
-
-	get_enpsiH(params_fromP(P), args...)
+	get_args_psi(params_fromP(P), args...; kwargs...)
 
 
 end 
 
+	
+function get_args_psi(MBparams::AbstractVector{<:Real}, args...;
+											atol::Float64=1e-12)
 
-function get_psiH(MBparams::AbstractVector{<:Real}, n::Int, k0::Real, args...;
-									atol::Float64=1e-12
+	get_pertHdata(MBparams, H, args...; atol=atol)
+
+end 
+
+function get_psiH(MBparams::Union{<:UODict, <:AbstractVector{<:Real}}, 
+									n::Int, 
+									k::Union{<:Real,<:AbstractVector{<:AbstractVector{<:Real}}
+														}, 
+									args...;
+									kwargs...
+#									atol::Float64=1e-12
 								 )::Array{ComplexF64,4}
 
-	WLO.psiH_on_mesh(n, k0, get_pertHdata(MBparams, H, args...; atol=atol)...)
+	WLO.psiH_on_mesh(n, k, get_args_psi(MBparams, args...; kwargs...)...)
 
 end  
 
 
-function get_enpsiH(MBparams::AbstractVector{<:Real}, n::Int, k0::Real, args...;
-									atol::Float64=1e-12
+function get_enpsiH(MBparams::Union{<:UODict,AbstractVector{<:Real}},
+										n::Int, k0::Real, args...;
+										kwargs...
+	#								atol::Float64=1e-12
 									)::Vector{Array} #{ComplexF64,4}
 
-	WLO.enpsiH_on_mesh(n, k0, get_pertHdata(MBparams, H, args...; atol=atol)...)
+	WLO.enpsiH_on_mesh(n, k0, get_args_psi(MBparams, args...; kwargs...)...)
 
 end 
+
+
+
 
 function get_hoppf(P::UODict)::Function 
 
