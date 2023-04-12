@@ -59,19 +59,23 @@ tiers2 = [
 				] 
 
 tiers3 = [Dict(
-							 "nut"=>20,
-							 "kis"=>8,
-							"taranis"=>8,
-#							"sia"=>4,
-							"horon"=>4,
-							"re"=>4,
-#							"uneg"=>4,
-							"neper"=>4,
-							"spaceml4"=>28,
-							"toad"=>36,
-							"shu"=>4,
-							 )
+							 "re"=>4,
+							 "kis"=>4,  
+							 "horon"=>4, 
+"nut"=>4,
+"spaceml4"=>8,
+							 "taranis"=>4,
+								"shu"=>4,
+							"neper"=>4, 
+								"yoshi"=>8,
+
+							"sia"=>4,
+							"toad"=>32,
+							)
+
 					]
+
+
 
 tiers = tiers1 
 #tiers = tiers2

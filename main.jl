@@ -11,23 +11,22 @@ include("input_file_10.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
-#				 init(BMCMSOTS,:WannierBands1),
+				 init(BMCMSOTS,:WannierBands2),
 				 ];
 
 
 ComputeTasks.missing_data.(tasks,show_missing=false);
 
-
+error()
 
 for t in tasks 
 
 P, = ComputeTasks.get_first_paramcomb(t) 
 
-for q in Base.product(((k=>v for v=input_checks[:allparams][k]) for k=[:kMesh_type, :preserved_symmetries])...)
+for q in Base.product(((k=>v for v=input_checks[:allparams][k]) for k=[:kMesh_model, :preserved_symmetries])...)
 
-	P1 = Utils.adapt_merge(P,q...)
+	P1 = Utils.adapt_merge(P,q...,:nr_kPoints => 10)
 	
-
 	t.get_data(P1; force_comp=true, mute=false)
 
 end 

@@ -41,25 +41,21 @@ Dependencies = [MODEL,WLO]
 
 
 usedkeys()::Vector{Symbol} = [
-
-						:kMesh_type, :kMesh_model,
-
-						:preserved_symmetries, 
-
-						:perturb_strength,
+						:kMesh_model, :preserved_symmetries, :perturb_strength,
 						]
 									 
 function usedkeys(P::UODict)::Vector{Symbol} 
 
 	uk = usedkeys() 
 	
-	adaptive_kMesh(P) || setdiff!(uk, [:kMesh_type, :kMesh_model])
+	adaptive_kMesh(P) || setdiff!(uk, [:kMesh_model])
 
-	all_symms_preserved(P) && setdiff!(uk, [ :perturb_strength, ]) 
+	if all_symms_preserved(P) || zero_perturb_strength(P) 
+		
+		setdiff!(uk, [:preserved_symmetries, :perturb_strength])
 
-	zero_perturb_strength(P) && setdiff!(uk, [:preserved_symmetries, :perturb_strength])
+	end 
 
-#	(all_symms_preserved(P)||zero_perturb_strength(P))&& return Symbol[]
 
 	return uk
 
@@ -79,7 +75,9 @@ calc_observables = ["WannierBands1","WannierBands2"] # no "WannierGap"
 
 function adaptive_kMesh(P::UODict)::Bool 
 
-	haskey(P, :kMesh_type) && lowercase(P[:kMesh_type]) == "adaptive"
+	#haskey(P, :kMesh_type) && lowercase(P[:kMesh_type]) == "adaptive"
+	
+	haskey(P,:kMesh_model) && lowercase(P[:kMesh_model])!="uniform"
 
 end 
 
@@ -88,7 +86,7 @@ function kMesh_model(P::UODict)::Function
 
 	@assert adaptive_kMesh(P)
 
-	n = P[:kMesh_model]
+	n = lowercase(P[:kMesh_model])
 
 	getf = getproperty(AdaptiveMesh, Symbol("f_"*n))
 
@@ -732,7 +730,7 @@ function calc_kxy_adaptive(Hdata,
 
 	nks = [min(17,nk),min(71,nk),nk] 
 
-	extrema_gaps_dk = ([0.02, 0.5],[1e-7, pi/15]) 
+	extrema_gaps_dk = ([1e-3, 0.5],[1e-7, pi/15]) 
 
 	out_1,out_2 = map(1:2) do dir 
 		

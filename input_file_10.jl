@@ -34,9 +34,9 @@ input_checks  = Dict{Symbol,Any}(
 		braiding_time = [1/4],
 
 		s0_Hamilt = [0.1],
-#		s0_Hamilt = 0:0.1:0.5,#Utils.uniqlinsp(1e-3,0.4,5,3; Trunc=true),
 		
-		s_Hamilt = [1],
+		s_Hamilt = [0.5,1,1.5],
+
 		b_Hamilt = [1],
 					
 #		nr_kPoints = vcat(10, 60, 70),
@@ -53,9 +53,9 @@ input_checks  = Dict{Symbol,Any}(
 																																															 ),
 
 
-		kMesh_type = ["Uniform","Adaptive"],
+#		kMesh_type = ["Uniform","Adaptive"],
 
-		kMesh_model = ["line"],#["square","sin", "line","expminv"],
+		kMesh_model = ["Uniform","Line"],#["square","sin", "line","expminv"],
 
 
 		kPoint_start = [-1], 
@@ -75,9 +75,8 @@ input_checks  = Dict{Symbol,Any}(
 
 		nr_perturb_instances = [1],
 
-#		perturb_strength = 0:0.2:0.8,
-		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true),
-														 0.3:0.1:0.6),
+		perturb_strength = [0.3],#0:0.2:0.8,
+#		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true), 0.3:0.1:0.6),
 
 
   		), 
@@ -99,7 +98,6 @@ input_checks  = Dict{Symbol,Any}(
 
 			kPoint_start = (1,2), 
 
-			kMesh_type = (),
 			kMesh_model = (),
 
 

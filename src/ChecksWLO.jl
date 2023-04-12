@@ -29,47 +29,36 @@ import ..CalcWLO: preserved_symmetries,
 									adaptive_kMesh, calc_kxy_adaptive  
 
 
-#get_perturb_on_mesh_, 
-
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
 
-Dependencies = [CalcWLO]
+Dependencies = [MODEL,WLO]
 
 
-usedkeys()::Vector{Symbol} = [
-
-#						:preserved_symmetries, 
-
-#						:perturb_strength,  # only for plotting 
-
-						:nr_perturb_strength,
-						:max_perturb_strength,
-						:nr_perturb_instances,
-						]
+usedkeys()::Vector{Symbol} = vcat(
+						CalcWLO.usedkeys(),
+						:nr_perturb_strength, :max_perturb_strength, :nr_perturb_instances,
+						)
 
 function usedkeys(P::UODict)::Vector{Symbol} 
 
-	@assert haskey(P, :preserved_symmetries)
+	uk = setdiff!(usedkeys(), [:perturb_strength]) # used for plots only 
 
-	@assert haskey(P, :perturb_strength)
+	adaptive_kMesh(P) || setdiff!(uk, [:kMesh_model])
 
-
-	uk = setdiff!(usedkeys(),[:perturb_strength])
-	
 	all_symms_preserved(P) && setdiff!(uk, [
-								:nr_perturb_strength, # don't disregard!!
-								:max_perturb_strength,
+								:max_perturb_strength, 
 								:nr_perturb_instances
-								]
-					 )
+								])
 
 	return uk
 
 end 
+
+
 
 obs_batch_1 = ["D110", "D111", "D113", "WannierGap"]
 obs_batch_2 = ["D30", "D48","D123", "D125", "D127.1", "D127"]  
@@ -1005,7 +994,7 @@ function Compute_(P::UODict, target, get_fname::Function;
 	obs = get_target(target; kwargs...) 
 	
 	results = Compute_(P, obs; kwargs...)
-	
+
 	ReadWrite.Write_PhysObs(get_fname(P), FILE_STORE_METHOD, results)
 
 	return isnothing(target) ? results : Utils.dict_keepkeys(results, obs) 
@@ -1134,6 +1123,8 @@ end
 function FoundFiles(P::UODict; 
 										target=nothing, get_fname::Function, kwargs...)::Bool
 
+	#@show get_fname(P) 
+
 	FoundFiles0(get_fname(P), get_target(target; kwargs...))
 
 end 
@@ -1152,6 +1143,8 @@ end
 
 
 function Read(P::UODict; target=nothing, get_fname::Function, kwargs...)::Dict 
+
+	@warn splitpath(get_fname(P)(""))[end]
 
 	Read0(get_fname(P), get_target(target; kwargs...))
 
