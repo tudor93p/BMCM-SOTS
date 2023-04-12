@@ -712,12 +712,22 @@ function uniqueInds_kMirror(n::Int, k0::Real)::Vector{Int}
 #	@show start=div(m,2)+1+isodd(m)
 #	@show div(n,2)+iseven(m)*isodd(n)
 #
-	out = range(start=div(m,2)+1+isodd(m),length=div(n,2)+iseven(m)*isodd(n))
+	out = range(start=div(m,2)+1+isodd(m),length=div(n,2)+iseven(m)*isodd(n)) 
 
-	return sort!(mod1.(out,n-1))
+	#@show mod1.(out,n-1) 
+#println(get_kij(n,k0)(mod1.(out,n-1)))
+	#println(get_kij(n,k0;restricted=false)(out)) 
+
+#	return sort!(mod1.(out,n-1))
+	return mod1.(out,n-1)
 
 end 
 
+function uniqueKs_kMirror(n::Int, k0::Real)::Vector{Float64}
+
+	get_kij(n,k0)(uniqueInds_kMirror(n, k0))
+
+end 
 
 function check_nr_kPoints(n::Int)
 
@@ -726,6 +736,14 @@ function check_nr_kPoints(n::Int)
 end 
 
 
+function next_kPoint(k_ref::Real, dk::Real 
+										 )::Float64
+
+	@assert dk >=0 
+
+	k_ref - dk 
+
+end 
 
 
 function get_kij!(n::Int, k0::Real; 
@@ -746,7 +764,7 @@ function get_kij!(n::Int, k0::Real;
 
 			restricted && @assert 1<=ind<n
 
-			setindex!(k, kmax - dk*ind, i)
+			setindex!(k, next_kPoint(kmax, dk*ind), i)
 
 		end 
 
@@ -807,7 +825,7 @@ function get_kij(n::Int, k0::Real,
 # 	ind >= n: i=2, 3, .... # nr periods outside 
 #  2pi * (1-i) = -2pi, -4pi, ...
 	
-		k[precomp_dir] = precomp_ks[m] - 2pi*(i-1) 
+		k[precomp_dir] = next_kPoint(precomp_ks[m], 2pi*(i-1))
 
 		return k
 
@@ -835,7 +853,7 @@ function get_kij(n::Int,
 
 			i,m = fldmod1(inds[precomp_dir], n-1)
 
-			k[precomp_dir] = ks[m] - 2pi*(i-1) 
+			k[precomp_dir] = next_kPoint(ks[m], 2pi*(i-1))
 
 		end 
 
@@ -910,21 +928,23 @@ end
 #end  
 
 
-function ind_minusk(i::Int, n::Int, k0::Real)::Int 
+function ind_minusk(i::Int, n::Int, k0::Real;
+									 restricted::Bool=true)::Int 
 
-	mod1(Int(round(k0*(n-1)/pi))+2-i, n-1)
+	j = Int(round(k0*(n-1)/pi))+2-i
+
+	return restricted ? mod1(j, n-1) : j
 
 end 
 
-function ind_minusk(n::Int, k0::Real)::Function 
+function ind_minusk(n::Int, k0::Real;
+									 restricted::Bool=true)::Function 
 
 	i0 = check_kMirror_possible(n,k0) + 2 
 
-	return function ind_minusk_(i::Int)::Int 
+	restricted && return ind_minusk_r(i::Int)::Int = mod1(i0-i, n-1) 
 
-		mod1(i0-i, n-1)
-
-	end 
+	return ind_minusk_u(i::Int)::Int = i0-i 
 
 end 
 
@@ -1839,54 +1859,55 @@ end
 #
 #---------------------------------------------------------------------------#
 
-
-function psiH_on_mesh(n::Int, k0::Real, 
-											perturb::AbstractArray{ComplexF64,4},
-											H::Function, Hdata...; kwargs...
+function psiH_on_mesh(n::Int, 
+											k::Union{<:Real,
+															 <:AbstractVector{<:AbstractVector{<:Real}}
+															 },
+											args...; kwargs...
 											)::Array{ComplexF64,4}
 
-	kij = get_kij(n,k0)  
-
-	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
-
-
-	store_on_mesh!!(eigH!, tuple, Bloch_WFs, H, kij, perturb, Hdata...; kwargs...) 
-
-##
-#	store_on_mesh!!(eigH!, source=tuple, dest=Bloch_WFs,  rest...)
-#	rest= (H,kij,perturb,Hdata...)
-#	Hdata = (bs,pert_strength)
-#
-#	store_one!!(eigh!, source=tuple, i, j, dest=Bloch_WFs, rest...)
-#
-#	get_one_wrapper!(Bloch_WFs[i,j], eigH!, tuple, i, j, rest...)
-#
-#	eigH!(Bloch_WFs[i,j], (i,j), rest...) 
-#	
-#	eigH!(Bloch_WFs[i,j], (i,j), H, rest...) 
-#	rest= (kij,perturb,Hdata...)
-#
-# eigH(Bloch_WFs[i,j], H(ij, rest...); kwargs...)
-#
-# H(ij, kij, perturb, bs, pert_strength)
-#
-##
-
-	return Bloch_WFs 
+	psiH_on_mesh(n, get_kij(n,k), args...; kwargs...)
 
 end 
 
 
 function psiH_on_mesh(n::Int, 
-											k::Union{<:Real,
-															 <:AbstractVector{<:AbstractVector{<:Real}}
-															 },
+											kij::Function,
+											perturb::AbstractArray{ComplexF64,4},
 											H::Function, Hdata...; kwargs...
 											)::Array{ComplexF64,4}
 
-	psiH_on_mesh(n, get_kij(n,k), H, Hdata...; kwargs...)
+
+	WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
+
+
+	store_on_mesh!!(eigH!, tuple, WFs, H, kij, perturb, Hdata...; kwargs...) 
+
+##
+#	store_on_mesh!!(eigH!, source=tuple, dest=WFs,  rest...)
+#	rest= (H,kij,perturb,Hdata...)
+#	Hdata = (bs,pert_strength)
+#
+#	store_one!!(eigh!, source=tuple, i, j, dest=WFs, rest...)
+#
+#	get_one_wrapper!(WFs[i,j], eigH!, tuple, i, j, rest...)
+#
+#	eigH!(WFs[i,j], (i,j), rest...) 
+#	
+#	eigH!(WFs[i,j], (i,j), H, rest...) 
+#	rest= (kij,perturb,Hdata...)
+#
+# eigH(WFs[i,j], H(ij, rest...); kwargs...)
+#
+# H(ij, kij, perturb, bs, pert_strength)
+#
+##
+
+	return WFs 
 
 end 
+
+
 
 function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; kwargs...
 											)::Array{ComplexF64,4}

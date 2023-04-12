@@ -476,13 +476,15 @@ end
 
 function set_results!(results::AbstractDict,
 													nk::Int, k0::Real,
-													data)::Nothing
+													data)::Dict 
 
 	for (dir1,d) in enumerate(data)
 					
 		set_results_onedir!(results, nk, k0, dir1, d) 
 
 	end 
+	
+	return results 
 
 end  
 
@@ -570,10 +572,14 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	symms = preserved_symmetries(P)
 	strength = perturb_strength(P)
 	#parallel=nprocs()>=2 # parallel 2 cores not worth it 
-
-	results = init_results(nk, k0, get_target(target; kwargs...))
-
+	
+	
 	perturb1 = get_perturb_on_mesh(P)
+
+
+
+	results = init_results(nk, k0, get_target(target; kwargs...)) # differs 
+
 
 #
 #	if !in(symms ,["None","All"])
@@ -607,30 +613,11 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 #
 #	println()
 #
-#
-#end 
-
-
-################## test 
-#
-#	perturb2 = get_perturb_on_mesh("Ct", nk, k0, 1993)
-#
-##	perturb1 = perturb1*strength + perturb2*1e-10 
-#
-#	LinearAlgebra.axpby!(1e-10, perturb2, strength, perturb1)
-#
-#	strength = 1
-#
-#	@show LinearAlgebra.norm(perturb1)
-#
 #########################
 
 	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
 
-
-	set_results!(results, nk, k0, get_data(psi, results))
-
-	return results
+	return set_results!(results, nk, k0, get_data(psi, results))
 
 end 
 

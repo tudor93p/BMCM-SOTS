@@ -29,6 +29,7 @@ import ..CalcWLO: all_symms_preserved, preserved_symmetries,
 									 perturb_strength, 
 									 islegend, fn_legend, xxlabel,
 									 get_target, FoundFiles, Read,
+									 get_perturb_on_mesh,
 									 cp_wcc_to_results,
 									 get_data,
 									 set_results!
@@ -105,88 +106,6 @@ function init_results(n::Int,
 	return results
 
 end   
-
-
-
-
-
-
-
-#===========================================================================#
-#
-#
-#
-#---------------------------------------------------------------------------#
-
-
-function symmetrize_and_normalize!(pert::AbstractArray{ComplexF64,4}, 
-																	 symms::AbstractString,
-																	 args...)::AbstractArray{ComplexF64,4}
-
-	WLO.store_on_mesh!!(Symmetries.symmetrize_HC!, pert)
-
-	if !isempty(MODEL.sepSymmString(symms))
-
-		error("Not ready to symmetrize on non-uniform mesh")
-
-	end 
-#	MODEL.symmetrize_on_mesh!(pert, symms, args...)
-
-	WLO.store_on_mesh!!(Symmetries.normalize!, pert)
-
-	return pert 
-
-end 
-
-
-
-function get_perturb_on_mesh_(
-										 symms::AbstractString, 
-										 )::Array{ComplexF64,4}
-
-	symmetrize_and_normalize!(rand(ComplexF64,4,4,n-1,n-1), symms, n, k0) 
-
-end   
-
-function get_perturb_on_mesh_(
-										 symms::AbstractString, 
-										 n::Int, k0::Real,
-										 seed::Int 
-										 )::Array{ComplexF64,4}
-
-
-	Random.seed!(seed) 
-
-	return get_perturb_on_mesh_(symms, n, k0)
- 
-end 
-
-function get_perturb_on_mesh(symms::AbstractString, n::Int,
-														 args...)::Array{ComplexF64,4}
-	
-	all_symms_preserved(symms) && return zeros(ComplexF64,4,4,n-1,n-1)
-
-	return get_perturb_on_mesh_(symms, n, args...)
-
-end 
-
-function get_perturb_on_mesh(
-											P::UODict, args...
-										 )::Array{ComplexF64,4}
-
-	get_perturb_on_mesh(preserved_symmetries(P), 
-											nr_kPoints(P),
-											kPoint_start(P),
-											args... 
-											) 
-
-end 
-
-
-
-
-
-
 
 
 
@@ -437,44 +356,53 @@ end
 #sum_kSteps(s::Real)::Float64 = s
 
 function sum_kSteps(ks::AbstractVector{<:Real},
+										nk::Int
 										 )::Float64
 
-	abs(ks[end]-ks[1])
+	check_vec_len(nk,ks)
+
+	@assert length(ks)==nk 
+
+	return abs(ks[end]-ks[1])  
 
 end 
 
 function sum_kSteps_dist2pi!(
 											 gaps::AbstractVector{Float64},
-												 ks::AbstractVector{Float64},
+											 ks::AbstractVector{Float64},
+												 nk::Int, 
 												 args...
 													 )::Function 
 
 	function ssi2p(alpha::Union{AbstractVector{<:Real},<:Real})::Float64 
 	
-		fill_gaps_ks!(gaps, ks, args..., only(alpha))
+		fill_gaps_ks!(gaps, ks, nk, args..., only(alpha))
 	
 #		println(only(alpha),"\t",sum_kSteps(ks))
 
-		return abs2(2pi-sum_kSteps(ks))
+		return abs(2pi-sum_kSteps(ks,nk))
 
 	end 
 
 end  
 
 
-#
-#function rescaling_factor_dk(args...)
-#
-#	2pi/sum_kSteps(args...)
-#
-#end 
 
 
 function init_gaps_ks(nk::Int)::NTuple{2,Vector{Float64}}
 
-	zeros(nk), zeros(nk)
+	Tuple(WLO.init_storage(Float64, nk+1) for i=1:2)
 
 end 
+
+function check_vec_len(nk::Int, vectors::AbstractVector{<:Real}...)
+
+	for v in vectors 
+		@assert WLO.nr_kPoints_from_mesh1(v)==nk+1
+	end 
+
+end 
+
 
 
 
@@ -487,58 +415,58 @@ function fill_gaps_ks(nk::Int,
 
 end 
 
-# merge methods 
-function fill_gaps_ks!(
-											 gaps::AbstractVector{Float64},
-											 ks::AbstractVector{Float64},
 
-												 nk::Int, k0::Real,
+function next_kPoint(get_dk_for_gap::Function,
+										 gap::Real,
+										 k_prev::Real,
+										br_args...)
 
-												 get_gap_at_k::Union{Function,
+	dk = get_dk_for_gap(gap)
+
+	@assert dk>0 "Decrease minimum expected gap"
+
+	WLO.next_kPoint(k_prev, 
+									bound_rescale_kStep(dk, br_args...)
+									)
+
+end 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function wrapper_get_gap(get_gap_at_k::Union{Function,
 																						 SignalProcessing.Dierckx.Spline1D},
-
-											get_dk_for_gap::Function,
-
-											br_args...
-
-											)::Tuple{<:AbstractVector{Float64},
-															 <:AbstractVector{Float64}
-															 }
-
-	@assert length(gaps)==length(ks)==nk 
+												 k::Real
+												 )::Float64
 
 
-	setindex!(ks, 2pi+k0, 1)
-
-	for i=2:nk
-
-		setindex!(gaps, get_gap_at_k(ks[i-1]), i-1)
-
-		setindex!(ks, get_dk_for_gap(gaps[i-1]), i) # ks[i] = temporary dk[i-1]
-
-		setindex!(ks, 
-							ks[i-1] - bound_rescale_kStep(ks[i], br_args...),
-							i)
-# k decreasing  as in WLO 
-#
-
-	end 
-		
-	setindex!(gaps, get_gap_at_k(ks[nk]), nk)
-
-	return gaps, ks
+	get_gap_at_k(k)
 
 end 
+function wrapper_get_gap(
+												 (get_gap_at_k,data_gap)::Tuple{Function,<:Any},
+												 k::Real
+												 )::Float64
 
+	get_gap_at_k(data_gap, k)
+
+end 
 
 
 function fill_gaps_ks!(
-											 gaps::AbstractVector{Float64},
-											 ks::AbstractVector{Float64},
+											 gaps_::AbstractVector{Float64},
+											 ks_::AbstractVector{Float64},
 
 												 nk::Int, k0::Real,
-
-												 (get_gap_at_k,data_gap)::Tuple{Function,<:Any},
+																	unif_kij::Function,
+																	uniq_kinds::AbstractVector{Int},
+																	ind_minusk::Function,
+																	
+																	get_gap_at_k::Union{<:Tuple{Function,<:Tuple}, Function, SignalProcessing.Dierckx.Spline1D},
 
 											get_dk_for_gap::Function,
 
@@ -548,26 +476,45 @@ function fill_gaps_ks!(
 															 <:AbstractVector{Float64}
 															 }
 
-	@assert length(gaps)==length(ks)==nk 
+	check_vec_len(nk, gaps_, ks_)
 
+	gaps = view(gaps_, uniq_kinds)
+	ks = view(ks_, uniq_kinds)
 
-	setindex!(ks, 2pi+k0, 1)
+	setindex!(ks, unif_kij(uniq_kinds[1])[1], 1)
 
-	for i=2:nk
+	for i=2:length(uniq_kinds)
 
-		setindex!(gaps, get_gap_at_k(data_gap, ks[i-1]), i-1)
-
-		setindex!(ks, get_dk_for_gap(gaps[i-1]), i) # ks[i] = temporary dk[i-1]
+		setindex!(gaps, wrapper_get_gap(get_gap_at_k, ks[i-1]), i-1)
 
 		setindex!(ks, 
-							ks[i-1] - bound_rescale_kStep(ks[i], br_args...),
-							i)
-# k decreasing  as in WLO 
-#
+							next_kPoint(get_dk_for_gap, gaps[i-1], ks[i-1], br_args...),
+							i) 
+
+	end  
+		
+	setindex!(gaps, wrapper_get_gap(get_gap_at_k, ks[end]), length(gaps)) 
+
+	for i in uniq_kinds 
+
+		j = ind_minusk(i)
+
+		setindex!(ks_, -ks_[i], j)
+
+		setindex!(gaps_, gaps_[i], j)
 
 	end 
+	
+	
+	#	ks_[nk] and gaps_[nk] unaccessed so far 
 		
-	setindex!(gaps, get_gap_at_k(data_gap, ks[nk]), nk)
+	setindex!(ks_, 
+						next_kPoint(get_dk_for_gap, gaps_[nk-1], ks_[nk-1], br_args...), 
+						nk)
+
+	setindex!(gaps_, wrapper_get_gap(get_gap_at_k, ks_[nk]), nk)
+
+
 
 	return gaps, ks
 
@@ -576,9 +523,9 @@ end
 
 
 
-function find_rescaling_factor_dk(nk::Int, args...) 
+function find_rescaling_factor_dk(nk::Int, args...; kwargs...)
 
-	find_rescaling_factor_dk!(init_gaps_ks(nk)..., nk, args...)
+	find_rescaling_factor_dk!(init_gaps_ks(nk)..., nk, args...; kwargs...)
 
 end 
 
@@ -590,56 +537,68 @@ function find_rescaling_factor_dk!(
 												 nk::Int, k0::Real, 
 
 												 get_gap_at_k,
+
 											get_dk_for_gap::Function,
 
-																	bounds::AbstractVector{<:Real}, 
+																	bounds::AbstractVector{<:Real};
+																	optim_tol::Float64=1e-8
+
+								
 
 														 )#::Tuple{Float64,Vector{Float64}}
 
-	@assert length(gaps)==length(ks)==nk  
+#@assert length(gaps)==length(ks)==nk  
+	check_vec_len(nk, gaps, ks)
 
-	bounds_new = verify_dk_bounds(bounds, nk)
+	bounds_new = verify_dk_bounds(bounds, nk) 
 
-	#fill_gaps_ks!(
-	#							gaps, ks, 
-	#							nk, k0,
-	#							get_gap_at_k,
-	#							get_dk_for_gap, 
-	#							bounds_new,
-	#							)
+	uniq_kinds = WLO.uniqueInds_kMirror(nk,k0)
+	unif_kij = WLO.get_kij(nk,k0) #restricted=false)
+	ind_minusk = WLO.ind_minusk(nk,k0)
 
-	#@show ks 
 
-	#alpha0 = rescaling_factor_dk(ks)
+	fill_gaps_ks!(gaps, ks, nk, k0, 
+																	unif_kij,
+																	uniq_kinds,
+																	ind_minusk,
 
-	alpha0 = 1.0 
+								get_gap_at_k, get_dk_for_gap, 
+								bounds_new,
+																	)
 
-#	@show alpha0 
 
 	sksd2p = sum_kSteps_dist2pi!(
 								gaps, ks, 
 								nk, k0,
+																	unif_kij,
+																	uniq_kinds,
+																	ind_minusk,
+
+
 								get_gap_at_k,
 								get_dk_for_gap, 
 								bounds_new,
 								)
-
-	sol = Optim.optimize(sksd2p, 
-											 #[1e-10], [1e10], 
-											 [alpha0])
+	sol = Optim.optimize(sksd2p, [1.0],
+											 Optim.Options(g_tol = optim_tol,
+																		 f_abstol=optim_tol,
+																		 ))
 
 	alpha = only(Optim.minimizer(sol))
 
-#	@show alpha Optim.minimum(sol)
-
 	get_dk_for_gap_new = bound_rescale_kStep(get_dk_for_gap, bounds_new, alpha)
 
-	fill_gaps_ks!(gaps, ks, nk, k0, get_gap_at_k, get_dk_for_gap_new)
+	fill_gaps_ks!(gaps, ks, nk, k0, 
+																	unif_kij,
+																	uniq_kinds,
+																	ind_minusk,
+								get_gap_at_k, get_dk_for_gap_new)
 
-	correct_sum_kSteps!(ks)
+
+
+#	correct_sum_kSteps!(ks, nk, uniq_kinds, ind_minusk)
 
 	return (gaps, ks), get_dk_for_gap_new 
-
 
 end 
 
@@ -660,7 +619,7 @@ function find_largest_step(ks::AbstractVector{<:Real},
 
 	for i = 2:length(ks)
 
-		dk = abs(ks[i-1]-ks[i]) 
+		dk = Utils.dist_periodic(ks[i-1],ks[i],2pi)
 
 		if dk > dk0
 
@@ -676,33 +635,55 @@ end
 
 
 
-function correct_sum_kSteps!(ks_3::AbstractVector{Float64}
-														 )::AbstractVector{Float64}
-
-	dk = sum_kSteps(ks_3)
-
-	eps = ks_3[1]>ks_3[end] ? dk-2pi : 2pi-dk
-
-	dkmax,imax = find_largest_step(ks_3)
-
-	dkmax > 10eps || @warn string("Large deviation from 2pi: dk=$dkmax, eps=$eps")
-
-
-	ks_3[imax:end] .+= eps 
-
-	return ks_3 
-
-end 
-
+#function correct_sum_kSteps!(ks::AbstractVector{Float64},
+#														 nk::Int,
+#														 uniq_kinds::AbstractVector{Int},
+#														 ind_minusk::Function,
+#														 )::AbstractVector{Float64} 
+#
+#	dk = sum_kSteps(ks,nk)
+#	
+#	#	ks[end] == next_kPoint(ks[1],2pi) = ks[1]-2pi 
+#
+#	#eps = ks[1]>ks[end] ? dk-2pi : 2pi-dk
+#
+#	eps = abs(dk-2pi)
+#
+#	dkmax,imax = find_largest_step(view(ks,uniq_kinds))
+#
+#
+#	@assert dkmax > 10eps string("Large deviation from 2pi: dk=$dkmax, eps=$eps")
+#
+#	i = uniq_kinds[imax]
+#
+#	dk = diff(ks[max(1,i-1):min(i+1,end)])[1] 
+#
+#	i_zero = argmin(Utils.dist_periodic(ks,0,2pi))
+#	i_pi = argmin(Utils.dist_periodic(ks,pi,2pi))
+#
+#
+#	dk>0 # increasing 
+#	dk<0 # decreasing 
+#
+## i0 invariant to mirror might exist 
+## 
+#
+#
+#error() 
+#
+#	return ks 
+#
+#end 
+#
 #===========================================================================#
 #
 #
 #
 #---------------------------------------------------------------------------#
 
-function init_arrays_gap(nk::Int, Hdata...)::Tuple
+function init_arrays_gap(nk::Int, h::Function, Hdata...)::Tuple
 
-	WF = WLO.init_storage1(WLO.init_eigH(rand(2), Hdata...)[1], nk)
+	WF = WLO.init_storage1(WLO.init_eigH(rand(2), h, Hdata...)[1], nk)
 
 	WF_occ = WLO.psi_sorted_energy(WF; halfspace=true, occupied=true) 
 						# only to init the right size 
@@ -752,16 +733,16 @@ function calc_gap!(
 
 end  
 
-function calc_gap!(data)::NTuple{2,Vector{Float64}}
-
-	nk,k0 = data[2]
-
-	ks = WLO.get_kij(nk,k0)(1:nk-1)
-
-	return [calc_gap!(data, k) for k=ks], ks 
-
-end  
-
+#function calc_gap!(data)::NTuple{2,Vector{Float64}}
+#
+#	nk,k0 = data[2]
+#
+#	ks = WLO.get_kij(nk,k0)(1:nk-1)
+#
+#	return [calc_gap!(data, k) for k=ks], ks 
+#
+#end  
+#
 
 
 
@@ -785,18 +766,38 @@ function threestep_find_ks(Hdata, (nks,k0),
 						model::Function
 						)
 
-	@assert length(nks)==3 
+	@assert length(nks)==3 && issorted(nks)
 
-	gaps_1, ks_1 = calc_gap!(pack_data_gap(Hdata, (nks[1],k0), sector))
+
+	# --- rough estimation of gap(k) in a halfspace --- #
 	
-	dk_from_gap_1 = model([minimum(gaps_1), extrema_gaps[2]], extrema_dk)
+	data_1 = pack_data_gap(Hdata, (nks[1],k0), sector)
+
+	gaps_1, ks_1 = [calc_gap!(data_1,k) for k=WLO.uniqueKs_kMirror(nks[1],k0)]
 
 
-	gap_at_k_1 = (calc_gap!,pack_data_gap(Hdata, (nks[2],k0), sector))
 
-	(gaps_2, ks_2),dk_from_gap_2 = find_rescaling_factor_dk(nks[2], k0, 
-																													gap_at_k_1,
-																							dk_from_gap_1, extrema_dk)
+	min_gap = min(extrema_gaps[1], minimum(gaps_1))
+	
+	dk_from_gap_1 = model([min_gap, extrema_gaps[2]], extrema_dk)
+	
+
+
+
+	# --- linearly scale 'model' such that ks span a halfspace --- #
+
+	gap_at_k_2 = (calc_gap!,pack_data_gap(Hdata, (nks[2],k0), sector)) 
+
+	(gaps_2, ks_2),dk_from_gap_2 = find_rescaling_factor_dk(
+																													nks[2], k0, 
+																													gap_at_k_2,
+																							dk_from_gap_1, extrema_dk;
+																							optim_tol=1e-8
+																							)
+
+
+	# --- scale again, full precision --- # 
+
 	if ks_2[2]<ks_2[1] 
 
 		reverse!(ks_2)
@@ -804,16 +805,17 @@ function threestep_find_ks(Hdata, (nks,k0),
 
 	end 
 
-	gap_at_k_2 = SignalProcessing.Interp1D(ks_2, gaps_2, 3) 
-
-
+	gap_at_k_3 = SignalProcessing.Interp1D(ks_2, gaps_2, 3) 
+	
 	(gaps_3, ks_3),dk_from_gap_3 = find_rescaling_factor_dk(nks[3], k0, 
-																													gap_at_k_2,
-																							dk_from_gap_2, extrema_dk)
+																													gap_at_k_3,
+																							dk_from_gap_2, extrema_dk;
+																							optim_tol=1e-14
+																						)
 
 	return (gaps_3, ks_3, dk_from_gap_3,
-					(nks[3],k0), sector,
-					)
+					(nks[3],k0),
+					sector)
 
 end 	
 
@@ -847,6 +849,25 @@ function kxy_from_threestep(
 
 end 
 
+function calc_kxy_adaptive(Hdata, 
+													 nks::AbstractVector{Int}, k0::Real, 
+													 extrema_gaps_dk::Tuple{
+																									<:AbstractVector{<:Real}, 
+																									<:AbstractVector{<:Real}, 
+																									},
+													 step_vs_gap_model::Function 
+													 )
+
+
+	out_1,out_2 = map(1:2) do dir 
+		
+		threestep_find_ks(Hdata, (nks,k0), (true,dir), extrema_gaps_dk, step_vs_gap_model) 
+
+	end 
+
+	return kxy_from_threestep(out_1, out_2)
+
+end 
 
 
 
@@ -897,54 +918,44 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 										kwargs...)::Dict{String,Any}
 	
 	
-	@assert adaptive_kMesh(P) # otherwise CalcWLO.Compute 
+	adaptive_kMesh(P) || return CalcWLO.Compute_(P, target, get_fname;
+																							 kwargs...)
 
 
 
 	nk = nr_kPoints(P)
 	k0 = kPoint_start(P)
+
 	symms = preserved_symmetries(P)
 	strength = perturb_strength(P)
 
+	
+	perturb1 = get_perturb_on_mesh(P)
 
 
-	model = kMesh_model(P)
-
-
-#	perturb1 = get_perturb_on_mesh(P)
-
-#	@show LinearAlgebra.norm(perturb1)
+	step_vs_gap_model = kMesh_model(P)
 
 
 
 
-#	Hdata = MODEL.get_args_psi(P, perturb1, strength)
 
-	Hdata = MODEL.get_args_psi(P) 
+	extrema_gaps_dk = ([0.02, 0.5],[1e-7, pi/15]) 
 
-	extrema_gaps_dk = ([0.02, 0.5],[1e-7, pi/15])
 	nks = [min(17,nk),min(71,nk),nk]
 
 
-	out_1 = threestep_find_ks(Hdata, (nks,k0), (true,1), extrema_gaps_dk, model) 
-	out_2 = threestep_find_ks(Hdata, (nks,k0), (true,2), extrema_gaps_dk, model) 
-
-
-#	mesh = mesh_from_threestep(out_1, out_2)
-
-	kxy = kxy_from_threestep(out_1, out_2)
-
-#
-#	psi = MODEL.get_psiH(P, nk, kxy)
-##	psi = MODEL.get_psiH(P, nk, k0, perturb1, strength)
-#
-	results = init_results(nk, kxy, get_target(target; kwargs...))
-#
-#	set_results!(results, nk, k0, get_data(psi, results))
+	# no perturbation 
+	
+	kxy = calc_kxy_adaptive(MODEL.get_args_psi(P), nks, k0, extrema_gaps_dk, step_vs_gap_model)
 
 
 
-	return results
+
+	results = init_results(nk, kxy, get_target(target; kwargs...)) 
+
+	psi = MODEL.get_psiH(P, nk, kxy, perturb1, strength)
+
+	return set_results!(results, nk, k0, get_data(psi, results))
 
 end 
 
