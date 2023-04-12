@@ -545,7 +545,6 @@ function find_rescaling_factor_dk!(
 
 														 )#::Tuple{Float64,Vector{Float64}}
 
-#@assert length(gaps)==length(ks)==nk  
 	check_vec_len(nk, gaps, ks)
 
 	bounds_new = AdaptiveMesh.verify_dk_bounds(bounds, nk) 
@@ -564,6 +563,9 @@ function find_rescaling_factor_dk!(
 								bounds_new,
 																	)
 
+
+# use gaps to improve get_dk_for_gap 
+#
 
 	sksd2p = sum_kSteps_dist2pi!(
 								gaps, ks, 
@@ -676,6 +678,10 @@ function threestep_find_ks(Hdata, (nks,k0),
 																							dk_from_gap_1, extrema_dk;
 																							optim_tol=1e-8
 																							)
+
+
+#	min_gap = min(min_gap, minimum(gaps_2)) 
+
 
 
 	# --- scale again, full precision --- # 
