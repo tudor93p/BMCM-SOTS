@@ -1,4 +1,4 @@
-include("../input_file_32.jl") 
+include("../input_file_10.jl") 
 
 import BMCMSOTS 
 

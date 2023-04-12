@@ -9,10 +9,11 @@ import BMCMSOTS: MB
 
 import PyPlot 
 
-import BMCMSOTS:WLO, CalcWLOadapt, ChecksWLO ,BBH
+import BMCMSOTS:WLO, CalcWLO 
 
 
-#import .CalcWLOadapt: fill_gaps_ks!, sum_kSteps_dist2pi!, sum_kSteps ,init_gaps_ks, verify_dk_bounds 
+
+#import .CalcWLO: fill_gaps_ks!, sum_kSteps_dist2pi!, sum_kSteps ,init_gaps_ks, verify_dk_bounds 
 
 
 P = (
@@ -22,7 +23,7 @@ P = (
 		 s_Hamilt = 1,
 		 b_Hamilt = 1,
 		 kPoint_start = -1, 
-		 kMesh_type="Adaptive",
+		 kMesh_type="Uniform",#Adaptive",
 		 kMesh_model="expminv",
 		 nr_kPoints = 33,
 		 preserved_symmetries = "Mx",
@@ -36,25 +37,25 @@ P = (
 
 
 
-nk = CalcWLOadapt.nr_kPoints(P)
-k0 = CalcWLOadapt.kPoint_start(P)
+nk = CalcWLO.nr_kPoints(P)
+k0 = CalcWLO.kPoint_start(P)
 
 
 	unif_kij = WLO.get_kij(nk, k0)
 	
 	uniq_kinds = WLO.uniqueInds_kMirror(nk,k0) 
 #	ind_minusk = WLO.ind_minusk(nk,k0)
-#	get_gap_at_k = (CalcWLOadapt.calc_gap!, 
-#									CalcWLOadapt.pack_data_gap(
+#	get_gap_at_k = (CalcWLO.calc_gap!, 
+#									CalcWLO.pack_data_gap(
 #													MB.get_args_psi(P),
 #													(nk,k0),
 #													(true,1)
 #													))
 #
 #
-#get_dk_from_gap = CalcWLOadapt.kMesh_model(P)([0.3061018379852348, 0.5],[1.0e-7, 0.20943951023931953])
+#get_dk_from_gap = CalcWLO.kMesh_model(P)([0.3061018379852348, 0.5],[1.0e-7, 0.20943951023931953])
 #
-results = CalcWLOadapt.Compute(P; observables=input_checks[:observables])
+results = CalcWLO.Compute(P; observables=input_checks[:observables])
 
 
 
@@ -83,8 +84,27 @@ end
 
 
 
+tasks = [
+				 init(BMCMSOTS, :WannierBands1),
+				 init(BMCMSOTS, :WannierBands2),
+
+				 ]
+
+task0 = init(BMCMSOTS, :CheckZero);
+
+pdata =map(tasks) do task
+
+p = ComputeTasks.get_first_paramcomb(task0)
+
+P = task0.get_plotparams(p)
+
+P["obs_group"]= "sector"
+P["obs_i"] = 2 
+P["smooth"]=0.3
+
+d = task.plot(P)
 
 
-
+end 
 
 

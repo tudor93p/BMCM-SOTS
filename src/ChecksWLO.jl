@@ -33,14 +33,14 @@ import ..CalcWLO: preserved_symmetries, all_symms_preserved, MODEL
 #
 #---------------------------------------------------------------------------#
 
-Dependencies = [MODEL,WLO]
+Dependencies = [CalcWLO]
 
 
 usedkeys()::Vector{Symbol} = [
 
-						:preserved_symmetries, 
+#						:preserved_symmetries, 
 
-						:perturb_strength,  # only for plotting 
+#						:perturb_strength,  # only for plotting 
 
 						:nr_perturb_strength,
 						:max_perturb_strength,
@@ -48,6 +48,11 @@ usedkeys()::Vector{Symbol} = [
 						]
 
 function usedkeys(P::UODict)::Vector{Symbol} 
+
+	@assert haskey(P, :preserved_symmetries)
+
+	@assert haskey(P, :perturb_strength)
+
 
 	uk = setdiff!(usedkeys(),[:perturb_strength])
 	
@@ -1030,15 +1035,6 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	all(isauxfile, keys(results)) && return results
 
-##################### test 
-#
-#	perturb2 = CalcWLO.get_perturb_on_mesh_("Ct", nk, k0, 1993)
-#
-#	perturb2 .*= 1e-10 
-#
-#	@show LinearAlgebra.norm(perturb2)
-#
-#######################
 
 
 	# ------ no perturbation --------- #

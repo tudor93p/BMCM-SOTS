@@ -235,11 +235,13 @@ function plotdict_WCC(P::AbstractDict,
 
 	data = task.get_data(P; fromPlot=true, mute=false, target=obs)  
 
-	ks,klabels = CalcWLO.xxlabel(data)
+	ksxy,klabels = CalcWLO.xxlabel(data)
 
 	legend = data[CalcWLO.fn_legend(obs)] 
 
 	y0 = transpose(selectdim(data[obs],2,d))
+
+	ks = selectdim(ksxy,2,d)
 
 	#yave = WLO.wcc_stat!(sum(eachrow(y0)),[0,0.5])[1] 
 
@@ -247,6 +249,7 @@ function plotdict_WCC(P::AbstractDict,
 
 #	@show yave 
 	ks ./= pi 
+
 
 	return Dict{String,Any}(
 
@@ -1047,8 +1050,6 @@ function WannierBands2(init_dict::AbstractDict;
 			out["labels"][i] *= " " * wcc_stat_text(stat)
 
 		end  
-
-
 
 
 		out["ylabel"] *= ",  L:\$-\\log_{10}\$" * wcc_stat_text(["\\mu","\\sigma"])

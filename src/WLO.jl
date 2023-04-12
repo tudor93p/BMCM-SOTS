@@ -1807,6 +1807,60 @@ function wlo_from_mesh!(dst::AbstractMatrix{ComplexF64},
 end 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+function init_arrays_gap(nk::Int, h::Function, Hdata...)::Tuple
+
+	WF = init_storage1(init_eigH(rand(2), h, Hdata...)[1], nk)
+
+	WF_occ = psi_sorted_energy(WF; halfspace=true, occupied=true) 
+						# only to init the right size 
+
+	return (WF, init_overlaps_line(WF_occ))
+
+end 
+function pack_data_gap(Hdata, (nk,k0), sector)
+
+		(
+							Hdata,
+							(nk, k0),
+							init_arrays_gap(nk, Hdata...),
+							sector,
+							)
+
+end 
+
+
+
+
+""" 
+Calculate the gap of W_dir1 for parameter k[dir2]=k2
+"""
+function calc_gap!(
+									 (Hdata,
+										(nk,k0),
+										(WF, overlaps), 
+										(occupied,dir1),
+										),
+							k2::Float64
+							)::Float64
+
+	get_K = get_kij_constrained(nk, k0, 2, k2, 3-dir1)
+	
+	store_on_mesh1!!(eigH!, nk, get_K, WF, Hdata...)
+
+	WF_occ = psi_sorted_energy(WF; halfspace=true, occupied=occupied)
+
+	w1 = wlo1_one_inplace!(overlaps..., WF_occ)
+
+	return Wannier_min_gap(get_periodic_eigvals!(w1))
+
+end  
+
 
 #===========================================================================#
 #

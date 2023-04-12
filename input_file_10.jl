@@ -43,9 +43,9 @@ input_checks  = Dict{Symbol,Any}(
 		nr_kPoints = vcat(
 											10,
 											50,
-#											95,
-#											145, 
-#											215, 
+											95,
+											145, 
+											215, 
 #											300, 
 #											600,
 #											1000,
