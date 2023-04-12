@@ -52,8 +52,6 @@ input_checks  = Dict{Symbol,Any}(
 																																															 ),
 
 
-		kMesh_type = ["Uniform","Adaptive"],
-
 		kPoint_start = [-1], 
 
 		preserved_symmetries = ["None";
@@ -92,8 +90,6 @@ input_checks  = Dict{Symbol,Any}(
 			nr_kPoints = (3,0),
 
 			kPoint_start = (1,2), 
-
-			kMesh_type = (),
 
 
 

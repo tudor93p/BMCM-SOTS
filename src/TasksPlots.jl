@@ -1259,12 +1259,8 @@ function fit_line_conv(xdata::AbstractVector{<:Real},
 #	start>0 || return (zeros(2),"no fit")
 
 #	i = start:length(xdata) 
-@show start stop 
 
-	return fit_line_conv(
-											 view(xdata,start:stop),
-											 view(ydata,start:stop),
-											 )
+	fit_line_conv( view(xdata,start:stop), view(ydata,start:stop),)
 end 
 
 

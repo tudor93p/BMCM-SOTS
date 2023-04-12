@@ -1,5 +1,5 @@
 import myLibs: ComputeTasks, Utils
-#import myPlots 
+import myPlots 
 
 import LinearAlgebra,Statistics,Optim
 
@@ -7,7 +7,7 @@ import BMCMSOTS.WLO: select_mesh_point
 
 import BMCMSOTS: MB
 
-import PyPlot 
+#import PyPlot 
 
 import BMCMSOTS:WLO, CalcWLO 
 
@@ -105,7 +105,7 @@ P = task0.get_plotparams(p)
 P["obs_group"]= "sector"
 P["obs_i"] = 2 
 P["smooth"]=0.3
-P["kMesh_model"]="line"
+#P["kMesh_model"]="line"
 P["kMesh_type"] = "Adaptive"
 
 d = task.plot(P)

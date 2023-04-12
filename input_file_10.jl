@@ -46,22 +46,25 @@ input_checks  = Dict{Symbol,Any}(
 											95,
 											145, 
 											215, 
-#											300, 
-#											600,
-#											1000,
+											300, 
+											600,
+											1000,
+											2000,
 																																															 ),
 
 
 		kMesh_type = ["Uniform","Adaptive"],
 
-		kMesh_model = ["square","sin", "line","expminv"],
+		kMesh_model = ["line"],#["square","sin", "line","expminv"],
 
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = ["None";
-														[join(c,"+") for c=Combinatorics.powerset(["P", "Mx", "Ct", "Tt","TC2y"],1) if good_comb(c)][13:end];
-														"All"],
+		preserved_symmetries = ["All";
+#														"None";
+#														[join(c,"+") for c=Combinatorics.powerset(["P", "Mx", "Ct", "Tt","TC2y"],1) if good_comb(c)][13:end];
+														"None"
+														],
 
 #		preserved_symmetries = ["None", "P", "Mx", "Ct", "Tt", "All"],
 

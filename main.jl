@@ -2,16 +2,16 @@ import Dates
 
 t0 = Dates.now() 
 
-import myLibs: ComputeTasks 
+import myLibs: ComputeTasks, Utils 
 
 import BMCMSOTS  
 
 
-include("input_file_32.jl")
+include("input_file_10.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
-				 init(BMCMSOTS,:WannierBands1),
+#				 init(BMCMSOTS,:WannierBands1),
 				 ];
 
 
@@ -19,9 +19,25 @@ ComputeTasks.missing_data.(tasks,show_missing=false);
 
 
 
-#error() 
+for t in tasks 
 
-ComputeTasks.get_data_one.(tasks, mute=false);
+P, = ComputeTasks.get_first_paramcomb(t) 
+
+for q in Base.product(((k=>v for v=input_checks[:allparams][k]) for k=[:kMesh_type, :preserved_symmetries])...)
+
+	P1 = Utils.adapt_merge(P,q...)
+	
+
+	t.get_data(P1; force_comp=true, mute=false)
+
+end 
+
+
+
+end 
+
+
+#ComputeTasks.get_data_one.(tasks, mute=false);
 
 #shuffle = gethostname()=="tudor-HP"
 
@@ -50,7 +66,7 @@ end
 ComputeTasks.get_data_all.(tasks, 
 													 shuffle=true, seed=4, 
 													 mute=false,
-													 check_data=false,
+#													 check_data=false,
 													 )
 
 
