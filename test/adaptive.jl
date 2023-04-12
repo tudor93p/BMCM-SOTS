@@ -15,6 +15,11 @@ import BMCMSOTS:WLO, CalcWLO
 
 #import .CalcWLO: fill_gaps_ks!, sum_kSteps_dist2pi!, sum_kSteps ,init_gaps_ks, verify_dk_bounds 
 
+println(CalcWLO.next_kPoint(x->-rand(), rand(), rand(),rand(2),rand()))
+
+#error() 
+
+
 #P = (braiding_time = 0.25, 
 #		 s0_Hamilt = 0.1, 
 #		 s_Hamilt = 1.0, #0.5, 

@@ -421,11 +421,26 @@ function next_kPoint(get_dk_for_gap::Function,
 
 	dk = get_dk_for_gap(gap)
 
-	@assert dk>0 "Decrease minimum expected gap"
+	if dk>0 
+		
+		return WLO.next_kPoint(k_prev, 
+													 AdaptiveMesh.bound_rescale_kStep(dk, br_args...))
 
-	WLO.next_kPoint(k_prev, 
-									AdaptiveMesh.bound_rescale_kStep(dk, br_args...)
-									)
+	end 
+
+	@show get_dk_for_gap 
+	@show get_dk_for_gap(0)
+	@show get_dk_for_gap(0.01)
+	@show get_dk_for_gap(0.02)
+	@show get_dk_for_gap(0.03)
+	@show get_dk_for_gap(0.1)
+	@show get_dk_for_gap(0.2)
+	@show get_dk_for_gap(0.3)
+	
+	@show gap k_prev br_args 
+
+	error("Decrease minimum expected gap")
+
 
 end 
 
