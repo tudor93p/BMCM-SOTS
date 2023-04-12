@@ -23,7 +23,11 @@ import myPlots
 import ..WLO: nr_kPoints, kPoint_start  
 
 import ..CalcWLO
-import ..CalcWLO: preserved_symmetries, all_symms_preserved, MODEL
+import ..CalcWLO: preserved_symmetries, 
+									all_symms_preserved,
+									MODEL,
+									adaptive_kMesh, calc_kxy_adaptive  
+
 
 #get_perturb_on_mesh_, 
 
@@ -913,7 +917,7 @@ function set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
 	if haskey(results,"D30")
 
 			nu2_minus_mk = selectdim(nus2pm[2],dir1+1,
-								WLO.ind_minusk.(axes(nus2pm[2],dir1+1),nk,k0)
+								 WLO.ind_minusk(nk,k0).(axes(nus2pm[2],dir1+1)),
 								)
 
 			SignalProcessing.run_m1!(results["D30"], trial,
@@ -1001,7 +1005,7 @@ function Compute_(P::UODict, target, get_fname::Function;
 	obs = get_target(target; kwargs...) 
 	
 	results = Compute_(P, obs; kwargs...)
-
+	
 	ReadWrite.Write_PhysObs(get_fname(P), FILE_STORE_METHOD, results)
 
 	return isnothing(target) ? results : Utils.dict_keepkeys(results, obs) 
@@ -1014,7 +1018,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 										kwargs...)::Dict{String,Any}
 
 	nk = nr_kPoints(P)
-	k0 = kPoint_start(P)
+	k0_ = kPoint_start(P)
 	symms = preserved_symmetries(P)
 	parallel=false#nprocs()>=4
 	parallel2=nprocs()>=4
@@ -1030,19 +1034,18 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	results = init_results(strengths, get_target(target; kwargs...))
 
 
-#	return Dict{String,Any}(k=>v for (k,v)=pairs(results) if isauxfile(k)) 
-
 
 	all(isauxfile, keys(results)) && return results
 
+					 
+	
+	k0_or_kxy = adaptive_kMesh(P) ? calc_kxy_adaptive(P) : k0_
 
 
 	# ------ no perturbation --------- #
 
-	set_results!(results, nk, k0, 1, s1,  
-										 get_data(MODEL.get_psiH(P, nk, k0, 
-#																						 perturb2, #### test 
-																						 ), 
+	set_results!(results, nk, k0_, 1, s1,  
+							 get_data(MODEL.get_psiH(P, nk, k0_or_kxy), 
 															results;
 															parallel=parallel2))
 
@@ -1076,14 +1079,14 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
-			get_data(MODEL.get_psiH(P, nk, k0, pert...), results)
+			get_data(MODEL.get_psiH(P, nk, k0_or_kxy, pert...), results)
 
 		end # get_data contains 4 jobs  
 
 
 		for (I,d) in zip(Iterators.product(eachindex(trials),s2e), data_all)
 
-			set_results!(results, nk, k0, I..., d)
+			set_results!(results, nk, k0_, I..., d)
 
 		end  
 
@@ -1094,13 +1097,12 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				data = get_data(MODEL.get_psiH(P, nk, k0, 
+				data = get_data(MODEL.get_psiH(P, nk, k0_or_kxy, 
 																			 perturb0, ps, 
-#																			perturb0*ps + perturb2 ####### test 
 																			), results;
 												parallel=parallel2)
 	
-				set_results!(results, nk, k0, j, i, data)
+				set_results!(results, nk, k0_, j, i, data)
 	
 			end  
 	

@@ -23,8 +23,8 @@ P = (
 		 s_Hamilt = 1,
 		 b_Hamilt = 1,
 		 kPoint_start = -1, 
-		 kMesh_type="Uniform",#Adaptive",
-		 kMesh_model="expminv",
+		 kMesh_type="Adaptive",
+		 kMesh_model="line",#expminv",
 		 nr_kPoints = 33,
 		 preserved_symmetries = "Mx",
 #		 nr_perturb_strength = 3, 
@@ -84,13 +84,17 @@ end
 
 
 
-tasks = [
-				 init(BMCMSOTS, :WannierBands1),
-				 init(BMCMSOTS, :WannierBands2),
-
-				 ]
 
 task0 = init(BMCMSOTS, :CheckZero);
+tasks = [
+				 task0,
+				 init(BMCMSOTS, :WannierBands2),
+				 init(BMCMSOTS, :WannierBands1),
+					init(BMCMSOTS, :CheckZero_atYs; Y=:kMesh_model),
+				 init(BMCMSOTS, :CheckZero_atPS_vsX; X=:nr_kPoints),
+				 init(BMCMSOTS, :CheckZero_atPS_vsX_atYs; X=:nr_kPoints,Y=:kMesh_model),
+
+				 ]
 
 pdata =map(tasks) do task
 
@@ -101,6 +105,8 @@ P = task0.get_plotparams(p)
 P["obs_group"]= "sector"
 P["obs_i"] = 2 
 P["smooth"]=0.3
+P["kMesh_model"]="line"
+P["kMesh_type"] = "Adaptive"
 
 d = task.plot(P)
 
