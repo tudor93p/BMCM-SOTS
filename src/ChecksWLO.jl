@@ -186,7 +186,7 @@ function get_data_args(psiH::AbstractArray{<:Number,4},
 
 end  
 
-function get_data_dir1(data::AbstractVector, dir1::Int
+function view_data_onedir(data::AbstractVector, dir1::Int
 											)::AbstractVector
 
 	view(data, 2dir1-1:2dir1)
@@ -215,6 +215,16 @@ function get_data(psiH::AbstractArray{ComplexF64,4},
 
 end 
 
+function get_data_onedir_occ(psiH::AbstractArray{ComplexF64,4}, 
+									results::AbstractDict,
+									dir1::Int;
+									) 
+	
+	WLO.get_wlo_data_mesh(psiH, true, dir1, 
+												any(in(keys(results)), obs_batch_2)
+												)
+
+end 
 
 
 
@@ -702,13 +712,13 @@ function set_results!(results::AbstractDict,
 	for dir1=1:2 
 					
 		set_results_onedir!(results, nk, k0, trial, i_ps, dir1, 
-												get_data_dir1(data, dir1)...)
+												view_data_onedir(data, dir1)...)
 
 	end  
 
 	set_results_twodir!(results, nk, k0, trial, i_ps, 
-											get_data_dir1(data, 1)..., 
-											get_data_dir1(data, 2)... 
+											view_data_onedir(data, 1)..., 
+											view_data_onedir(data, 2)... 
 											)
 
 end   
@@ -1038,6 +1048,23 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 															results;
 															parallel=parallel2))
 
+
+### 
+
+if nk>2000 
+	@assert all_symms_preserved(P) && !parallel && !parallel2 
+
+	dir1=1 
+
+	@time "psi"  psi = MODEL.get_psiH(P, nk, k0_or_kxy)
+
+	println("psi: size=",size(psi))
+
+@time "data1occ" data1o = get_data_onedir_occ(psi, results, dir1)
+	
+	set_results_onedir!(results, nk, k0_, 1, s1, dir1, data1o, data1o)
+end 
+####
 
 	if all_symms_preserved(P) 
 
