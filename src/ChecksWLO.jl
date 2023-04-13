@@ -1056,6 +1056,8 @@ if nk>2000
 
 	dir1=1 
 
+	@show dir1 
+
 	@time "psi"  psi = MODEL.get_psiH(P, nk, k0_or_kxy)
 
 	println("psi: size=",size(psi))
