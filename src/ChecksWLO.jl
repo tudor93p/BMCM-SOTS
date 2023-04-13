@@ -1043,12 +1043,6 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------ no perturbation --------- #
 
-	set_results!(results, nk, k0_, 1, s1,  
-							 get_data(MODEL.get_psiH(P, nk, k0_or_kxy), 
-															results;
-															parallel=parallel2))
-
-
 ### 
 
 if nk>2000 
@@ -1064,8 +1058,17 @@ if nk>2000
 
 @time "data1occ" data1o = get_data_onedir_occ(psi, results, dir1)
 	
-	set_results_onedir!(results, nk, k0_, 1, s1, dir1, data1o, data1o)
+	set_results_onedir!(results, nk, k0_, 1, s1, dir1, data1o, data1o) 
+
+else 
+
+	set_results!(results, nk, k0_, 1, s1,  
+							 get_data(MODEL.get_psiH(P, nk, k0_or_kxy), 
+															results;
+															parallel=parallel2))
+
 end 
+
 ####
 
 	if all_symms_preserved(P) 
