@@ -59,27 +59,33 @@ tiers2 = [
 				] 
 
 tiers3 = [Dict(
-							 "re"=>4,
-							 "kis"=>4,  
-							 "horon"=>4, 
-"nut"=>4,
-"spaceml4"=>8,
-							 "taranis"=>4,
-								"shu"=>4,
-							"neper"=>4, 
-								"yoshi"=>8,
-
-							"sia"=>4,
-							"toad"=>32,
-							)
-
+							 "taranis" => 8, 
+							 "neper" => 4, 
+							 "horon" => 4, 
+							 "sia" => 4, 
+							 "kis" => 8, 
+							 "shu" => 4, 
+							 "re" => 4, 
+							),
+					Dict(
+							 "spaceml4" => 8, 
+							 "toad" => 20, 
+							 "yoshi" => 12, 
+							 "nut" => 8,
+							 )
 					]
 
 
 
-tiers = tiers1 
+
+
+
+#tiers = tiers1 
 #tiers = tiers2
 tiers=tiers3 
+
+println("julia launch_jobs/monitor_workstation.jl "*join(union(keys.(tiers)...)," "))
+
 
 
 LaunchJobs.getrun_commands(ARGS, tiers, path)

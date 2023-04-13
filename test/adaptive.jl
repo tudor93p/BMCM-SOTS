@@ -15,7 +15,7 @@ import BMCMSOTS:WLO, CalcWLO
 
 #import .CalcWLO: fill_gaps_ks!, sum_kSteps_dist2pi!, sum_kSteps ,init_gaps_ks, verify_dk_bounds 
 
-println(CalcWLO.next_kPoint(x->-rand(), rand(), rand(),rand(2),rand()))
+#println(CalcWLO.next_kPoint(x->-rand(), rand(), rand(),rand(2),rand()))
 
 #error() 
 

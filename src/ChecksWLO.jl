@@ -1144,8 +1144,6 @@ end
 
 function Read(P::UODict; target=nothing, get_fname::Function, kwargs...)::Dict 
 
-	@warn splitpath(get_fname(P)(""))[end]
-
 	Read0(get_fname(P), get_target(target; kwargs...))
 
 end

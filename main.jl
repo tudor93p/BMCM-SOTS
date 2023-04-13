@@ -11,12 +11,12 @@ include("input_file_10.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
-#				 init(BMCMSOTS,:WannierBands2),
+				 init(BMCMSOTS,:WannierBands1),
 				 ];
 
 
 ComputeTasks.missing_data.(tasks,show_missing=false);
-
+error()
 
 for t in tasks 
 

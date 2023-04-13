@@ -374,7 +374,7 @@ function sum_kSteps_dist2pi!(
 
 	function ssi2p(alpha::Union{AbstractVector{<:Real},<:Real})::Float64 
 	
-		fill_gaps_ks!(gaps, ks, nk, args..., only(alpha))
+		fill_gaps_ks!(gaps, ks, nk, args..., abs(only(alpha)))
 	
 #		println(only(alpha),"\t",sum_kSteps(ks))
 
@@ -578,28 +578,27 @@ function find_rescaling_factor_dk!(
 								bounds_new,
 																	)
 
+	#return (gaps,ks),get_dk_for_gap
+
 
 # use gaps to improve get_dk_for_gap 
-#
+
 
 	sksd2p = sum_kSteps_dist2pi!(
 								gaps, ks, 
 								nk, k0,
-																	unif_kij,
-																	uniq_kinds,
-																	ind_minusk,
-
-
-								get_gap_at_k,
-								get_dk_for_gap, 
+								unif_kij, uniq_kinds, ind_minusk,
+								get_gap_at_k, get_dk_for_gap, 
 								bounds_new,
 								)
+
+
 	sol = Optim.optimize(sksd2p, [1.0],
 											 Optim.Options(g_tol = optim_tol,
 																		 f_abstol=optim_tol,
 																		 ))
 
-	alpha = only(Optim.minimizer(sol))
+	alpha = abs(only(Optim.minimizer(sol)))
 
 	get_dk_for_gap_new = AdaptiveMesh.bound_rescale_kStep(get_dk_for_gap, bounds_new, alpha)
 
@@ -609,9 +608,6 @@ function find_rescaling_factor_dk!(
 																	ind_minusk,
 								get_gap_at_k, get_dk_for_gap_new)
 
-
-
-#	correct_sum_kSteps!(ks, nk, uniq_kinds, ind_minusk)
 
 	return (gaps, ks), get_dk_for_gap_new 
 
@@ -693,11 +689,11 @@ function threestep_find_ks(Hdata, (nks,k0),
 																							dk_from_gap_1, extrema_dk;
 																							optim_tol=1e-8
 																							)
-
+	if nks[2]==nks[3]
+		return (gaps_2, ks_2, dk_from_gap_2, (nks[2],k0), sector)
+	end 
 
 #	min_gap = min(min_gap, minimum(gaps_2)) 
-
-
 
 	# --- scale again, full precision --- # 
 
@@ -708,7 +704,9 @@ function threestep_find_ks(Hdata, (nks,k0),
 
 	end 
 
-	gap_at_k_3 = SignalProcessing.Interp1D(ks_2, gaps_2, 3) 
+	gap_at_k_3 = SignalProcessing.Interp1D(ks_2, gaps_2, 3)  
+
+
 	
 	(gaps_3, ks_3),dk_from_gap_3 = find_rescaling_factor_dk(nks[3], k0, 
 																													gap_at_k_3,

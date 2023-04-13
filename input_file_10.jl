@@ -39,21 +39,20 @@ input_checks  = Dict{Symbol,Any}(
 
 		b_Hamilt = [1],
 					
-#		nr_kPoints = vcat(10, 60, 70),
 		nr_kPoints = vcat(
 											10,
 											50,
 											95,
 											145, 
-#											215, 
-#											300, 
-#											600,
-#											1000,
-#											2000,
+											215, 
+											300, 
+											601,
+											1001,
+											2001,
+											3001,
 																																															 ),
 
 
-#		kMesh_type = ["Uniform","Adaptive"],
 
 		kMesh_model = ["Uniform","Line"],#["square","sin", "line","expminv"],
 
@@ -63,7 +62,7 @@ input_checks  = Dict{Symbol,Any}(
 		preserved_symmetries = ["All";
 #														"None";
 #														[join(c,"+") for c=Combinatorics.powerset(["P", "Mx", "Ct", "Tt","TC2y"],1) if good_comb(c)][13:end];
-														"None"
+#														"None"
 														],
 
 #		preserved_symmetries = ["None", "P", "Mx", "Ct", "Tt", "All"],
@@ -75,7 +74,7 @@ input_checks  = Dict{Symbol,Any}(
 
 		nr_perturb_instances = [1],
 
-		perturb_strength = [0.3],#0:0.2:0.8,
+		perturb_strength = [0],#0:0.2:0.8,
 #		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true), 0.3:0.1:0.6),
 
 
