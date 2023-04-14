@@ -103,7 +103,9 @@ p, = ComputeTasks.get_first_paramcomb(task0)
 
 map(["Uniform","Line"]) do mesh 
 
-map(["All","None"]) do s 
+map(["All",
+#		 "None",
+		 ]) do s 
 	println()
 
 	@show mesh s 

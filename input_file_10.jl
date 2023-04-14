@@ -33,9 +33,9 @@ input_checks  = Dict{Symbol,Any}(
 
 		braiding_time = [1/4],
 
-		s0_Hamilt = [0.1],
+		s0_Hamilt = [0.1,0.3],
 		
-		s_Hamilt = [0.5,1,1.5],
+		s_Hamilt = [1,1.5,0.5],
 
 		b_Hamilt = [1],
 					
@@ -49,7 +49,10 @@ input_checks  = Dict{Symbol,Any}(
 											601,
 											1001,
 											2001,
-											3001,
+											3001, # >8 GB 
+											#8001, # >75 GB
+											#10001 # >45 GB  psi 
+											#20001 # >160 GB
 																																															 ),
 
 

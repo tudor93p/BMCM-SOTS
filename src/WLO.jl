@@ -1272,6 +1272,9 @@ function store_on_mesh!!(get_one!::Function,
 
 	end 
 
+# Computing wavefunctions: 
+# 		around 0.15s/10_000 calls store_on_mesh_one!!, or nk=100
+#
 	return 
 
 end  
@@ -2547,6 +2550,7 @@ function Wannier_band_basis_mesh(
 
 end   
 
+		
 
 function Wannier_band_basis_mesh(
 																 eigvecs::AbstractArray,
@@ -2575,17 +2579,6 @@ function Wannier_band_basis_mesh1(
 
 end  
 
-
-
-function Wannier_band_basis_mesh(
-																 s::Union{Function,Real},
-																 data...)
-
-	@warn "Inefficient obsolete method"
-
-	Wannier_band_basis_mesh(wlo1_on_mesh(data...)..., s)
-
-end  
 
 
 
@@ -3243,6 +3236,7 @@ function get_wlo_data_mesh(psiH::AbstractArray{ComplexF64,4},
 	if get_wlo2 
 
 		return (eigW1, wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
+		
 
 	else 
 
@@ -3254,13 +3248,22 @@ end
 
 
 
+#
+# psi: 0.15/10_000			 							# j 
+# 				even 0.18 
+#
+# for each dir 
+# 	wlo1: 0.6/10_000				 					# k 
+# 			@20k: 10.7s/10_000
+# 	subspaces: 0.6/10_000				 			#	j
+# 			@8k: 0.75/10_000
+#		
+#		for +/- 
+#	 		Wannier basis: 0.5/10_000 				# j,k
+#	 		eigvals: 0.015/10_000							# j
 
 
-
-
-
-
-
+# (0.15 + nr_dir * nr_sectors * 2.25) * (n/100)^2 
 
 
 

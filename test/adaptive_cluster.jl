@@ -60,7 +60,7 @@ P = (braiding_time = 0.25,
 		 s0_Hamilt = 0.1, 
 		 s_Hamilt = 1.0, #0.5, 
 		 b_Hamilt = 1, 
-		 nr_kPoints = 1501, 
+		 nr_kPoints = 15, #1501
 		 kMesh_model = "Line", 
 		 kPoint_start = -1, 
 		 preserved_symmetries = "All", 

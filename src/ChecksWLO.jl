@@ -4,7 +4,7 @@ module ChecksWLO
 
 using Distributed 
 
-import LinearAlgebra, Combinatorics, Random 
+import LinearAlgebra, Combinatorics, Random , Dates 
 
 using OrderedCollections: OrderedDict 
 
@@ -981,6 +981,17 @@ function prep_obs(args...)::Vector{String}
 end 
 
 
+function expected_time(n,nr_dir,nr_sectors)
+
+	t = (0.15 + nr_dir * nr_sectors * 2.25) * (n/100)^2
+
+	println(string("Expected time one PS single core: ",
+								 Dates.canonicalize(Dates.Second(max(1,Int(ceil(t)))))
+								 ))
+
+	return t 
+
+end 
 
 #===========================================================================#
 #
@@ -1048,6 +1059,8 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 if nk>2000 
 	@assert all_symms_preserved(P) && !parallel && !parallel2 
 
+	expected_time(nk, 1, 1) 
+
 	dir1=1 
 
 	@show dir1 
@@ -1061,6 +1074,8 @@ if nk>2000
 	set_results_onedir!(results, nk, k0_, 1, s1, dir1, data1o, data1o) 
 
 else 
+
+	expected_time(nk, 2, 2) 
 
 	set_results!(results, nk, k0_, 1, s1,  
 							 get_data(MODEL.get_psiH(P, nk, k0_or_kxy), 

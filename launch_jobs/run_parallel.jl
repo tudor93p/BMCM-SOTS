@@ -58,20 +58,38 @@ tiers2 = [
 #							)
 				] 
 
+
+
+
+
 tiers3 = [Dict(
-							 "taranis" => 8, 
-							 "neper" => 4, 
-							 "horon" => 4, 
-							 "sia" => 4, 
-							 "kis" => 8, 
-							 "shu" => 4, 
-							 "re" => 4, 
+#							 "taranis" => 1, 
+#							 "neper" => 1, 
+#							 "horon" => 1, 
+#							 "sia" => 1, 
+							 "shu" => 1, 
+							 "re" => 1, 
+#							 "toad" => 4,
+#							 "spaceml4" =>1,
+#							 "nut"=>2,
+#							 "yoshi" =>2,
+#							 "kis" =>4,
 							),
 					Dict(
-							 "spaceml4" => 8, 
-							 "toad" => 20, 
-							 "yoshi" => 12, 
+#							 "kis" => 6, 
+#							 "spaceml4" => 4, 
 							 "nut" => 8,
+							 ),
+					Dict(
+							 "yoshi" => 12, 
+#							 "toad" => 24, 
+
+							 ),
+
+					Dict("toad"=>3,
+							 "nut"=>1,
+							 "kis"=>1,
+							 "spaceml4"=>1,
 							 )
 					]
 
@@ -80,11 +98,11 @@ tiers3 = [Dict(
 
 
 
-#tiers = tiers1 
+tiers = tiers1 
 #tiers = tiers2
-tiers=tiers3 
+#tiers=tiers3 
 
-println("julia launch_jobs/monitor_workstation.jl "*join(union(keys.(tiers)...)," "))
+println("HINT:  julia launch_jobs/monitor_workstation.jl "*join(union(keys.(tiers)...)," "))
 
 
 
