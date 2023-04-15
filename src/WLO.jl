@@ -2,13 +2,18 @@ module WLO
 #############################################################################
 
 import LinearAlgebra, Statistics 
+import DistributedArrays 
+using DistributedArrays: 	localindices,localpart,
+													@spawnat,
+													workers,nworkers,procs,
+													DArray, SubOrDArray,
+													dzeros 
 
 import myLibs:Utils,SignalProcessing 
 import myLibs.Parameters:UODict
 
 
 import ..Helpers: PeriodicFuns, Symmetries 
-
 
 
 #===========================================================================#
@@ -956,7 +961,7 @@ function select_mesh_point(data::AbstractArray{T,M},
 													 i::Int,
 													 j::Int,
 													 )::AbstractArray{T,M-2} where {T<:Number,M}
-	
+
 	selectdim(selectdim(data,M,j),M-1,i)
 
 end  
@@ -980,7 +985,8 @@ end
 
 
 function select_mesh_point(data::Union{<:AbstractArray{<:AbstractArray},
-																			 <:Tuple{Vararg{<:AbstractArray}}},
+																			 <:Tuple{Vararg{<:AbstractArray}},
+																			 },
 													 args...
 													 )::AbstractArray{<:AbstractArray}
 	
@@ -1080,11 +1086,22 @@ function init_storage(T::DataType,
 end 
 
 function init_storage(T::DataType, 
-											s::Tuple{Vararg{Int}},
-											ns::Int...; kwargs...
-																	)::AbstractArray{<:Number}
+											s::NTuple{Ns,Int},
+											ns::Vararg{Int,Nn}; 
+											parallel::Bool=false,
+											distr_axis::Int=Ns+Nn,
+											kwargs...
+											)::AbstractArray{<:Number,Ns+Nn} where Ns where Nn 
 
-	zeros(T, s..., (n-1 for n=ns)...)
+	array_size = (s..., (n-1 for n=ns)...)
+
+	parallel || return zeros(T, array_size)
+
+	w = workers()
+
+	d = setindex!(ones(Int, Ns+Nn), length(w), distr_axis)
+
+	return dzeros(T, array_size, w, d) 
 
 end 
 
@@ -1101,8 +1118,6 @@ end
 function init_storage(item1::AbstractArray{T,N}, n::Int; kwargs...
 											)::AbstractArray{T,N+2} where T<:Number where N
 
-	#repeat(zero(item1), ones(Int, N)..., n-1, n-1) 
-	
 	init_storage(T, size(item1), n, n; kwargs...)
 
 end 
@@ -1232,24 +1247,103 @@ function store_on_mesh!!(get_one!::Function,
 												 inds::Tuple{<:AbstractVector{Int},
 																		 <:AbstractVector{Int}},
 												source::Union{Function, AbstractArray{<:Number},
-																		NTuple{N, <:AbstractArray} where N,
+																			Tuple{Vararg{<:AbstractArray}},
 																		},
-												dest::AbstractArray,
-												data...; kwargs...
+												dest::Union{Array,SubArray},
+												data...; 
+												kwargs...
+												)::Nothing  
+
+	store_on_mesh!!(get_one!, (), inds, source, dest, data...; kwargs...) 
+
+end   
+
+function store_on_mesh!!(get_one!::Function, 
+												 big_inds::Tuple{Vararg{<:AbstractVector{Int}}},
+												 inds::Tuple{<:AbstractVector{Int},
+																		 <:AbstractVector{Int}},
+												source::Union{Function, AbstractArray{<:Number},
+																			Tuple{Vararg{<:AbstractArray}},
+																		},
+												dest::Union{Array,SubArray},
+												data...; 
+												parallel::Bool=false,
+												kwargs...
 												)::Nothing 
 
 	for j=inds[2], i=inds[1]
 
-		store_on_mesh_one!!(get_one!, source, i, j, dest, data...; kwargs...)
+		store_on_mesh_one!!(get_one!, 
+												big_inds..., source, 
+												i, j, dest, data...; kwargs...)
 
 	end 
 
 # Computing wavefunctions: 
 # 		around 0.15s/10_000 calls store_on_mesh_one!!, or nk=100
 #
+
 	return 
 
-end  
+end   
+
+#findall_indexin = Base.Fix1(findall, !isnothing)∘indexin 
+
+
+function findall_indexin(a::AbstractVector, b::AbstractVector
+													 )::AbstractVector{Int} 
+
+	I = indexin(a,b) 
+
+	i1 = findfirst(!isnothing, I)
+	i2 = findlast(!isnothing, I)
+
+	return all(!isnothing, view(I,i1+1:i2-1)) ? (i1:i2) : findall(!isnothing, I)
+
+end 
+
+
+
+
+function store_on_mesh!!(get_one!::Function, 
+												 inds::Tuple{<:AbstractVector{Int},
+																		 <:AbstractVector{Int}},
+												source::Union{Function, AbstractArray{<:Number},
+																			Tuple{Vararg{<:AbstractArray}},
+																		},
+												dest::SubOrDArray,
+												data...;
+												kwargs...
+												)::Nothing 
+	
+
+	map(procs(dest)) do p
+
+		@spawnat p begin   
+
+			big_inds = Tuple(select_mesh_dir(localindices(dest),d) for d=1:2)
+
+			store_on_mesh!!(get_one!, big_inds,
+											map(findall_indexin, big_inds, inds),
+										source, 
+										localpart(dest), data...;
+										kwargs...)
+
+
+		end  
+
+	end .|> fetch 
+
+	return 
+
+end   
+
+
+
+
+
+
+
 
 function store_on_mesh1!!(get_one!::Function, 
 													nk::Int,
@@ -1331,30 +1425,66 @@ end
 
 
 
-
-
-
 function store_on_mesh_one!!(
-														 get_one!::Function, 
-												source::Union{Function, AbstractArray{<:Number},
-																		NTuple{M, <:AbstractArray} where M,
-																		},
-														i::Int, j::Int,
-														dest::Union{<:AbstractArray{<:Number,N},
-																					 <:AbstractVector{<:AbstractArray}
+							get_one!::Function, 
+							i_source::Int, j_source::Int,
+							source::Union{Function, 
+														AbstractArray{<:Number},
+														NTuple{M, <:AbstractArray} where M,
+														},
+							i_dest::Int, j_dest::Int,
+							dest::Union{<:AbstractArray{<:Number,N},
+													<:AbstractVector{<:AbstractArray}
 																					 },
-														
-												data...; kwargs...
+							data...; kwargs...
 												)::Nothing where N
 	
-	get_one_wrapper!(
-									 select_mesh_point(dest, i, j),
+	get_one_wrapper!(select_mesh_point(dest, i_dest, j_dest),
 									 get_one!, 
-									 source, i, j, data...; kwargs...)
+									 source, i_source, j_source, 
+									 data...; kwargs...)
 
 	return 
 
 end  
+
+function store_on_mesh_one!!(
+							get_one!::Function, 
+							I_source::AbstractVector{Int}, J_source::AbstractVector{Int},
+							source::Union{Function, 
+														AbstractArray{<:Number},
+														Tuple{Vararg{<:AbstractArray}},
+														},
+							i::Int, j::Int,
+							args...; kwargs...
+												)::Nothing
+
+	store_on_mesh_one!!(get_one!, 
+											I_source[i], J_source[j], source, 
+											i, j, args...; kwargs...)
+
+end  
+
+
+
+function store_on_mesh_one!!(
+							get_one!::Function, 
+							source::Union{Function, 
+														AbstractArray{<:Number},
+														NTuple{M, <:AbstractArray} where M,
+														},
+							i::Int, j::Int,
+							args...; kwargs...
+							)::Nothing 
+
+	store_on_mesh_one!!(get_one!, i, j, source, i, j, args...; kwargs...)
+
+end  
+
+
+
+
+
 
 
 function store_on_mesh_one!(get_one::Function, 
@@ -1868,6 +1998,8 @@ end
 function psiH_on_mesh1(n::Int, k0::Real, H::Function, Hdata...; kwargs...
 											)::Array{ComplexF64,3}
 
+	@assert !get(kwargs,:parallel,false) "Not implemented"
+
 	kij = get_kij(n,k0)  
 
 	Bloch_WFs = init_storage1(init_eigH(kij(1), H, Hdata...; kwargs...)[1], n; 
@@ -1915,7 +2047,7 @@ function psiH_on_mesh(n::Int,
 															 <:AbstractVector{<:AbstractVector{<:Real}}
 															 },
 											args...; kwargs...
-											)::Array{ComplexF64,4}
+											)::Union{Array{ComplexF64,4},DArray{ComplexF64,4}}
 
 	psiH_on_mesh(n, get_kij(n,k), args...; kwargs...)
 
@@ -1926,7 +2058,7 @@ function psiH_on_mesh(n::Int,
 											kij::Function,
 											perturb::AbstractArray{ComplexF64,4},
 											H::Function, Hdata...; kwargs...
-											)::Array{ComplexF64,4}
+											)::Union{Array{ComplexF64,4},DArray{ComplexF64,4}}
 
 
 	WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
@@ -1960,11 +2092,11 @@ end
 
 
 
-function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; kwargs...
-											)::Array{ComplexF64,4}
+function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; 
+											kwargs...
+											)::Union{Array{ComplexF64,4}, DArray{ComplexF64,4}}
 
-	WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; 
-													 kwargs...)
+	WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
 
 	store_on_mesh!!(eigH!, kij, WFs, H, Hdata...; kwargs...)
 
@@ -1985,7 +2117,7 @@ function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; kwargs...
 
 end 
 function enpsiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
-												)::Vector{Array}
+												)::Union{Vector{Array},Vector{DArray}}
 
 	kij = get_kij(n,k0)  
 
@@ -2000,7 +2132,7 @@ end
 function enpsiH_on_mesh(n::Int, k0::Real, 
 											perturb::AbstractArray{ComplexF64,4},
 											H::Function, Hdata...; kwargs...
-											)::Vector{Array}
+												)::Union{Vector{Array},Vector{DArray}}
 
 	kij = get_kij(n,k0)   
 
@@ -2533,13 +2665,13 @@ function nr_kPoints_from_mesh(W::AbstractArray{<:Number,N})::Int where N
 
 end 
 
-function nr_kPoints_from_mesh(W::AbstractArray{<:Number,N},
-															dir::Int,
-															meshdim::Int=2)::Int where N
+function nr_kPoints_from_mesh(W::AbstractArray{<:Number}, args::Int...)::Int 
 
-	@assert N>=meshdim && 1<=dir<=meshdim
 
-	return size(W, N-meshdim+dir) + 1 
+	select_mesh_dir(size(W), args...) + 1
+	#@assert N>=meshdim && 1<=dir<=meshdim
+
+#	return size(W, N-meshdim+dir) + 1 
 
 end 
 
@@ -2548,6 +2680,18 @@ function nr_kPoints_from_mesh1(W::AbstractArray{<:Number,N})::Int where N
 	nr_kPoints_from_mesh(W, 1, 1)
 
 end 
+
+
+function select_mesh_dir(I::NTuple{N,T}, dir::Int, meshdim::Int=2
+						 )::T where T<:Union{Int, UnitRange{Int}} where N
+
+	@assert N>=meshdim && 1<=dir<=meshdim
+
+	return I[N-meshdim+dir] 
+
+end 
+
+
 
 
 #===========================================================================#
@@ -3332,14 +3476,12 @@ end
 
 
 #
-# psi: 0.15/10_000			 							# j 
+# psi: 0.15-0.18/10_000			 							# j 
 # 				even 0.18 
 #
 # for each dir 
-# 	wlo1: 0.6/10_000				 					# k 
-# 			@20k: 10.7s/10_000
-# 	subspaces: 0.6/10_000				 			#	j
-# 			@8k: 0.75/10_000
+# 	wlo1: 0.12/10_000				 					# k 
+# 	subspaces: 0.75/10_000				 			#	j
 #		
 #		for +/- 
 #	 		Wannier basis: 0.5/10_000 				# j,k

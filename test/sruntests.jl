@@ -11,9 +11,9 @@ for fn in [
 
 #"symms",
 
-"overlap_matmul",
+#"overlap_matmul",
 #"wlos",
-
+"distrib_array",
 #"adaptive_cluster",
 #"adaptive",
 #"ribbon",
