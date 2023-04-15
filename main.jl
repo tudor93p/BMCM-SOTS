@@ -7,11 +7,11 @@ import myLibs: ComputeTasks, Utils
 import BMCMSOTS  
 
 
-include("input_file_32.jl")
+include("input_file_10.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
-				 init(BMCMSOTS,:WannierBands1),
+#				 init(BMCMSOTS,:WannierBands1),
 				 ];
 	
 

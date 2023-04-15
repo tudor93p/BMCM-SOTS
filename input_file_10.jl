@@ -23,6 +23,15 @@ function good_comb(c::AbstractVector{<:AbstractString})::Bool
 	return true 
 
 end 
+obs_unocc = ["D110", "D111", "D123", "D125"]
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -33,9 +42,9 @@ input_checks  = Dict{Symbol,Any}(
 
 		braiding_time = [1/4],
 
-		s0_Hamilt = [0.1,0.3],
+		s0_Hamilt = [0.1],#0.3],
 		
-		s_Hamilt = [1,1.5,0.5],
+		s_Hamilt = [1],#1.5,0.5],
 
 		b_Hamilt = [1],
 					
@@ -52,12 +61,12 @@ input_checks  = Dict{Symbol,Any}(
 											3001, # >8 GB 
 											#8001, # >75 GB
 											#10001 # >45 GB  psi 
-											#20001 # >160 GB
+											20001 # >160 GB
 																																															 ),
 
 
 
-		kMesh_model = ["Uniform","Line"],#["square","sin", "line","expminv"],
+		kMesh_model = ["Line"],#"Uniform","Line"],#["square","sin", "line","expminv"],
 
 
 		kPoint_start = [-1], 
@@ -117,13 +126,15 @@ input_checks  = Dict{Symbol,Any}(
 
 		),
   
-	:observables => ["D110","D111","D113",
+	:observables => setdiff!([
+										"D110","D111","D113",
 									 "D48","D30","D123",
 									 "D125","D127","D127.1",
 									 "WannierGap",
 									 "WannierBands1",
 									 "WannierBands2",
 									 ],
+				obs_unocc)
 
 	
 )
