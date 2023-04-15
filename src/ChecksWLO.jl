@@ -63,7 +63,9 @@ end
 obs_batch_1 = ["D110", "D111", "D113", "WannierGap"]
 obs_batch_2 = ["D30", "D48","D123", "D125", "D127.1", "D127"]  
 
-calc_observables = vcat(obs_batch_1, obs_batch_2)
+calc_observables = vcat(obs_batch_1, obs_batch_2) 
+
+obs_unocc = ["D110", "D111", "D123", "D125"]
 
 #===========================================================================#
 #
@@ -226,6 +228,66 @@ function get_data_onedir_occ(psiH::AbstractArray{ComplexF64,4},
 
 end 
 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function expected_time(n::Int,nr_dir::Int,nr_sectors::Int)
+
+	t = (0.15 + nr_dir * nr_sectors * 2.25) * (n/100)^2
+
+	println(string("Expected time one PS single core: ",
+								 Dates.canonicalize(Dates.Second(max(1,Int(ceil(t)))))
+								 ))
+
+	return t 
+
+end  
+
+
+function getset_results!(results::AbstractDict,
+												 psi::AbstractArray{ComplexF64,4},
+												 nk::Int, k0_::Real, 
+												 trial::Int, i_ps::Int; 
+																		verbose::Bool=false,
+												kwargs_gd...)
+	error() 
+
+	verbose && expected_time(nk, 2, 2) 
+	
+	data = get_data(psi, results; kwargs_gd...)
+		
+	set_results!(results, nk, k0_, trial, i_ps, data)
+
+end 
+
+function getset_results_onedir_occ!(results::AbstractDict, 
+																		psi::AbstractArray{ComplexF64,4},
+																		dir1::Int, 
+																		nk::Int, k0_::Real, 
+																		trial::Int, i_ps::Int; 
+																		verbose::Bool=false,
+																		kwargs_gd...)
+	
+	isempty(kwargs_gd)||@warn "Ignored: $kwargs_gd"
+
+
+	verbose && expected_time(nk, 1, 1)
+
+	data1o = if verbose 
+		@time "data1o"	get_data_onedir_occ(psi, results, dir1)
+	else 
+		get_data_onedir_occ(psi, results, dir1)
+	end 
+
+	set_results_onedir!(results, nk, k0_, trial, i_ps, dir1, data1o, data1o) 
+
+end 
 
 
 
@@ -981,17 +1043,6 @@ function prep_obs(args...)::Vector{String}
 end 
 
 
-function expected_time(n,nr_dir,nr_sectors)
-
-	t = (0.15 + nr_dir * nr_sectors * 2.25) * (n/100)^2
-
-	println(string("Expected time one PS single core: ",
-								 Dates.canonicalize(Dates.Second(max(1,Int(ceil(t)))))
-								 ))
-
-	return t 
-
-end 
 
 #===========================================================================#
 #
@@ -1023,9 +1074,29 @@ function Compute_(P::UODict, target, get_fname::Function;
 end 
 
 
+	
+
+
+
 
 function Compute_(P::UODict, target, get_fname::Nothing=nothing; 
+									light_calc::Bool=true,
 										kwargs...)::Dict{String,Any}
+
+	observables = get_target(target; kwargs...)
+
+	if light_calc 
+		@assert isdisjoint(obs_unocc, observables) 
+		@warn "Light version"
+	end 
+
+	strengths = perturb_strengths(P)  
+
+	results = init_results(strengths, observables) 
+
+	all(isauxfile, keys(results)) && return results
+
+
 
 	nk = nr_kPoints(P)
 	k0_ = kPoint_start(P)
@@ -1033,19 +1104,12 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	parallel=false#nprocs()>=4
 	parallel2=nprocs()>=4
 
-	strengths = perturb_strengths(P)
+
 
 	zero_strength, rest_strengths = Base.Iterators.peel(strengths)
 	s1, s2e = Base.Iterators.peel(eachindex(strengths))
 
 	@assert iszero(zero_strength)
-
-
-	results = init_results(strengths, get_target(target; kwargs...))
-
-
-
-	all(isauxfile, keys(results)) && return results
 
 					 
 	
@@ -1054,37 +1118,24 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------ no perturbation --------- #
 
-### 
+	psi = MODEL.get_psiH(P, nk, k0_or_kxy)
 
-if nk>2000 
-	@assert all_symms_preserved(P) && !parallel && !parallel2 
+	if light_calc
+		
+		(parallel|parallel2) && @warn "Nothing to parallelize"
 
-	expected_time(nk, 1, 1) 
+		getset_results_onedir_occ!(results, psi, 1, nk, k0_, 1, s1)#verbose=true)
+		#		getset_results_onedir_occ!(results, psi, 2, nk, k0_, 1, s1; verbose=true)
 
-	dir1=1 
+	else 
 
-	@show dir1 
+		getset_results!(results, psi, nk, k0_, 1, s1; parallel=parallel2)
 
-	@time "psi"  psi = MODEL.get_psiH(P, nk, k0_or_kxy)
+	end 
 
-	println("psi: size=",size(psi))
 
-@time "data1occ" data1o = get_data_onedir_occ(psi, results, dir1)
-	
-	set_results_onedir!(results, nk, k0_, 1, s1, dir1, data1o, data1o) 
 
-else 
 
-	expected_time(nk, 2, 2) 
-
-	set_results!(results, nk, k0_, 1, s1,  
-							 get_data(MODEL.get_psiH(P, nk, k0_or_kxy), 
-															results;
-															parallel=parallel2))
-
-end 
-
-####
 
 	if all_symms_preserved(P) 
 
@@ -1106,12 +1157,12 @@ end
 
 	# ------------- with perturbation -------------- # 
 
-	trials = get_perturb_on_mesh(P)#, 3268) # seed ensures results recovered
+	trials = get_perturb_on_mesh(P, 3268) # seed ensures results recovered
 
 	
 	if parallel #---- parallel evaluation ---#
 
-		#error() #################### test 
+		@assert !light_calc "Not implemented"
 
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
@@ -1133,13 +1184,19 @@ end
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				data = get_data(MODEL.get_psiH(P, nk, k0_or_kxy, 
-																			 perturb0, ps, 
-																			), results;
-												parallel=parallel2)
+				psi = MODEL.get_psiH(P, nk, k0_or_kxy, perturb0, ps)
+			
+				if light_calc 
+					parallel2 && @warn "Nothing to parallelize"
+
+					getset_results_onedir_occ!(results, psi, 1, nk, k0_, j, i) 
+
+	#				getset_results_onedir_occ!(results, psi, 2, nk, k0_, j, i)
 	
-				set_results!(results, nk, k0_, j, i, data)
-	
+				else 
+					getset_results!(results, psi, nk, k0_, j, i; parallel=parallel2)
+				end 
+
 			end  
 	
 		end # ---------#  

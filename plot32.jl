@@ -32,8 +32,9 @@ tasks = [
 
 
 for t in tasks[1:1]
-	@assert isempty(ComputeTasks.missing_data(t,show_missing=true))
+	if !isempty(ComputeTasks.missing_data(t,show_missing=true))
+		ComputeTasks.get_data_one(t,mute=false) 
+	end 
 end 
-#ComputeTasks.get_data_one(tasks[1], mute=false) 
 
 myPlots.plot(tasks)

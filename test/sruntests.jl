@@ -14,8 +14,8 @@ for fn in [
 #"overlap_matmul",
 #"wlos",
 
-#"adaptive_cluster",
-"adaptive",
+"adaptive_cluster",
+#"adaptive",
 #"ribbon",
 #
 

@@ -23,6 +23,7 @@ function good_comb(c::AbstractVector{<:AbstractString})::Bool
 	return true 
 
 end 
+obs_unocc = ["D110", "D111", "D123", "D125"]
 
 
 
@@ -34,28 +35,27 @@ input_checks  = Dict{Symbol,Any}(
 		braiding_time = [1/4],
 
 		s0_Hamilt = [0.1],
-#		s0_Hamilt = 0:0.1:0.5,#Utils.uniqlinsp(1e-3,0.4,5,3; Trunc=true),
 		
 		s_Hamilt = [1],
+
 		b_Hamilt = [1],
 					
-#		nr_kPoints = vcat(10, 60, 70),
 		nr_kPoints = vcat(
 											10,
 											50,
-#											95,
-#											145, 
-#											215, 
-#											300, 
-#											600,
-#											1000,
-																																															 ),
+											95,
+											145, 
+											215, 
+											300,
+											),
 
+		kMesh_model = ["Uniform"],#,"Line"],#["square","sin", "line","expminv"],
 
 		kPoint_start = [-1], 
 
 		preserved_symmetries = ["None";
-														[join(c,"+") for c=Combinatorics.powerset(["P", "Mx", "Ct", "Tt","TC2y"],1) if good_comb(c)][13:end];
+#														[join(c,"+") for c=Combinatorics.powerset(["P", "Ct", "Tt","Mx", "TC2y"],1) if good_comb(c)];
+[join(c,"+") for c=Base.product(["P","Ct","Tt"],["Mx","TC2y"])][:];
 														"All"],
 
 #		preserved_symmetries = ["None", "P", "Mx", "Ct", "Tt", "All"],
@@ -90,6 +90,9 @@ input_checks  = Dict{Symbol,Any}(
 			nr_kPoints = (3,0),
 
 			kPoint_start = (1,2), 
+			
+			kMesh_model = (),
+
 
 
 
@@ -106,13 +109,15 @@ input_checks  = Dict{Symbol,Any}(
 
 		),
   
-	:observables => ["D110","D111","D113",
+	:observables => setdiff!([
+										"D110","D111","D113",
 									 "D48","D30","D123",
 									 "D125","D127","D127.1",
 									 "WannierGap",
 									 "WannierBands1",
 									 "WannierBands2",
 									 ],
+										obs_unocc),
 
 	
 )

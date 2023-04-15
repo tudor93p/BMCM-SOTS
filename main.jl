@@ -7,28 +7,67 @@ import myLibs: ComputeTasks, Utils
 import BMCMSOTS  
 
 
-include("input_file_10.jl")
+include("input_file_32.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
 				 init(BMCMSOTS,:WannierBands1),
 				 ];
+	
+
+prep_all = ComputeTasks.get_data_all_prep.(tasks, 
+													 shuffle=true, seed=4, 
+													 mute=false,
+#													 check_data=false,
+													 )
+
+function relevant_params(criterion::Function, vals::AbstractVector) 
+
+	length(vals)==1 && return vals 
+
+	A = map(criterion,vals)
+
+	return vals[filter!(!isnothing,[findfirst(A),findfirst(!,A)])]
+
+end   
+
+function relevant_params(::Val{:preserved_symmetries})
+
+	relevant_params(==("All"),
+									input_checks[:allparams][:preserved_symmetries] 
+									)
+end  
+
+relevant_params(::Val{:nr_kPoints})=[10] 
+
+function relevant_params(::Val{:kMesh_model})
+	
+	relevant_params(lowercase∘==("uniform"),
+									get(input_checks[:allparams],:kMesh_model,["Uniform"])
+									)
+end 
+
+relevant_params(k::Symbol)=[k=>v for v=relevant_params(Val(k))]
+
+#relevant_params(k::Vector{Symbol}) = map(relevant_params, k)
+
+relevant_params(k::Symbol...) = map(relevant_params, k)
 
 
 ComputeTasks.missing_data.(tasks,show_missing=false);
-error()
 
-for t in tasks 
 
-P, = ComputeTasks.get_first_paramcomb(t) 
+for (t,(active,a,k)) in zip(tasks,prep_all)
 
-for q in Base.product(((k=>v for v=input_checks[:allparams][k]) for k=[:kMesh_model, :preserved_symmetries])...)
+	active || continue 	
 
-	P1 = Utils.adapt_merge(P,q...,:nr_kPoints => 10)
+	P, = ComputeTasks.get_first_paramcomb(t) 
+
+	for q in Base.product(relevant_params(:kMesh_model, :preserved_symmetries, :nr_kPoints)...)
+
+		t.get_data(Utils.adapt_merge(P,q...); force_comp=true, mute=false)
 	
-	t.get_data(P1; force_comp=true, mute=false)
-
-end 
+	end 
 
 
 
@@ -61,11 +100,11 @@ if Dates.now()<t1
 end 
 
 
-ComputeTasks.get_data_all.(tasks, 
-													 shuffle=true, seed=4, 
-													 mute=false,
-#													 check_data=false,
-													 )
+for (t,(active,args,kwargs)) in zip(tasks,prep_all)
+
+	ComputeTasks.get_data_all(t, active, args...; kwargs...)
+
+end 
 
 
 

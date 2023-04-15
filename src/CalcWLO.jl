@@ -75,8 +75,6 @@ calc_observables = ["WannierBands1","WannierBands2"] # no "WannierGap"
 
 function adaptive_kMesh(P::UODict)::Bool 
 
-	#haskey(P, :kMesh_type) && lowercase(P[:kMesh_type]) == "adaptive"
-	
 	haskey(P,:kMesh_model) && lowercase(P[:kMesh_model])!="uniform"
 
 end 
