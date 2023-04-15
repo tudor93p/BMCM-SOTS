@@ -1231,6 +1231,16 @@ function line(x::AbstractVector{<:Real}, (a,b)::AbstractVector{<:Real}
 
 end 
 
+function line_intersection(
+													 (a1,b1)::AbstractVector{<:Real},
+													 (a2,b2)::AbstractVector{<:Real},
+						 )::Vector{Float64}
+	
+	x = (b2-b1)/(a1-a2)
+
+	return [x,a1*x+b1]
+	
+end 
 
 
 function fit_line_conv(xdata::AbstractVector{<:Real},

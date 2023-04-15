@@ -11,10 +11,10 @@ for fn in [
 
 #"symms",
 
-#"overlap_matmul",
+"overlap_matmul",
 #"wlos",
 
-"adaptive_cluster",
+#"adaptive_cluster",
 #"adaptive",
 #"ribbon",
 #

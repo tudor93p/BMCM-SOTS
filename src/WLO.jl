@@ -482,33 +482,18 @@ end
 
 
 
+function eigH!(uv::AbstractVector{<:AbstractArray},
+														psi::AbstractMatrix,
+														E::AbstractVector{<:Real};
+														kwargs...
+														)::Nothing 
 
-#function occupied_subspace!(u,
-#														k::AbstractVector, 
-#														H::Function, data...;
-#														kwargs...)::Nothing 
-#
-#	occupied_subspace!(u, H(k, data...); kwargs...)
-#
-#end  
-#
-#
-#
-#function occupied_subspace!(u,
-#														H::AbstractMatrix;
-#														kwargs...
-#														)::Nothing 
-#
-#	eig = LinearAlgebra.eigen(H)
-#
-#	occupied_subspace!(u, eig.vectors, eig.values; kwargs...)
-#end  
-#
-#
-#
-#
+	copy!.(uv, psien_sorted_energy(psi, E; kwargs...))
 
-												
+	return 
+
+end   
+
 
 function sortperm_energy(N::Int;
 												 halfspace::Bool=false,
@@ -534,21 +519,6 @@ function sortperm_energy(E::AbstractVector{<:Real};
 																				 halfspace=halfspace, kwargs...)
 												 )
 end 
-
-
-
-
-function eigH!(uv::AbstractVector{<:AbstractArray},
-														psi::AbstractMatrix,
-														E::AbstractVector{<:Real};
-														kwargs...
-														)::Nothing 
-
-	copy!.(uv, psien_sorted_energy(psi, E; kwargs...))
-
-	return 
-
-end   
 
 function psien_sorted_energy(
 													 psi::AbstractArray{ComplexF64,N},
@@ -731,7 +701,9 @@ end
 
 function check_nr_kPoints(n::Int)
 
-	@assert n>2 "Too few k points" 
+	@assert n>2 "Too few k points"  
+
+	return n 
 
 end 
 
@@ -1673,10 +1645,16 @@ end
 
 
 
-function matmulpairs!(data::AbstractArray{T,3},
-											 stop::Int=size(data,3)-1,
-											 N::Int=stop,
+function matmulpairs!(data::AbstractArray{T,3}, # overwritten 
+											 stop::Int 
 											)::AbstractMatrix{T} where T<:Number 
+
+#	stop = size(data,3)-1
+
+	N::Int = stop 
+
+	N>1 && @assert stop<size(data,3) "Extra space needed for storage" 
+
 
 	while N>1 
 
@@ -1794,20 +1772,36 @@ end
 
 
 
+# obsolete 
+#function wlo_from_mesh!(dst::AbstractMatrix{ComplexF64},
+#												IJ0::Union{AbstractVector{Int},Tuple{Int,Int}},
+#												dir::Int,
+#											 wfs::AbstractArray{ComplexF64,4},
+#											 n::Int,
+#											 overlaps::AbstractArray{ComplexF64,3},
+#											 )::Nothing 
+#
+#	copy!(dst, matmulpairs!(unitary_overlaps_on_mesh!(overlaps, n, dir, IJ0, wfs)))
+#
+#	return  
+#
+#######
 
-function wlo_from_mesh!(dst::AbstractMatrix{ComplexF64},
-												IJ0::Union{AbstractVector{Int},Tuple{Int,Int}},
-												dir::Int,
-											 wfs::AbstractArray{ComplexF64,4},
-											 n::Int,
-											 aux::AbstractArray{ComplexF64,3},
-											 )::Nothing 
 
-	copy!(dst, matmulpairs!(unitary_overlaps_on_mesh!(aux, n, dir, IJ0, wfs)))
+#wlo1_one_inplace!(
+#																overlaps
+#																wfs 
+#																dir, IJ0 
+#
+#	wlo_from_ov!(unitary_overlaps_on_mesh!(overlaps, 
+#																				 prep_args_uoom(args_uoom...)...,
+#																				 WFs), 
+#							 ov_aux,
+#							 )
 
-	return  
+#####
 
-end 
+#end 
 
 
 #===========================================================================#
@@ -1846,7 +1840,7 @@ Calculate the gap of W_dir1 for parameter k[dir2]=k2
 function calc_gap!(
 									 (Hdata,
 										(nk,k0),
-										(WF, overlaps), 
+										(WF, (overlaps,ov_aux)), 
 										(occupied,dir1),
 										),
 							k2::Float64
@@ -1858,7 +1852,7 @@ function calc_gap!(
 
 	WF_occ = psi_sorted_energy(WF; halfspace=true, occupied=occupied)
 
-	w1 = wlo1_one_inplace!(overlaps..., WF_occ)
+	w1 = wlo1_one_inplace!(overlaps, ov_aux, WF_occ)
 
 	return Wannier_min_gap(get_periodic_eigvals!(w1))
 
@@ -2214,27 +2208,33 @@ function loop_inds!(inds::AbstractVector{Int},
 
 end  
 
+function loop_inds(start::Int, nmesh::Int
+										)::AbstractVector{Int}
 
-#function wlo_from_ov!(
-#							dest::AbstractMatrix{ComplexF64},						# mod 
-#							args...,
-#							)::AbstractMatrix{ComplexF64}
-#
-#	copy!(dest, wlo_from_ov!(args...))
-#
-#end   
+	loop_inds!(init_storage(Int, nmesh), start, nmesh)
+
+end  
+
+
+
 
 function wlo_from_ov!(
 							overlaps::AbstractArray{ComplexF64,3},
 							ov_aux::AbstractArray{ComplexF64,3},		 		# mod
-							ov_inds::AbstractVector{Int},								# mod 
 							start::Int		
 							)::AbstractMatrix{ComplexF64}
 
-	wlo_from_ov!(#dest, 
-							 overlaps, ov_aux, loop_inds!(ov_inds, start))
+	wlo_from_ov!(overlaps, ov_aux, loop_inds(start,nr_kPoints_from_mesh1(overlaps)))
 
 end 
+#function wlo_from_ov!(
+#							overlaps::AbstractArray{ComplexF64,3},			# mod 
+#							start::Int		
+#							)::AbstractMatrix{ComplexF64}
+#
+#	wlo_from_ov!(overlaps, loop_inds(start,nr_kPoints_from_mesh1(overlaps)))
+#
+#end 
 
 function wlo_from_ov!(
 							overlaps::AbstractArray{ComplexF64,3},
@@ -2245,6 +2245,19 @@ function wlo_from_ov!(
 	matmulpairs!(ov_aux, overlaps, ov_inds...)
 
 end  
+
+
+
+#function wlo_from_ov!(
+#							overlaps::AbstractArray{ComplexF64,3}, 			# mod 
+#							ov_inds::AbstractVector{Int}...
+#							)::AbstractMatrix{ComplexF64}
+#
+#	matmulpairs!(overlaps, ov_inds...)
+#
+#end  
+
+
 
 
 #===========================================================================#
@@ -2259,63 +2272,111 @@ end
 
 
 
+prep_args_uoom() = () 
 
+function prep_args_uoom(dir::Int, k_perp::Int)
+
+	(dir, orderinds(dir,1,k_perp))
+
+end  
+
+
+"""Compute overlaps on a line and and multiply them"""
 function wlo1_one_inplace!(
-#													 			dest::AbstractMatrix{ComplexF64},					#
-																overlaps::AbstractArray{ComplexF64,3},		#
-																ov_aux::AbstractArray{ComplexF64,3},			#
-																ov_inds::AbstractVector{Int},							# 
+																overlaps::AbstractArray{ComplexF64,3},		# modif 
+																ov_aux::AbstractArray{ComplexF64,3},			# modif
 
-																Bloch_WFs::AbstractArray{ComplexF64,3},
-
-																start::Int=1,
+																WFs::AbstractArray{ComplexF64},
+																args_uoom::Int...
 
 																)::AbstractMatrix{ComplexF64}
 
-	wlo_from_ov!(#dest,
-							 unitary_overlaps_on_mesh!(overlaps, Bloch_WFs), ov_aux,
-							 ov_inds, start)
-
+	wlo_from_ov!(unitary_overlaps_on_mesh!(overlaps, 
+																				 prep_args_uoom(args_uoom...)...,
+																				 WFs), 
+							 ov_aux,
+							 )
 end 
 
 
 
 
+# time complexity O(N^2.5)
+#function wlo1_on_mesh1_inplace_2!(
+#																dest::AbstractArray{ComplexF64,N},				#
+#																overlaps::AbstractArray{ComplexF64,3},		#
+#																ov_aux::AbstractArray{ComplexF64,3},			#
+#
+#																WFs::AbstractArray{ComplexF64,N},
+#
+#																dir::Int=1, k_perp::Int...,
+#
+#																)::AbstractArray{ComplexF64,N} where N 
+#
+#	@assert 3<=N<=4 
+#
+#	unitary_overlaps_on_mesh!(overlaps, 
+##														prep_args_uoom(dir, k_perp...)
+#														dir, orderinds(dir,1,k_perp...),
+#														WFs)
+#	
+#
+## time complexity O(N^1.9), a bit worse for larger matrices 
+#	for m=1:nr_kPoints_from_mesh1(overlaps)-1
+#
+#		copy!(select_mesh_point(dest, orderinds(dir,m,k_perp...),), 
+#					wlo_from_ov!( overlaps, ov_aux, m),
+#					)
+#									
+#	end 
+#
+#	return dest 
+#
+#end 
+##
 
-
-
+# time complexity O(N^2)
 function wlo1_on_mesh1_inplace!(
 																dest::AbstractArray{ComplexF64,N},				#
 																overlaps::AbstractArray{ComplexF64,3},		#
 																ov_aux::AbstractArray{ComplexF64,3},			#
-																ov_inds::AbstractVector{Int},							# 
 
-																Bloch_WFs::AbstractArray{ComplexF64,N},
+																WFs::AbstractArray{ComplexF64,N},
 
-																dir::Int=1, k_perp::Int...,
+																dir::Int, k_perp::Int...,
 
 																)::AbstractArray{ComplexF64,N} where N 
 
 	@assert 3<=N<=4 
 
-	unitary_overlaps_on_mesh!(overlaps, 
-														dir, orderinds(dir,1,k_perp...),
-														Bloch_WFs)
 
-	for m=1:nr_kPoints_from_mesh1(overlaps)-1
+	copy!(select_mesh_point(dest, orderinds(dir,1,k_perp...),),
+				wlo1_one_inplace!(overlaps, ov_aux, WFs, dir, k_perp...
+													), # computes overlaps first 
+				)
 
-		copy!(
-#		wlo_from_ov!(
-								 select_mesh_point(dest, orderinds(dir,m,k_perp...),), 
-								 wlo_from_ov!(
-								 overlaps, ov_aux, ov_inds, m)
-								 )
+	# time complexity O(N^0.9), a bit worse for larger matrices
+	for m=2:nr_kPoints_from_mesh1(overlaps)-1
+
+		copy!(select_mesh_point(dest, orderinds(dir,m,k_perp...),), 
+						matmulpairs!(ov_aux,
+											 inv(selectdim(overlaps, 3, m-1)),
+											 select_mesh_point(dest, orderinds(dir,m-1,k_perp...)),
+											 selectdim(overlaps, 3, m-1)
+											 )
+					)
 									
 	end 
 
 	return dest 
 
 end 
+
+
+
+
+
+
 
 
 
@@ -2331,10 +2392,10 @@ end
 
 function init_overlaps_line(nwf::Int, nmesh::Int)::Vector{Array}
 	
-	[
+	Array[
 	 init_storage(ComplexF64, (nwf,nwf), nmesh),
 	 init_storage(ComplexF64, (nwf,nwf), nmesh),
-	 init_storage(Int, nmesh),
+#	 init_storage(Int, nmesh),
 	 ]
 
 end 
@@ -2343,12 +2404,24 @@ end
 function init_overlaps_line(wfs::AbstractArray{ComplexF64,3},
 											 )::Vector{Array} 
 
-	init_overlaps_line(wfs,1)
+	init_overlaps_line(1,wfs)
 
 end  
 
-function init_overlaps_line(wfs::AbstractArray{ComplexF64,N},
-														dir::Int
+function init_overlaps_line(
+														wfs::AbstractArray{ComplexF64,N},
+														nmesh::Int,
+											 )::Vector{Array} where N 
+
+	@assert 3<=N<=4 
+
+	init_overlaps_line(size(wfs,2), check_nr_kPoints(nmesh))
+
+end 
+
+function init_overlaps_line(
+														dir::Int,
+														wfs::AbstractArray{ComplexF64,N},
 											 )::Vector{Array} where N 
 
 	@assert 3<=N<=4
@@ -2367,12 +2440,22 @@ function init_wlo_mesh(nwf::Int, nmesh::Vararg{Int,N}
 
 end 
 
-function init_wlo_mesh(wfs::AbstractArray{ComplexF64,3}
+function init_wlo_mesh(wfs::AbstractArray{ComplexF64,3},
+											 nmesh::Int= nr_kPoints_from_mesh1(wfs),
 											)::Array{ComplexF64,3}
 
-	init_wlo_mesh(size(wfs,2), nr_kPoints_from_mesh1(wfs))
+	init_wlo_mesh(size(wfs,2), nmesh)
 
-end 
+end  
+
+function init_wlo_mesh(wfs::AbstractArray{ComplexF64,4},
+											 nmesh::Int
+											 )::Array{ComplexF64,4}
+
+	init_wlo_mesh(size(wfs,2), nmesh, nmesh)
+
+end  
+
 function init_wlo_mesh(dir::Int,
 											 wfs::AbstractArray{ComplexF64,4}
 											)::Array{ComplexF64,4}
@@ -2416,7 +2499,7 @@ function wlo1_on_mesh_inplace(dir1::Int,
 
 	dest = init_wlo_mesh(dir1, Bloch_WFs)
 
-	overlaps = init_overlaps_line(Bloch_WFs, dir1)
+	overlaps = init_overlaps_line(dir1, Bloch_WFs)
 
 	for k2=1:nr_kPoints_from_mesh(Bloch_WFs, 3-dir1)-1
 															# each perpendicular momentum -> parameter 
