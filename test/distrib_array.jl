@@ -112,6 +112,25 @@ P = (braiding_time = 0.25,
 		 perturb_strength = 0.3,
 		 )
 
+@everywhere function H(ij::NTuple{2,Int},
+						kpoint::Function,#Union{Function,<:AbstractArray{<:Real,4}},
+						perturb::AbstractArray{<:Number,4},
+					 )::Matrix{ComplexF64}
+
+	H(kpoint(ij), view(perturb,:,:,ij...))
+
+end 
+
+@everywhere function H(k::AbstractVector{<:Real}, 
+											 pert::AbstractMatrix{<:Number}
+											 )
+	a = H(k) 
+	
+	a += LinearAlgebra.Hermitian(pert)  
+
+	return a 
+
+end 
 
 @everywhere function H((kx,ky)::AbstractVector{<:Real})
 
@@ -122,6 +141,8 @@ P = (braiding_time = 0.25,
 	LinearAlgebra.Hermitian(intra+cis(kx)*inter_x+cis(ky)*inter_y)
 
 end 
+
+
 
 pmap(H,eachcol(rand(2,10)))
 
@@ -147,10 +168,19 @@ end
 
 psi1 = WLO.psiH_on_mesh(50, 0 , H) 
 psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true) 
+pert = (rand(ComplexF64,size(psi1)),) 
+#pert = ()
 
-@time "psi no distr" psi1 = WLO.psiH_on_mesh(100, 0 , H) 
-@time "psi distr" psi2 = WLO.psiH_on_mesh(100, 0 ,H; parallel=true)
 
+psi1 = WLO.psiH_on_mesh(50, 0, pert..., H) 
+psi2 = WLO.psiH_on_mesh(50, 0, pert..., H; parallel=true) 
+
+
+
+#
+#@time "psi no distr" psi1 = WLO.psiH_on_mesh(100, 0 , H) 
+#@time "psi distr" psi2 = WLO.psiH_on_mesh(100, 0 ,H; parallel=true)
+#
 @testset "psi==psi_distr" begin 
 
 	@test psi2 isa Array  

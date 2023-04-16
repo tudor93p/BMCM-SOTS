@@ -414,11 +414,19 @@ function init_eigH(k::AbstractVector, H::Function, data...; kwargs...)
 
 end 
 
+function init_eigH(ij::NTuple{2,Int},
+									 H::Function, kij::Function, 
+									 perturb::AbstractArray{ComplexF64,4}, Hdata...; kwargs...)
+
+	init_eigH(select_mesh_point(perturb,ij); kwargs...)
+
+end 
+
+
 
 function init_eigH(ij_to_arg::Function, data...; kwargs...) 
 
 	init_eigH(ij_to_arg(1,1), data...; kwargs...)
-#	get_one_wrapper(init_eigH, ij_to_arg, 1, 1, data...; kwargs...)
 
 end 
 
@@ -505,6 +513,7 @@ function eigH!(storage::AbstractArray,
 							 H::Function,
 							 #ij::NTuple{2,Int}, get_k::Function, perturb::AbstractArray{ComplexF64,4},
 							 Hdata...; kwargs...)::Nothing 
+#	eigH!(d_ij,(i,j),...)
 
 	eigH!!(storage, H(ij_or_k, Hdata...); kwargs...) 
 
@@ -534,6 +543,7 @@ end
 
 function eigH!!(storage::AbstractArray, H::AbstractMatrix; kwargs...
 							 )::Nothing 
+
 
 	eig = LinearAlgebra.eigen!(H)
 
@@ -1094,6 +1104,7 @@ end
 
 
 
+
 function get_one_wrapper!(storage::AbstractArray,
 													get_one!::Function,
 													ij_to_arg::Function,
@@ -1215,6 +1226,7 @@ function store_on_mesh1(get_one::Function,
 												)
 
 	dest = init_storage1(get_one(source(1),data...; kwargs...), n)
+
 
 	store_on_mesh1!(get_one, n, source, dest, data...; kwargs...)
 
@@ -1521,7 +1533,6 @@ end
 
 function store_on_mesh_one!!(
 							get_one!::Function, 
-				#			i_source::Int, j_source::Int, # old method 
 							source,
 							i::Int, j::Int,
 							dest::Union{<:SubOrArray{<:Number},
@@ -2102,14 +2113,6 @@ function psiH_on_mesh1(n::Int, k0::Real,
 											 H::Function, Hdata...; kwargs...
 											)::Array{ComplexF64,3}
 
-#	kij = get_kij(n,k0)  
-#
-#
-#	Bloch_WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
-#
-#
-#	store_on_mesh!!(eigH!, tuple, Bloch_WFs, H, kij, perturb, Hdata...; kwargs...) 
-###
 	kij = get_kij(n,k0)  
 
 	Bloch_WFs = init_storage1(init_eigH(kij(1), H, Hdata...; kwargs...)[1], n; 
@@ -2146,14 +2149,11 @@ function psiH_on_mesh(n::Int,
 											H::Function, Hdata...; kwargs...
 											)::Array{ComplexF64,4}
 
-
-	WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
-
-
-	store_on_mesh!!(eigH!, tuple, WFs, H, kij, perturb, Hdata...; kwargs...) 
+	store_on_mesh(first∘init_eigH, eigH!, 
+								n, tuple, H, kij, perturb, Hdata...; kwargs...)
 
 ##
-#	store_on_mesh!!(eigH!, source=tuple, dest=WFs,  rest...)
+#	store_on_mesh!!(eigH!, n, source=tuple, dest=WFs,  rest...)
 #	rest= (H,kij,perturb,Hdata...)
 #	Hdata = (bs,pert_strength)
 #
@@ -2171,9 +2171,6 @@ function psiH_on_mesh(n::Int,
 # H(ij, kij, perturb, bs, pert_strength)
 #
 ##
-
-	return WFs 
-
 end 
 
 
@@ -3747,11 +3744,9 @@ function get_wlo_data_mesh(psiH::SubOrArray{ComplexF64,4},
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
-	
 	w1 = wlo1_on_mesh_inplace(dir1, psi; kwargs...)
 
 	eigW1 = Wannier_subspaces_on_mesh!(w1; dir=dir1, kwargs...)
-
 
 	if get_wlo2 
 
