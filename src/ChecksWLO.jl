@@ -1106,7 +1106,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	symms = preserved_symmetries(P)
 	parallel=false#nprocs()>=4
 	parallel2=false# nprocs()>=4
-	parallel3=nworkers()>=4
+	parallel3=nworkers()>=3
 
 
 

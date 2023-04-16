@@ -1415,8 +1415,6 @@ function store_on_mesh!!(get_one!::Function,
 
 		@spawnat p begin   
 
-			@show p 
-
 			store_on_mesh!!(get_one!, 
 											map(findall_indexin, get_big_inds(dest), inds),
 											localpart_(source,dest),
@@ -2739,8 +2737,6 @@ function wlo1_on_mesh_inplace!(
 	map(procs(dest)) do p
 
 		@spawnat p begin      
-
-			@show p 
 
 			wlo1_on_mesh_inplace!(
 											localpart(dest),
