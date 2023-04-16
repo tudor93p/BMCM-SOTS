@@ -1167,7 +1167,7 @@ function init_storage(T::DataType,
 	
 	@assert 1<=distr_axis<=Nn
 
-	w = workers()
+	w = workers()[1:min(end,array_size[Ns+distr_axis])]
 
 	d = setindex!(ones(Int, Ns+Nn), length(w), Ns+distr_axis)
 

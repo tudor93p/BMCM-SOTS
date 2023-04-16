@@ -38,11 +38,11 @@ function relevant_params(::Val{:preserved_symmetries})
 									)
 end  
 
-relevant_params(::Val{:nr_kPoints})=[10] 
+relevant_params(::Val{:nr_kPoints})=[5] 
 
 function relevant_params(::Val{:kMesh_model})
 	
-	relevant_params(lowercase∘==("uniform"),
+	relevant_params(==("uniform")∘lowercase,
 									get(input_checks[:allparams],:kMesh_model,["Uniform"])
 									)
 end 
