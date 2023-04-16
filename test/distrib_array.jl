@@ -124,26 +124,6 @@ end
 
 pmap(H,eachcol(rand(2,10)))
 
-
-psi1 = WLO.psiH_on_mesh(50, 0 , H) 
-psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true) 
-
-@time "no distr" psi1 = WLO.psiH_on_mesh(1000, 0 , H) 
-@time "distr" psi2 = WLO.psiH_on_mesh(1000, 0 ,H; parallel=true)
-
-@testset "psi=psi distr" begin 
-
-	@test psi2 isa DArray  
-	@test psi1 isa Array 
-#	@show LinearAlgebra.norm(psi1)
-#	@show LinearAlgebra.norm(psi2)
-
-	@test LinearAlgebra.norm(psi1-psi2) <1e-10 
-
-
-end 
-
-
 @testset "findall indexin" begin 
 
 	for n= 10:10:100
@@ -164,8 +144,59 @@ end
 end 
 
 
+psi1 = WLO.psiH_on_mesh(50, 0 , H) 
+psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true) 
+
+#@time "psi no distr" psi1 = WLO.psiH_on_mesh(1000, 0 , H) 
+#@time "psi distr" psi2 = WLO.psiH_on_mesh(1000, 0 ,H; parallel=true)
+
+@testset "psi==psi_distr" begin 
+
+	@test psi2 isa Array  
+	@test psi1 isa Array 
+#	@show LinearAlgebra.norm(psi1)
+#	@show LinearAlgebra.norm(psi2)
+
+	@test LinearAlgebra.norm(psi1-psi2) <1e-10 
 
 
+end 
+
+println() 
+
+eigW1_single, wcc2_single  = WLO.get_wlo_data_mesh(psi1, true, 2, false)
+@show LinearAlgebra.norm.(eigW1_single)
+@show LinearAlgebra.norm.(wcc2_single)
+
+eigW1_multi, wcc2_multi = WLO.get_wlo_data_mesh(psi1, true, 2, false; parallel=true)
+@show LinearAlgebra.norm.(eigW1_multi)
+@show LinearAlgebra.norm.(wcc2_multi)
+
+
+
+#@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, false)
+#@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi1, true, 2, false; parallel=true)
+
+@testset "wlo==wlo_distr" begin 
+
+#	@test w1_multi isa Array  
+#	@test w1_single isa Array 
+
+	@test LinearAlgebra.norm(w1_single-w1_multi) <1e-10 
+
+	for (s,m) in zip(eigW1_single,eigW1_multi)
+
+		@test LinearAlgebra.norm(s-m) <1e-10  
+
+	end 
+
+	for (s,m) in zip(wcc2_single,wcc2_multi)
+
+		@test LinearAlgebra.norm(s-m) <1e-10  
+
+	end 
+
+end 
 
 
 
