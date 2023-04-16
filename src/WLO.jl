@@ -4,7 +4,7 @@ module WLO
 import LinearAlgebra, Statistics 
 import DistributedArrays 
 using DistributedArrays: 	localindices,localpart,
-													@spawnat,
+													@spawnat, #myid,
 													workers,nworkers,procs,
 													DArray, SubOrDArray,
 													dzeros 
@@ -1415,6 +1415,8 @@ function store_on_mesh!!(get_one!::Function,
 
 		@spawnat p begin   
 
+			@show p 
+
 			store_on_mesh!!(get_one!, 
 											map(findall_indexin, get_big_inds(dest), inds),
 											localpart_(source,dest),
@@ -2736,7 +2738,9 @@ function wlo1_on_mesh_inplace!(
 
 	map(procs(dest)) do p
 
-		@spawnat p begin     
+		@spawnat p begin      
+
+			@show p 
 
 			wlo1_on_mesh_inplace!(
 											localpart(dest),
@@ -3008,7 +3012,7 @@ end
 function Wannier_subspaces_on_mesh!(W::SubOrDArray{ComplexF64,4};
 																		dir::Int,
 																		parallel::Bool=true 
-																	 )::Vector{DArray}
+																	 )::Vector{Array}
 
 	@assert parallel 
 
@@ -3111,8 +3115,9 @@ end
 function wcc2mesh_fromSubspaces1(dir2::Int,
 																 data_dir1::AbstractVector{<:AbstractArray},
 																psiH::AbstractArray{<:Number,4};
+																distr_axis::Int=3-dir2,
 																kwargs...
-																)#::Vector{Array{Float64,3}}
+																)::Vector{Array{Float64,3}}
 
 	map([1,3]) do sector  
 
@@ -3123,7 +3128,9 @@ function wcc2mesh_fromSubspaces1(dir2::Int,
 
 		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
 												 nr_kPoints_from_mesh(psiH),
-												 w2; kwargs...)
+												 w2; 
+											distr_axis=3-dir2,
+												 kwargs...)
 
 
 	end 
@@ -3135,7 +3142,7 @@ function wcc2mesh_fromSubspaces1(dir2::Int,
 																 data_dir12::AbstractVector{<:AbstractVector{<:AbstractArray} },
 																psiH::AbstractArray{<:Number,4};
 																kwargs...
-																)#::Vector{Array{Float64,3}}
+																)::Vector{Array{Float64,3}}
 
 
 	wcc2mesh_fromSubspaces1(dir2, data_dir12[3-dir2], psiH; kwargs...)
@@ -3153,7 +3160,7 @@ end
 
 	
 function wlo2_on_mesh(dir2::Int, data...; 
-											dir::Int=dir2,
+											distr_axis::Int=3-dir2,
 											kwargs...
 										 )#::Array{ComplexF64,4}
 
@@ -3711,6 +3718,7 @@ function get_wlo_data_mesh1(psiH::AbstractArray{ComplexF64,3},
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
+
 	W1 = wlo1_on_mesh1_inplace(psi)
 
 #	@assert select_mesh_point(W1,1)≈wlo1_from_mesh1(psi)
@@ -3750,9 +3758,7 @@ function get_wlo_data_mesh(psiH::SubOrArray{ComplexF64,4},
 
 	if get_wlo2 
 
-		eigW1_ = convert(Vector{Array}, eigW1) 
-
-		return (eigW1_, wcc2mesh_fromSubspaces1(3-dir1, eigW1_, psi; kwargs...))
+		return (eigW1, wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi; kwargs...))
 
 	else 
 

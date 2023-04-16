@@ -220,10 +220,12 @@ end
 function get_data_onedir_occ(psiH::AbstractArray{ComplexF64,4}, 
 									results::AbstractDict,
 									dir1::Int;
+									kwargs...
 									) 
 	
 	WLO.get_wlo_data_mesh(psiH, true, dir1, 
-												any(in(keys(results)), obs_batch_2)
+												any(in(keys(results)), obs_batch_2);
+												kwargs...
 												)
 
 end 
@@ -256,7 +258,6 @@ function getset_results!(results::AbstractDict,
 												 trial::Int, i_ps::Int; 
 																		verbose::Bool=false,
 												kwargs_gd...)
-	error() 
 
 	verbose && expected_time(nk, 2, 2) 
 	
@@ -274,16 +275,18 @@ function getset_results_onedir_occ!(results::AbstractDict,
 																		verbose::Bool=false,
 																		kwargs_gd...)
 	
-	isempty(kwargs_gd)||@warn "Ignored: $kwargs_gd"
+#	isempty(kwargs_gd)||@warn "Ignored: $kwargs_gd"
 
 
 	verbose && expected_time(nk, 1, 1)
 
+
 	data1o = if verbose 
-		@time "data1o"	get_data_onedir_occ(psi, results, dir1)
+		@time "data1o"	get_data_onedir_occ(psi, results, dir1; kwargs_gd...)
 	else 
-		get_data_onedir_occ(psi, results, dir1)
+		get_data_onedir_occ(psi, results, dir1; kwargs_gd...)
 	end 
+
 
 	set_results_onedir!(results, nk, k0_, trial, i_ps, dir1, data1o, data1o) 
 
@@ -1102,7 +1105,8 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	k0_ = kPoint_start(P)
 	symms = preserved_symmetries(P)
 	parallel=false#nprocs()>=4
-	parallel2=nprocs()>=4
+	parallel2=false# nprocs()>=4
+	parallel3=nworkers()>=4
 
 
 
@@ -1118,13 +1122,15 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------ no perturbation --------- #
 
-	psi = MODEL.get_psiH(P, nk, k0_or_kxy)
+	psi = MODEL.get_psiH(P, nk, k0_or_kxy; parallel=parallel3)
+
 
 	if light_calc
 		
 		(parallel|parallel2) && @warn "Nothing to parallelize"
 
-		getset_results_onedir_occ!(results, psi, 1, nk, k0_, 1, s1)#verbose=true)
+		getset_results_onedir_occ!(results, psi, 1, nk, k0_, 1, s1;
+															 parallel=parallel3)#verbose=true)
 		#		getset_results_onedir_occ!(results, psi, 2, nk, k0_, 1, s1; verbose=true)
 
 	else 
@@ -1163,6 +1169,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	if parallel #---- parallel evaluation ---#
 
 		@assert !light_calc "Not implemented"
+		@assert !parallel3 "Not implemented"
 
 		data_all = pmap(Iterators.product(trials,rest_strengths)) do pert
 
@@ -1184,16 +1191,19 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				psi = MODEL.get_psiH(P, nk, k0_or_kxy, perturb0, ps)
+				psi = MODEL.get_psiH(P, nk, k0_or_kxy, perturb0, ps;
+														 parallel=parallel3)
 			
 				if light_calc 
 					parallel2 && @warn "Nothing to parallelize"
 
-					getset_results_onedir_occ!(results, psi, 1, nk, k0_, j, i) 
+					getset_results_onedir_occ!(results, psi, 1, nk, k0_, j, i;
+																		parallel=parallel3)
 
 	#				getset_results_onedir_occ!(results, psi, 2, nk, k0_, j, i)
 	
 				else 
+					@warn "parallel3 not used"
 					getset_results!(results, psi, nk, k0_, j, i; parallel=parallel2)
 				end 
 

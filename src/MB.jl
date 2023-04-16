@@ -440,7 +440,7 @@ function get_psiH(MBparams::Union{<:UODict, <:AbstractVector{<:Real}},
 #									atol::Float64=1e-12
 								 )::Array{ComplexF64,4}
 
-	WLO.psiH_on_mesh(n, k, get_args_psi(MBparams, args...; kwargs...)...)
+	WLO.psiH_on_mesh(n, k, get_args_psi(MBparams, args...)...; kwargs...)
 
 end  
 
@@ -451,7 +451,7 @@ function get_enpsiH(MBparams::Union{<:UODict,AbstractVector{<:Real}},
 	#								atol::Float64=1e-12
 									)::Vector{Array} #{ComplexF64,4}
 
-	WLO.enpsiH_on_mesh(n, k0, get_args_psi(MBparams, args...; kwargs...)...)
+	WLO.enpsiH_on_mesh(n, k0, get_args_psi(MBparams, args...)...; kwargs...)
 
 end 
 

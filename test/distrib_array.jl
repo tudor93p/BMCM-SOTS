@@ -1,7 +1,7 @@
 using Distributed 
 @everywhere using DistributedArrays 
 @everywhere import LinearAlgebra 
-import BMCMSOTS: WLO 
+import BMCMSOTS: WLO , ChecksWLO 
 
 import Random 
 
@@ -98,19 +98,6 @@ import Random
 
 
 
-P = (braiding_time = 0.25, 
-		 s0_Hamilt = 0.1, 
-		 s_Hamilt = 1.0, 
-		 b_Hamilt = 1, 
-		 nr_kPoints = 15, 
-		 kMesh_model = "Line", 
-		 kPoint_start = -1, 
-		 preserved_symmetries = "All", 
-		 nr_perturb_strength = 11, 
-		 max_perturb_strength = 0.6, 
-		 nr_perturb_instances = 1, 
-		 perturb_strength = 0.3,
-		 )
 
 @everywhere function H(ij::NTuple{2,Int},
 						kpoint::Function,#Union{Function,<:AbstractArray{<:Real,4}},
@@ -231,5 +218,26 @@ end
 
 
 
+
+
+P = (braiding_time = 0.25, 
+		 s0_Hamilt = 0.1, 
+		 s_Hamilt = 1.0, 
+		 b_Hamilt = 1, 
+		 nr_kPoints = 10, 
+		 kMesh_model = "Line", 
+		 kPoint_start = -1, 
+		 preserved_symmetries = "All", 
+		 nr_perturb_strength = 11, 
+		 max_perturb_strength = 0.6, 
+		 nr_perturb_instances = 1, 
+		 perturb_strength = 0.3,
+		 ) 
+
+
+
+obs=["D48"]
+
+@time data1 = ChecksWLO.Compute_(P, obs; observables=obs) 
 
 
