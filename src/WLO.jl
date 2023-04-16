@@ -67,18 +67,35 @@ function same_mesh_distrib(A::SubOrDArray,
 	return true 
 
 end  
+	
+function same_mesh_distrib(arrays::AbstractVector{<:SubOrDArray}
+													 )::Bool
 
+	for i=2:length(arrays)
+		same_mesh_distrib(arrays[1],arrays[i]) || return false 
+	end  
 
-#findall_indexin = Base.Fix1(findall, !isnothing)∘indexin 
+	return true 
+
+end 
 
 
 function findall_indexin(a::AbstractVector, b::AbstractVector
 													 )::AbstractVector{Int} 
 
+	(isempty(a)|isempty(b)) && return Int[]
+
 	I = indexin(a,b) 
 
-	i1 = findfirst(!isnothing, I)
+	i1 = findfirst(!isnothing, I) 
+
+	isnothing(i1) && return Int[]
+
 	i2 = findlast(!isnothing, I)
+
+
+	isnothing(i2) && return Int[]
+
 
 	return all(!isnothing, view(I,i1+1:i2-1)) ? (i1:i2) : findall(!isnothing, I)
 
@@ -984,6 +1001,8 @@ function select_mesh_point(data::AbstractArray{T,M},
 
 end
 
+
+
 function select_mesh_point(data::AbstractArray{T,M},
 													 k1::Int,
 													 dir1::Int,
@@ -997,9 +1016,9 @@ function select_mesh_point(data::AbstractArray{T,M},
 end   
 
 function select_mesh_point(data::AbstractArray{T,M},
-													 i::Int,
-													 j::Int,
-													 )::AbstractArray{T,M-2} where {T<:Number,M}
+													 i::Union{Int,<:AbstractVector{Int}},
+													 j::Union{Int,<:AbstractVector{Int}},
+													 )::AbstractArray{T} where {T<:Number,M}
 
 	selectdim(selectdim(data,M,j),M-1,i)
 
@@ -1024,12 +1043,8 @@ end
 
 
 function select_mesh_point(
-							data::Union{
-													<:AbstractVector{<:SubOrArray},
-													<:Tuple{Vararg{<:SubOrArray}},
-													},
-													 args...
-													 )::AbstractArray{<:AbstractArray}
+							data::AbstractVector{<:SubOrArray}, args...
+													 )::Vector{<:AbstractArray}
 	
 	[select_mesh_point(d,args...) for d in data]
 
@@ -1049,7 +1064,7 @@ end
 function get_one_wrapper(get_one::Function,
 												 data::Union{<:AbstractArray{<:Number},
 																		 <:AbstractArray{<:AbstractArray},
-																		 <:Tuple{Vararg{<:AbstractArray}}},
+																		 },
 												 i::Int, 
 												 j::Int,
 												 data_...;
@@ -1095,7 +1110,6 @@ end
 function get_one_wrapper!(storage::AbstractArray,
 													get_one!::Function,
 												data::Union{<:SubOrArray{<:Number},
-																		<:Tuple{Vararg{<:SubOrArray}},
 																		<:AbstractVector{<:SubOrArray},
 																		},
 												 i::Int, 
@@ -1167,16 +1181,14 @@ function init_storage(item1::AbstractArray{T,N}, n::Int; kwargs...
 
 end 
 
-function init_storage1(item1::Union{Tuple{Vararg{<:AbstractArray}},
-																	 AbstractVector{<:AbstractArray}},
+function init_storage1(item1::AbstractVector{<:AbstractArray},
 											args...; kwargs...)::Vector
 
 	[init_storage1(it, args...; kwargs...) for it in item1]
 
 end 
 
-function init_storage(item1::Union{Tuple{Vararg{<:AbstractArray}},
-																	 AbstractVector{<:AbstractArray}},
+function init_storage(item1::AbstractVector{<:AbstractArray},
 											args...; kwargs...)::Vector
 
 	[init_storage(it, args...; kwargs...) for it in item1]
@@ -1188,7 +1200,7 @@ function store_on_mesh(get_one::Function,
 												source::AbstractArray{<:Number},
 											 data...; kwargs...
 												)
-
+	error()
 
 	store_on_mesh(get_one, nr_kPoints_from_mesh(source), source, data...;
 								kwargs...)
@@ -1220,6 +1232,8 @@ function store_on_mesh(get_one::Function,
 											 kwargs...
 												)
 
+	error() 
+
 	dest = init_storage(get_one_wrapper(get_one, source, 1,1, data...; 
 																				 kwargs...), n) 
 
@@ -1229,20 +1243,34 @@ function store_on_mesh(get_one::Function,
 	return dest
 
 end  
+function store_on_mesh(get_one::Function, get_one!::Function,
+											 n::Int,
+											 source,
+											 data...;
+											 kwargs...
+											)
+
+	dest = init_storage(get_one_wrapper(get_one, source, 1,1, data...),
+											n; kwargs...)
+
+	store_on_mesh!!(get_one!, n, source, dest, data...)
+
+	return dest
+
+end  
 
 
 
 
-function store_on_mesh!(get_one::Function, 
-												source::Union{Function, AbstractArray{<:Number},
-																		NTuple{N, <:AbstractArray} where N,
+function store_on_mesh(get_one::Function, get_one!::Function,
+												source::Union{<:SubOrArray{<:Number},
+																			<:AbstractVector{<:SubOrArray},
 																		},
-												dest::AbstractArray,
 												data...; kwargs...
-												)::Nothing  
+												)::AbstractArray 
 
-	store_on_mesh!(get_one, nr_kPoints_from_mesh(dest), 
-								 source, dest, data...; kwargs...)
+	store_on_mesh(get_one, get_one!, nr_kPoints_from_mesh(source),
+								source, data...; kwargs...)
 
 end 
 
@@ -1255,11 +1283,11 @@ function store_on_mesh!(get_one::Function,
 												data...; kwargs...
 												)::Nothing 
 
-	for j=1:n-1, i=1:n-1
-
-		store_on_mesh_one!(get_one, source, i, j, dest, data...; kwargs...)
-
-	end 
+#	for j=1:n-1, i=1:n-1
+#
+#		store_on_mesh_one!(get_one, source, i, j, dest, data...; kwargs...)
+#
+#	end 
 
 	return 
 
@@ -1289,7 +1317,6 @@ end
 
 function store_on_mesh!!(get_one!::Function, 
 												source::Union{<:SubOrArray{<:Number},
-																			<:Tuple{Vararg{<:SubOrArray}},
 																			<:AbstractVector{<:SubOrArray},
 																		},
 												dest::AbstractArray=source,
@@ -1313,26 +1340,28 @@ function store_on_mesh!!(get_one!::Function, n::Int, args...;
 
 end 
 
+#function store_on_mesh!!(get_one!::Function, 
+#												 inds::Tuple{<:AbstractVector{Int},
+#																		 <:AbstractVector{Int}},
+#												 source,
+#												dest::Union{<:SubOrArray{<:Number},
+#																		<:AbstractVector{<:SubOrArray},
+#																		},
+#												data...; 
+#												kwargs...
+#												)::Nothing  
+#
+#	store_on_mesh!!(get_one!, (), inds, source, dest, data...; kwargs...) 
+#
+#end   
+
 function store_on_mesh!!(get_one!::Function, 
 												 inds::Tuple{<:AbstractVector{Int},
 																		 <:AbstractVector{Int}},
-												 source,
-												dest::Union{<:SubOrArray{<:Number},
-																		<:AbstractVector{<:SubOrArray},
+												source::Union{<:Function, 
+																			<:SubOrArray{<:Number},
+																			<:AbstractVector{<:SubOrArray},
 																		},
-												data...; 
-												kwargs...
-												)::Nothing  
-
-	store_on_mesh!!(get_one!, (), inds, source, dest, data...; kwargs...) 
-
-end   
-
-function store_on_mesh!!(get_one!::Function, 
-												 big_inds::Tuple{Vararg{<:AbstractVector{Int}}},
-												 inds::Tuple{<:AbstractVector{Int},
-																		 <:AbstractVector{Int}},
-												 source,
 												dest::Union{<:SubOrArray{<:Number},
 																		<:AbstractVector{<:SubOrArray},
 																		},
@@ -1343,15 +1372,14 @@ function store_on_mesh!!(get_one!::Function,
 
 	for j=inds[2], i=inds[1]
 
-		store_on_mesh_one!!(get_one!, 
-												big_inds..., source, 
-												i, j, dest, data...; kwargs...)
+		store_on_mesh_one!!(get_one!, source, i, j, dest, data...; kwargs...)
 
 	end 
 
 	return 
 
 end   
+
 
 
 
@@ -1360,69 +1388,29 @@ function store_on_mesh!!(get_one!::Function,
 												 inds::Tuple{<:AbstractVector{Int},
 																		 <:AbstractVector{Int}},
 												source::Union{<:Function, 
-																			<:SubOrArray{<:Number},
-																			<:Tuple{Vararg{<:SubOrArray}},
-																			<:AbstractVector{<:SubOrArray},
+																			<:AbstractArray{<:Number},
+																			<:AbstractVector{<:AbstractArray},
 																		},
-												dest::SubOrDArray{<:Number},
-												data...; # assumes data is read-only 
-												kwargs...
-												)::Nothing 
-	
-
-	map(procs(dest)) do p
-
-		@spawnat p begin   
-
-			I,J = big_inds = Tuple(select_mesh_dir(localindices(dest),d) for d=1:2)
-
-			store_on_mesh!!(get_one!, big_inds,
-											map(findall_indexin, big_inds, inds),
-										source, 
-										localpart(dest), data...;
-										kwargs...)
-
-
-		end  
-
-	end .|> fetch 
-
-	return 
-
-end   
-
-
-function store_on_mesh!!(get_one!::Function, 
-												 inds::Tuple{<:AbstractVector{Int},
-																		 <:AbstractVector{Int}},
-												 source::AbstractVector{<:SubOrDArray},
-												 dest::AbstractVector{<:SubOrDArray},
+												 dest::Union{<:AbstractVector{<:SubOrDArray},
+																		 SubOrDArray{<:Number},
+																		 },
 												 # both source and dest may be overwritten
 												data...; # assumes data is read-only 
 												kwargs...
 												)::Nothing 
 
-	for s in source, d in dest 
-		@assert same_mesh_distrib(s,d) 
-	end 
-
-	map(procs(dest[1])) do p
+	map(procs(eltype(dest)<:AbstractArray ? dest[1] : dest)) do p
 
 		@spawnat p begin   
 
-
-			big_inds = Tuple(select_mesh_dir(localindices(dest[1]),d) for d=1:2)
-
 			store_on_mesh!!(get_one!, 
-											map(findall_indexin, big_inds, inds), # both src+dst
-											localpart.(source),
-											localpart.(dest),
+											map(findall_indexin, get_big_inds(dest), inds),
+											localpart_(source,dest),
+											localpart_(dest),
 										data...;
 										kwargs...)
 
-#one!!(get_one, i,j, src, i, j, dest, data...; kwargs...)
-#wrapper(dest_ij, get_one!, src, i, j, data...) 
-#get_one!(dest_ij, src_ij, data...) 
+#eventually: get_one!(dest_ij, src_ij, data...) 
 
 		end  
 
@@ -1431,12 +1419,6 @@ function store_on_mesh!!(get_one!::Function,
 	return 
 
 end   
-
-
-
-
-
-
 
 
 
@@ -1539,38 +1521,38 @@ end
 
 function store_on_mesh_one!!(
 							get_one!::Function, 
-							i_source::Int, j_source::Int,
+				#			i_source::Int, j_source::Int, # old method 
 							source,
-							i_dest::Int, j_dest::Int,
+							i::Int, j::Int,
 							dest::Union{<:SubOrArray{<:Number},
 													<:AbstractVector{<:SubOrArray},
 													},
 							data...; kwargs...
 												)::Nothing 
 	
-	get_one_wrapper!(select_mesh_point(dest, i_dest, j_dest),
+	get_one_wrapper!(select_mesh_point(dest, i, j),
 									 get_one!, 
-									 source, i_source, j_source, 
+									 source, i, j, 
 									 data...; kwargs...)
 
 	return 
 
 end  
 
-function store_on_mesh_one!!(
-							get_one!::Function, 
-							I_source::AbstractVector{Int}, J_source::AbstractVector{Int},
-							source,
-							i::Int, j::Int,
-							args...; kwargs...
-												)::Nothing
-
-	store_on_mesh_one!!(get_one!, 
-											I_source[i], J_source[j], source, 
-											i, j, args...; 
-											kwargs...)
-
-end  
+#function store_on_mesh_one!!(
+#							get_one!::Function, 
+#							I_source::AbstractVector{Int}, J_source::AbstractVector{Int},
+#							source,
+#							i::Int, j::Int,
+#							args...; kwargs...
+#												)::Nothing
+#
+#	store_on_mesh_one!!(get_one!, 
+#											I_source[i], J_source[j], source, 
+#											i, j, args...; 
+#											kwargs...)
+#
+#end  
 
 
 
@@ -2200,26 +2182,12 @@ function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...;
 											kwargs...
 											)::Array{ComplexF64,4}
 
-	WFs = init_storage(init_eigH(kij, H, Hdata...; kwargs...)[1], n; kwargs...)
+	store_on_mesh(first∘init_eigH, eigH!, n, kij, H, Hdata...; kwargs...)
 
-	store_on_mesh!!(eigH!, kij, WFs, H, Hdata...; kwargs...)
+end  
 
-	return WFs 
-##
-#	store_on_mesh!!(eigH!, source=kij, dest=WFs,  H, Hdata...) 
-#	Hdata = (bs,)
-#
-#	store_one!!(eigH!, source=kij, i, j, dest=WFs, H, Hdata...)
-#
-#	get_one_wrapper!(WFs[i,j], eigH!, kij, i, j, H, Hdata...)
-#
-#	eigH!(WFs[i,j], k, H, Hdata...)
-#
-# eigH(WFs[i,j], H(k, Hdata...); kwargs...) OK 
- 
-##
 
-end 
+
 function enpsiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
 												)::Vector{Array}
 
@@ -2290,6 +2258,8 @@ function has_symm_on_mesh(n::Int, k0::Real, # k0 not used
 													kwargs...
 													)::BitArray{3}
 
+	error() 
+
 	store_on_mesh(has_symm_on_mesh_one, n, tuple, symm, A; kwargs...)
 
 
@@ -2299,6 +2269,8 @@ end
 function has_symm_on_mesh(n::Int, k0::Real, symm::NTuple{2,Function},
 													H::Function, args...; kwargs...
 													)::BitArray{3}
+
+	error() 
 
 	store_on_mesh(has_symm_on_mesh_one, 
 								n, tuple, symm, H, get_kij(n,k0), args...;
@@ -2338,56 +2310,12 @@ end
 
 
 
-#function wlo1_on_mesh(dir1::Int, n::Int, k0::Real, Hdata...)
-#
-#	Bloch_WFs = store_on_mesh(first∘occupied_subspace, n, 
-#														get_kij(n,k0), Hdata...)
-#
-#	return store_on_mesh(wlo_from_mesh, tuple, dir1, Bloch_WFs), Bloch_WFs 
-#
-#end 
-#
-#
-#function wlo1_on_mesh(dir1::AbstractVector{Int}, n::Int, k0::Real, Hdata...; 
-#											halfspace::Bool=true, occupied::Bool=true,
-#											kwargs...)
-#
-#
-#	Bloch_WFs = igH_on_mesh(n, k0, Hdata...; 
-#													 halfspace=halfspace, 
-#													 occupied=occupied,
-#													 kwargs...)
-#
-#	if halfspace 
-#
-#		w1 = store_on_mesh(wlo_from_mesh, n, tuple, dir1[1], Bloch_WFs)
-##all 		Bloch_WFs  ok
-#
-#	else 
-#		
-#		#separately occ and unocc  
-#		
-#
-#
-#		w1_occ = store_on_mesh(wlo_from_mesh, n, tuple, dir1[1], psi_occ)
-#		
-#		w1_unocc = store_on_mesh(wlo_from_mesh, n, tuple, dir1[1], psi_unocc)
-#
-#	end 
-#
-#
-#
-#	return (
-#					(w1, (wlo1_on_mesh(d1, n, Bloch_WFs) for d1 in dir1[2:end])...), 
-#					Bloch_WFs
-#					)
-#
-#end 
-
 
 
 function wlo1_on_mesh(dir1::Int, Bloch_WFs::AbstractArray,
 											)::Array
+
+	error() 
 
 	store_on_mesh(wlo_from_mesh, 
 								nr_kPoints_from_mesh(Bloch_WFs), 
@@ -2776,8 +2704,7 @@ function wlo1_on_mesh_inplace!(
 		@assert select_size_dir(WFs,d)==select_size_dir(dest,d)
 	end 
 
-# each perpendicular momentum -> parameter 
-	for k2=1:select_size_dir(WFs, 3-dir1)
+	for k2=1:select_size_dir(WFs, 3-dir1) # parameter 
 
 		wlo1_on_mesh1_inplace!(dest, overlaps, ov_aux, WFs, dir1, k2)
 
@@ -2787,11 +2714,23 @@ function wlo1_on_mesh_inplace!(
 
 end 
 
+
+
+
+
+#
+#selectdim(B, d1, I)
+#selectdim(B, d2, I) 
+#
+#			source(big_inds[1][i], big_inds[2][i])
+
+
+
 function wlo1_on_mesh_inplace!(
 						 dest::SubOrDArray{ComplexF64,4},
 						 overlaps::SubOrDArray{ComplexF64,4},
 						 ov_aux::SubOrDArray{ComplexF64,4},
-						 WFs::SubOrArray{ComplexF64,4},
+						 WFs::AbstractArray{ComplexF64,4},
 						 dir1::Int
 						)::Nothing
 
@@ -2806,7 +2745,7 @@ function wlo1_on_mesh_inplace!(
 											localpart(dest),
 											only(eachslice(localpart(overlaps), dims=d2)),
 											only(eachslice(localpart(ov_aux), dims=d2)),
-											selectdim(WFs,d2, localindices(dest)[d2]),
+											localpart_(WFs, dest, dir2),
 											dir1, 
 											)
 
@@ -2862,11 +2801,10 @@ function select_size_dir(A::AbstractArray, args...)::Int
 	
 end 
 
-function select_mesh_dir(I::NTuple{N,T}, args::Int...
-						 )::T where T<:Union{Int, UnitRange{Int}} where N
+function select_mesh_dir(I::Tuple{Vararg{T}}, args::Int...
+						 )::T where T<:Union{Int, UnitRange{Int}} 
 
-
-	return I[get_mesh_dir(N,args...)]
+	I[get_mesh_dir(I,args...)]
 
 end 
 
@@ -2878,11 +2816,124 @@ function get_mesh_dir(N::Int, dir::Int, meshdim::Int=2)::Int
 
 end 
 
-function get_mesh_dir(A::AbstractArray{<:Number,N}, args::Int...)::Int where N 
+function get_mesh_dir(A::Union{NTuple{N,<:Union{Int,UnitRange{Int}}},
+															 AbstractArray{<:Number,N}
+															 },
+											args::Int...
+											)::Int where N 
 
 	get_mesh_dir(N, args...)
 
+end  
+
+
+
+
+
+function localpart_(B::SubOrDArray{<:Number}, 
+										)::SubOrArray
+
+	localpart(B) 
+
 end 
+
+function localpart_(B::SubOrDArray{<:Number}, 
+										A::SubOrDArray{<:Number}, args... 
+										)::SubOrArray
+
+	@assert same_mesh_distrib(B,A) 
+
+	return localpart(B) 
+
+end 
+
+function localpart_(B::SubOrArray{<:Number}, 
+										I::Tuple{Vararg{UnitRange{Int}}}, 
+										dir::Int)::SubArray
+
+	d = get_mesh_dir(I,dir) 
+
+	return selectdim(B, d, I[d])
+
+end 
+
+
+function localpart_(B::SubOrArray{<:Number}, 
+										A::SubOrDArray{<:Number}, dir::Int...)::SubArray
+
+	localpart_(B, localindices(A), dir...)
+
+end 
+
+function localpart_(B::SubOrArray{<:Number}, 
+										I::Tuple{Vararg{UnitRange{Int}}}
+									 )::SubArray
+
+	select_mesh_point(B, select_mesh_dir(I,1), select_mesh_dir(I,2))
+
+end  
+
+function localpart_(F::Function, A::SubOrDArray{<:Number}
+#										I::Tuple{Vararg{UnitRange{Int}}}
+									 )::Function 
+
+	I1, I2 = get_big_inds(A) 
+
+	function F2(i1::Int, i2::Int) 
+		
+		F(I1[i1], I2[i2])
+
+	end 
+
+end 
+																			
+function localpart_(A,
+										arrays::AbstractVector{<:SubOrDArray},
+										args...
+										)
+
+	@assert same_mesh_distrib(arrays)
+
+	localpart_(A, arrays[1],args...)
+
+end 
+
+function localpart_(arrays::AbstractVector{<:AbstractArray},
+										args...)::Vector{<:SubOrArray} 
+
+	[localpart_(a, args...) for a in arrays] 
+
+end 
+
+function localpart_(arrays1::AbstractVector{<:AbstractArray}, 
+										arrays2::AbstractVector{<:SubOrDArray}, 
+										::Vararg)
+	
+	@assert same_mesh_distrib(arrays2)
+
+	localpart_(arrays1, arrays2[1])
+
+end 
+
+
+function get_big_inds(
+										arrays::AbstractVector{<:SubOrDArray},
+										)
+
+	@assert same_mesh_distrib(arrays)
+										
+	get_big_inds(arrays[1])
+
+end 
+
+function get_big_inds(A::SubOrDArray{<:Number}
+											 )
+
+	Tuple(select_mesh_dir(localindices(A),d) for d=1:2)
+
+end 
+
+										
 
 #===========================================================================#
 #
@@ -2909,6 +2960,8 @@ function Wannier_subspace_on_mesh(W::AbstractArray,
 													s::Union{Function,Real}, 
 													)
 
+	error() 
+
 	store_on_mesh(Wannier_subspace_on_mesh_one, 
 								nr_kPoints_from_mesh(W), tuple, W, s)
 
@@ -2916,6 +2969,8 @@ end
 
 
 function Wannier_subspaces_on_mesh(W::AbstractArray)
+
+	error() 
 
 	store_on_mesh(Wannier_subspaces∘get_item_ij,
 								nr_kPoints_from_mesh(W), tuple, W) 
@@ -2996,50 +3051,52 @@ function Wannier_subspace_on_mesh(s::Union{Function,Real}, Hdata...)
 end 
 
 
-#function Wannier_band_basis_mesh(Bloch_WFs::AbstractArray,
-#																 WLO_WFs::AbstractArray)
-#
-#	store_on_mesh(Wannier_band_basis0, tuple, Bloch_WFs, WLO_WFs)
-#
-#end  
-
 function Wannier_band_basis_mesh(
 																 W::AbstractArray,
-																 Bloch_WFs::AbstractArray,
+																 psiH::AbstractArray,
 																 s::Union{Function,Real})
-																 
+
+	@warn "Obsolete, output modified"
+
 	eig = Wannier_subspace_on_mesh(W, s)
 
-	return Wannier_band_basis_mesh(eig[1], Bloch_WFs)[1], eig 
+	return Wannier_band_basis_mesh(eig[1], psiH)[1]
 
 end   
 
 		
 
 function Wannier_band_basis_mesh(
-																 eigvecs::AbstractArray,
-																 Bloch_WFs::AbstractArray
-																 )
-	(															 
-	store_on_mesh(Wannier_band_basis0, 
-								nr_kPoints_from_mesh(Bloch_WFs), 
-								tuple, Bloch_WFs, eigvecs),
-	eigvecs
-	)
+																 Wwf::AbstractArray{ComplexF64,4},
+																 psiH::AbstractArray{ComplexF64,4};
+																 kwargs...
+																 )::AbstractArray{ComplexF64,4}
 
-end  
+	store_on_mesh(Wannier_band_basis0, Wannier_band_basis0!,
+								nr_kPoints_from_mesh(psiH), tuple, psiH, Wwf; 
+								kwargs...)
+
+end   
+
+
+
+
+
+
+
 function Wannier_band_basis_mesh1(
-																 eigvecs::AbstractArray,
-																 Bloch_WFs::AbstractArray{ComplexF64,3}
+																 Wwf::AbstractArray,
+																 psiH::AbstractArray{ComplexF64,3}
 																 ) 
 
 
-	(															 
+	#(															 
 	store_on_mesh1(Wannier_band_basis0, 
-								 size(Bloch_WFs,3)+1,
-								identity, Bloch_WFs, eigvecs),
-	eigvecs
-	)
+								 size(psiH,3)+1,
+								identity, psiH, Wwf) 
+
+	#Wwf
+	#)
 
 end  
 
@@ -3056,17 +3113,21 @@ end
 
 function wcc2mesh_fromSubspaces1(dir2::Int,
 																 data_dir1::AbstractVector{<:AbstractArray},
-																psiH::AbstractArray{<:Number,4},
-																)::Vector{Array{Float64,3}}
+																psiH::AbstractArray{<:Number,4};
+																kwargs...
+																)#::Vector{Array{Float64,3}}
 
 	map([1,3]) do sector  
 
 		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
 		#		dir1 = 3-dir2
 		
-		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH) 
+		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH; kwargs...)
 
-		return store_on_mesh(get_periodic_eigvals, w2)
+		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
+												 nr_kPoints_from_mesh(psiH),
+												 w2; kwargs...)
+
 
 	end 
 
@@ -3075,11 +3136,12 @@ end
 
 function wcc2mesh_fromSubspaces1(dir2::Int,
 																 data_dir12::AbstractVector{<:AbstractVector{<:AbstractArray} },
-																psiH::AbstractArray{<:Number,4},
-																)::Vector{Array{Float64,3}}
+																psiH::AbstractArray{<:Number,4};
+																kwargs...
+																)#::Vector{Array{Float64,3}}
 
 
-	wcc2mesh_fromSubspaces1(dir2, data_dir12[3-dir2], psiH) 
+	wcc2mesh_fromSubspaces1(dir2, data_dir12[3-dir2], psiH; kwargs...)
 
 end 
 
@@ -3093,12 +3155,16 @@ end
 
 
 	
-function wlo2_on_mesh(dir2::Int, data...)::Array{ComplexF64,4}
+function wlo2_on_mesh(dir2::Int, data...; 
+											dir::Int=dir2,
+											kwargs...
+										 )#::Array{ComplexF64,4}
 
-	wlo1_on_mesh_inplace(dir2, Wannier_band_basis_mesh(data...)[1])
+	wbb = Wannier_band_basis_mesh(data...; distr_axis=3-dir2, kwargs...)
+
+	return wlo1_on_mesh_inplace(dir2, wbb; kwargs...)
 
 end 
-
 
 
 function wlo2_on_mesh(dir2::Int,
@@ -3220,21 +3286,36 @@ function Wannier_Hamilt(W::AbstractMatrix{<:Number})::Matrix{ComplexF64}
 
 end 
 
+function get_periodic_eigvals!(dst::AbstractVector{Float64},
+															 W::AbstractMatrix)::AbstractVector{Float64}
+
+	copy!(dst, get_periodic_eigvals!(W))
+
+end 
 
 
-
-function get_periodic_eigvals!(W::AbstractMatrix)::Vector{Float64}
+function get_periodic_eigvals!(W::SubOrArray{<:Number,2}
+															 )::Vector{Float64}
 
 	get_periodic_eigvals(LinearAlgebra.eigvals!(W))
 
-end  
+end 
 
 
-function get_periodic_eigvals(W::AbstractMatrix)::Vector{Float64}
+function get_periodic_eigvals(W::SubOrArray{<:Number,2}
+														 )::Vector{Float64}
 
 	get_periodic_eigvals(LinearAlgebra.eigvals(W))
 
 end  
+
+#function get_periodic_eigvals(W::SubOrDArray{<:Number,2}
+#														 )::Vector{Float64}
+#
+#	get_periodic_eigvals(convert(Array,W))
+#
+#end 
+
 
 function get_periodic_eigvals(eigvals::AbstractVector)
 
@@ -3657,9 +3738,7 @@ function get_wlo_data_mesh1(psiH::AbstractArray{ComplexF64,3},
 end  
 
 
-function get_wlo_data_mesh(psiH::Union{Array{ComplexF64,4}, 
-																	SubArray{ComplexF64,4}
-																	},
+function get_wlo_data_mesh(psiH::SubOrArray{ComplexF64,4}, 
 									occupied::Bool,
 									dir1::Int,
 									get_wlo2::Bool;
@@ -3673,11 +3752,12 @@ function get_wlo_data_mesh(psiH::Union{Array{ComplexF64,4},
 
 	eigW1 = Wannier_subspaces_on_mesh!(w1; dir=dir1, kwargs...)
 
-#	eigW1 = Wannier_subspaces_on_mesh!(wlo1_on_mesh_inplace(dir1, psi))  
 
 	if get_wlo2 
 
-		return (eigW1, wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi))
+		eigW1_ = convert(Vector{Array}, eigW1) 
+
+		return (eigW1_, wcc2mesh_fromSubspaces1(3-dir1, eigW1_, psi; kwargs...))
 
 	else 
 
@@ -3727,42 +3807,45 @@ end
 #
 #---------------------------------------------------------------------------#
 
+
+function Wannier_band_basis0!(
+															A::AbstractMatrix{ComplexF64},
+															i::Int,
+														 psiH::AbstractArray{ComplexF64,3},
+														 W1wf_::AbstractArray{ComplexF64,3},
+														 )::AbstractMatrix{ComplexF64}
+
+	LinearAlgebra.mul!(A, get_item_ij(i, psiH), get_item_ij(i, W1wf_))
+
+end 
+
+function Wannier_band_basis0!(
+															A::AbstractMatrix{ComplexF64},
+															ij::Tuple{Int,Int},
+														 psiH::AbstractArray{ComplexF64,4},
+														 W1wf_::AbstractArray{ComplexF64,4},
+														 )::AbstractMatrix{ComplexF64}
+
+	LinearAlgebra.mul!(A, get_item_ij(ij, psiH), get_item_ij(ij, W1wf_))
+
+end 
+
+
 function Wannier_band_basis0(i::Int,
-														 Bloch_WFs_::AbstractArray{ComplexF64,3},
+														 psiH::AbstractArray{ComplexF64,3},
 														 W1wf_::AbstractArray{ComplexF64,3},
 														 )::Matrix{ComplexF64}
 
-	get_item_ij(i, Bloch_WFs_) * get_item_ij(i, W1wf_)
+	get_item_ij(i, psiH) * get_item_ij(i, W1wf_)
 
 end 
 
 function Wannier_band_basis0(ij::Tuple{Int,Int},
-														 Bloch_WFs_::AbstractArray{ComplexF64,4},
+														 psiH::AbstractArray{ComplexF64,4},
 														 W1wf_::AbstractArray{ComplexF64,4},
 														 )::Matrix{ComplexF64}
 
-	out = get_item_ij(ij, Bloch_WFs_) * get_item_ij(ij, W1wf_)
-
-
-#	n = size(out,2)
-#
-#	if n>1
-#
-#		ov = abs.(overlap(out))
-#	
-#		s = join(["($i,$j): $(ov[i,j])" for i=1:n for j=1:i],"\n")
-#	
-#		s*="\nov-1 = $(LinearAlgebra.norm(ov-one(ov)))\n"
-#	
-#		open("wbb.dat","a") do f 
-#			write(f,s)
-#	
-#		end;
-#
-#	end
-	
-
-	return out 
+	get_item_ij(ij, psiH) * get_item_ij(ij, W1wf_)
 
 end 
 

@@ -1,3 +1,4 @@
+using Distributed 
 @everywhere using DistributedArrays 
 @everywhere import LinearAlgebra 
 import BMCMSOTS: WLO 
@@ -147,8 +148,8 @@ end
 psi1 = WLO.psiH_on_mesh(50, 0 , H) 
 psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true) 
 
-#@time "psi no distr" psi1 = WLO.psiH_on_mesh(1000, 0 , H) 
-#@time "psi distr" psi2 = WLO.psiH_on_mesh(1000, 0 ,H; parallel=true)
+@time "psi no distr" psi1 = WLO.psiH_on_mesh(100, 0 , H) 
+@time "psi distr" psi2 = WLO.psiH_on_mesh(100, 0 ,H; parallel=true)
 
 @testset "psi==psi_distr" begin 
 
@@ -157,6 +158,7 @@ psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)
 #	@show LinearAlgebra.norm(psi1)
 #	@show LinearAlgebra.norm(psi2)
 
+	@test LinearAlgebra.norm(psi1) > 1e-10 
 	@test LinearAlgebra.norm(psi1-psi2) <1e-10 
 
 
@@ -164,37 +166,36 @@ end
 
 println() 
 
-eigW1_single, wcc2_single  = WLO.get_wlo_data_mesh(psi1, true, 2, false)
-@show LinearAlgebra.norm.(eigW1_single)
-@show LinearAlgebra.norm.(wcc2_single)
+out_single = WLO.get_wlo_data_mesh(psi1, true, 2, true)
+@show LinearAlgebra.norm.(out_single)
 
-eigW1_multi, wcc2_multi = WLO.get_wlo_data_mesh(psi1, true, 2, false; parallel=true)
-@show LinearAlgebra.norm.(eigW1_multi)
-@show LinearAlgebra.norm.(wcc2_multi)
+@show typeof.(out_single)
+
+println()  
+
+out_multi = WLO.get_wlo_data_mesh(psi1, true, 2, true; parallel=true)
+@show LinearAlgebra.norm.(out_multi)
+@show typeof.(out_multi)
 
 
 
-#@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, false)
-#@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi1, true, 2, false; parallel=true)
+@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
+@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi1, true, 2, true; parallel=true)
 
 @testset "wlo==wlo_distr" begin 
 
 #	@test w1_multi isa Array  
 #	@test w1_single isa Array 
 
-	@test LinearAlgebra.norm(w1_single-w1_multi) <1e-10 
+	for (S,M) in zip(out_single,out_multi)
 
-	for (s,m) in zip(eigW1_single,eigW1_multi)
-
-		@test LinearAlgebra.norm(s-m) <1e-10  
-
-	end 
-
-	for (s,m) in zip(wcc2_single,wcc2_multi)
-
-		@test LinearAlgebra.norm(s-m) <1e-10  
-
-	end 
+		for (s,m) in zip(S,M) 
+	
+			@test LinearAlgebra.norm(s) > 1e-10 
+			@test LinearAlgebra.norm(s-m) <1e-10  
+	
+		end 
+end 
 
 end 
 
