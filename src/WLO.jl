@@ -1261,7 +1261,6 @@ function store_on_mesh(get_one::Function, get_one!::Function,
 											 data...;
 											 kwargs...
 											)
-
 	dest = init_storage(get_one_wrapper(get_one, source, 1,1, data...),
 											n; kwargs...)
 
@@ -3115,21 +3114,57 @@ function wcc2mesh_fromSubspaces1(dir2::Int,
 																kwargs...
 																)::Vector{Array{Float64,3}}
 
-	map([1,3]) do sector  
+	dist_axis = 3-dir2 
 
+	n = nr_kPoints_from_mesh(psiH)
+
+	wbb = init_storage(get_one_wrapper(Wannier_band_basis0, 
+																	 tuple, 1, 1, 
+																	psiH, data_dir1[1],), n; 
+										 distr_axis=distr_axis,kwargs...)
+	
+	w2 = init_wlo_mesh(dir2, wbb; kwargs...)
+
+	overlaps = init_overlaps_line(dir2, wbb; kwargs...) 
+
+
+	return map([1,3]) do sector  
+	
 		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
-		#		dir1 = 3-dir2
-		
-		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH; kwargs...)
+		#		dir1 = 3-dir2 
+#		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH; kwargs...)
+#
+	#wbb = Wannier_band_basis_mesh(data_dir1[1], psiH; distr_axis=distr_axis, kwargs...) 
+
+		store_on_mesh!!(Wannier_band_basis0!, n, tuple, 
+										wbb, psiH, data_dir1[sector])
+
+		wlo1_on_mesh_inplace!(w2, overlaps..., wbb, dir2)
+
 
 		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
-												 nr_kPoints_from_mesh(psiH),
-												 w2; 
-											distr_axis=3-dir2,
-												 kwargs...)
+												 n, w2; distr_axis=3-dir2, kwargs...)
 
 
 	end 
+
+
+
+#	map([1,3]) do sector  
+#
+#		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
+#		#		dir1 = 3-dir2
+#		
+#		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH; kwargs...)
+#
+#		store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
+#												 nr_kPoints_from_mesh(psiH),
+#												 w2; 
+#											distr_axis=3-dir2,
+#												 kwargs...)
+#
+#
+#	end 
 
 end 
 

@@ -1090,7 +1090,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	if light_calc 
 		@assert isdisjoint(obs_unocc, observables) 
-		@warn "Light version"
+#		@warn "Light version"
 	end 
 
 	strengths = perturb_strengths(P)  
