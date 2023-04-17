@@ -1144,7 +1144,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	parallel=false#nprocs()>=4
 	parallel2=false# nprocs()>=4
 	parallel3=nworkers()>=3
-	shared=true 
+	shared=true  # ignored when not parallel 
 
 
 	zero_strength, rest_strengths = Base.Iterators.peel(strengths)
@@ -1161,7 +1161,6 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	psi = MODEL.get_psiH(P, nk, k0_or_kxy; 
 											 parallel=parallel3, shared=shared)
-
 
 	if light_calc
 		
@@ -1274,8 +1273,6 @@ end
 
 function FoundFiles(P::UODict; 
 										target=nothing, get_fname::Function, kwargs...)::Bool
-
-	#@show get_fname(P) 
 
 	FoundFiles0(get_fname(P), get_target(target; kwargs...))
 

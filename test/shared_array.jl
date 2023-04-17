@@ -15,10 +15,11 @@ psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)
 
 @testset "simualate ind distrib" begin 
 	
-	for (i,j) in zip(psi2.indices,WLO.inds_distrib_array(
-																											 view(psi1,:,:,1,1),
-																											 WLO.nr_kPoints_from_mesh(psi1)
-																											 ;parallel=true))
+	
+	for (i,j) in zip(
+									 WLO.init_storage(H(rand(2)), 50; parallel=true).indices,
+									 WLO.inds_distrib_array(H(rand(2)), 50;
+																											 parallel=true))
 		@test i==j  
 	end  
 

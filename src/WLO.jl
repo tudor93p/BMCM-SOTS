@@ -1470,24 +1470,24 @@ function store_on_mesh(get_one::Function, get_one!::Function,
 
 end 
 
-function store_on_mesh!(get_one::Function, 
-												n::Int,
-												source::Union{Function, AbstractArray{<:Number},
-																		NTuple{N, <:AbstractArray} where N,
-																		},
-												dest::AbstractArray,
-												data...; kwargs...
-												)::Nothing 
-
+#function store_on_mesh!(get_one::Function, 
+#												n::Int,
+#												source::Union{Function, AbstractArray{<:Number},
+#																		NTuple{N, <:AbstractArray} where N,
+#																		},
+#												dest::AbstractArray,
+#												data...; kwargs...
+#												)::Nothing 
+#
 #	for j=1:n-1, i=1:n-1
 #
 #		store_on_mesh_one!(get_one, source, i, j, dest, data...; kwargs...)
 #
 #	end 
 
-	return 
-
-end 
+#	return 
+#
+#end 
 
 
 #===========================================================================#
@@ -2403,11 +2403,12 @@ function psiH_on_mesh(n::Int,
 											kij::Function,
 											perturb::AbstractArray{ComplexF64,4},
 											H::Function, Hdata...; kwargs...
-											)::AbstractArray{ComplexF64,4}
+											)::Union{Array{ComplexF64,4},SharedArray{ComplexF64,4}} 
 
-	store_on_mesh(first∘init_eigH, eigH!, 
-								n, tuple, H, kij, perturb, Hdata...; kwargs...)
+	out = store_on_mesh(first∘init_eigH, eigH!, 
+								n, tuple, H, kij, perturb, Hdata...; kwargs...) 
 
+	return out isa SubOrDArray ? convert(Array, out) : out 
 ##
 #	store_on_mesh!!(eigH!, n, source=tuple, dest=WFs,  rest...)
 #	rest= (H,kij,perturb,Hdata...)
@@ -2433,9 +2434,11 @@ end
 
 function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; 
 											kwargs...
-											)::AbstractArray{ComplexF64,4}
+											)::Union{Array{ComplexF64,4},SharedArray{ComplexF64,4}} 
 
-	store_on_mesh(first∘init_eigH, eigH!, n, kij, H, Hdata...; kwargs...)
+	out = store_on_mesh(first∘init_eigH, eigH!, n, kij, H, Hdata...; kwargs...)
+
+	return out isa SubOrDArray ? convert(Array, out) : out 
 
 end  
 
@@ -3151,7 +3154,10 @@ function wlo1_on_mesh_inplace(dir1::Int,
 
 	dest = init_wlo_mesh(dir1, WFs; kwargs...)  
 
+	@assert !isa(dest,SubOrSArray) 
+
 	overlaps = init_overlaps_line(dir1, WFs; kwargs...)
+
 
 	wlo1_on_mesh_inplace!(dest, overlaps..., WFs, dir1)
 

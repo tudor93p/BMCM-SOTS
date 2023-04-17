@@ -1,6 +1,7 @@
 module MB  
 
-import LinearAlgebra, Statistics
+import LinearAlgebra, Statistics 
+import SharedArrays: SharedArray
 
 import ..WLO 
 import ..Helpers:Symmetries 
@@ -438,7 +439,9 @@ function get_psiH(MBparams::Union{<:UODict, <:AbstractVector{<:Real}},
 									args...;
 									kwargs...
 #									atol::Float64=1e-12
-								 )::Array{ComplexF64,4}
+								 )::Union{Array{ComplexF64,4},
+													SharedArray{ComplexF64,4}
+													}
 
 	WLO.psiH_on_mesh(n, k, get_args_psi(MBparams, args...)...; kwargs...)
 
