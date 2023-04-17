@@ -1155,26 +1155,85 @@ function init_storage(T::DataType,
 
 end 
 
+
+function prep_init_array(
+											s::NTuple{Ns,Int},
+											ns::NTuple{Nn,Int}; 
+											parallel::Bool=false,
+											distr_axis::Int=Nn,
+											kwargs...
+											)::Tuple{NTuple{Ns+Nn,Int}, Vector{Int}, Vector{Int}
+															 } where {Ns,Nn}
+	
+	array_size = (s..., (n-1 for n=ns)...)
+
+	d = ones(Int, Ns+Nn)
+	
+	w = workers()
+
+	parallel || return (array_size, w, d)
+
+	@assert 1<=distr_axis<=Nn
+
+	wmax = min(length(w), array_size[Ns+distr_axis])
+
+	return (array_size, w[1:wmax], setindex!(d, wmax, Ns+distr_axis))
+
+end 
+
+function inds_distrib_array(array_size::NTuple{N,Int},
+														q::AbstractVector{Int},
+														array_distrib::AbstractVector{Int},
+														)::Vector{NTuple{N,UnitRange{Int}}} where N
+
+	I = findall(>(1), array_distrib)
+
+	t0 = Tuple(1:a for a=array_size)
+
+	isempty(I) && return [t0]
+
+	@assert length(I)==1 
+
+	i = only(I)
+
+	distr_i = Utils.EqualDistributeBallsToBoxes_cumulRanges(
+																array_size[i], array_distrib[i])
+
+	return [Tuple(i==d ? J : a for (d,a)=enumerate(t0)) for J=distr_i]
+
+end 
+														
+
+function inds_distrib_array(
+														args...; kwargs...
+														)::Vector{<:Tuple{Vararg{UnitRange{Int}}}}
+
+	inds_distrib_array(prep_init_array(args...; kwargs...)...)
+
+end 
+
+
+
+
 function init_storage(T::DataType, 
 											s::NTuple{Ns,Int},
 											ns::Vararg{Int,Nn}; 
 											parallel::Bool=false,
-											distr_axis::Int=Nn,
+											shared::Bool=false,
+#											distr_axis::Int=Nn,
 											kwargs...
 											)::AbstractArray{<:Number,Ns+Nn} where Ns where Nn 
 
-	array_size = (s..., (n-1 for n=ns)...)
+	array_size, array_workers, array_distrib = prep_init_array(s,ns; 
+																						parallel=parallel, 
+																						kwargs...)
 
-	
+
 	parallel || return zeros(T, array_size)
-	
-	@assert 1<=distr_axis<=Nn
 
-	w = workers()[1:min(end,array_size[Ns+distr_axis])]
+	shared || return dzeros(T, array_size, array_workers, array_distrib)
 
-	d = setindex!(ones(Int, Ns+Nn), length(w), Ns+distr_axis)
-
-	return dzeros(T, array_size, w, d) 
+	return SharedArray{T}(array_size; pids=union(myid(), array_workers))
 
 end 
 
@@ -1264,10 +1323,15 @@ function store_on_mesh(get_one::Function, get_one!::Function,
 											 data...;
 											 kwargs...
 											)
-	dest = init_storage(get_one_wrapper(get_one, source, 1,1, data...),
-											n; kwargs...)
+	sample_out = get_one_wrapper(get_one, source, 1,1, data...)
 
-	store_on_mesh!!(get_one!, n, source, dest, data...)
+	dest = init_storage(sample_out, n; kwargs...)
+
+	array_distrib = inds_distrib_array(size(sample_out), (n, n); kwargs...)
+
+	store_on_mesh!!(get_one!, n, source, dest, data...;
+									array_distrib=array_distrib
+									)
 
 	return dest
 
@@ -1381,6 +1445,7 @@ function store_on_mesh!!(get_one!::Function,
 																		},
 												data...; 
 												parallel::Bool=false,
+												array_distrib=[],
 												kwargs...
 												)::Nothing 
 
@@ -1410,6 +1475,7 @@ function store_on_mesh!!(get_one!::Function,
 																		 },
 												 # both source and dest may be overwritten
 												data...; # assumes data is read-only 
+												array_distrib=nothing,
 												kwargs...
 												)::Nothing 
 
@@ -1433,6 +1499,52 @@ function store_on_mesh!!(get_one!::Function,
 	return 
 
 end   
+
+function store_on_mesh!!(get_one!::Function, 
+												 inds::Tuple{<:AbstractVector{Int},
+																		 <:AbstractVector{Int}},
+												source::Union{<:Function, 
+																			<:AbstractArray{<:Number},
+																			<:AbstractVector{<:AbstractArray},
+																		},
+												 dest::Union{<:AbstractVector{<:SharedArray},
+																		 SharedArray{<:Number},
+																		 },
+												 # both source and dest may be overwritten
+												data...; # assumes data is read-only 
+												array_distrib::AbstractVector{<:Tuple{Vararg{UnitRange{Int}}}},
+												kwargs...
+												)::Nothing 
+
+	@assert length(array_distrib)===length(workers())
+
+	map(workers(),array_distrib
+#			procs(eltype(dest)<:AbstractArray ? dest[1] : dest)
+			) do p,locinds
+
+		@spawnat p begin   
+
+			store_on_mesh!!(get_one!, 
+											map(findall_indexin, get_big_inds(locinds), inds),
+											localpart_(source,locinds),
+											localpart_(dest,locinds),
+										data...;
+										kwargs...)
+
+#eventually: get_one!(dest_ij, src_ij, data...) 
+
+		end  
+
+	end .|> fetch 
+
+	return 
+
+end   
+
+
+
+
+
 
 
 
@@ -2550,13 +2662,46 @@ end
 #---------------------------------------------------------------------------#
 
 
+#
+#function init_overlaps_line_ida((A,B)::AbstractVector{<:AbstractArray{ComplexF64,N}};
+#											parallel::Bool=false,
+#											distr_axis::Int=6,
+#											kwargs...
+#											) where N 
+#
+#	nmesh = nr_kPoints_from_mesh(A,1) 	
+#
+#	n::Vector{Int} = fill(nmesh,1+parallel)
+#
+#	parallel && setindex!(n, nworkers()+1, distr_axis) 
+#
+#	[
+#	 init_storage(ComplexF64, (nwf,nwf), n...;
+#								parallel=parallel, distr_axis=distr_axis, kwargs...
+#								) for i=1:2
+#	 ]
+#
+#end 
 
+function init_overlaps_line_ida(nwf::Int, nmesh::Int; 
+											parallel::Bool=false,
+											distr_axis::Int=6,
+											kwargs...
+											)
 
+	n::Vector{Int} = fill(nmesh,1+parallel)
+
+	parallel && setindex!(n, nworkers()+1, distr_axis) 
+
+	return (ComplexF64, (nwf,nwf), n...), (parallel=parallel, distr_axis=distr_axis, kwargs...)
+
+end 
 
 function init_overlaps_line(nwf::Int, nmesh::Int; 
 											parallel::Bool=false,
 											distr_axis::Int=6,
-											)::Vector{<:Union{Array,DArray}}
+											kwargs...
+											)::Vector{<:Union{Array,DArray,SharedArray}}
 
 	n::Vector{Int} = fill(nmesh,1+parallel)
 
@@ -2564,11 +2709,13 @@ function init_overlaps_line(nwf::Int, nmesh::Int;
 
 	[
 	 init_storage(ComplexF64, (nwf,nwf), n...;
-								parallel=parallel, distr_axis=distr_axis
+								parallel=parallel, distr_axis=distr_axis, kwargs...
 								) for i=1:2
 	 ]
 
 end 
+
+#return (T, s, n...),(parallel=parallel,)
 
 
 function init_overlaps_line(wfs::AbstractArray{ComplexF64,3},
@@ -2589,29 +2736,63 @@ function init_overlaps_line(
 
 end 
 
+function init_overlaps_line_ida(
+														dir::Int,
+														wfs::AbstractArray{ComplexF64,N};
+														parallel::Bool=false,
+														dist_axis::Int=10,
+														kwargs...
+														) where N
+
+	@assert 3<=N<=4
+
+	init_overlaps_line_ida(size(wfs,2), nr_kPoints_from_mesh(wfs,dir,N-2);
+								parallel=N==4 && parallel,
+								distr_axis=3-dir,
+								kwargs...
+								)
+
+
+end  
+
 function init_overlaps_line(
 														dir::Int,
 														wfs::AbstractArray{ComplexF64,N};
 														parallel::Bool=false,
-											)::Vector{<:Union{Array,DArray}
+														dist_axis::Int=10,
+														kwargs...
+														)::Vector{<:Union{Array,DArray,SharedArray}
 																		} where N 
 
 	@assert 3<=N<=4
 
 	init_overlaps_line(size(wfs,2), nr_kPoints_from_mesh(wfs,dir,N-2);
 								parallel=N==4 && parallel,
-								distr_axis=3-dir
+								distr_axis=3-dir,
+								kwargs...
 								)
 
 
 end  
+
+function init_wlo_mesh_ida(result::AbstractArray{ComplexF64,N};
+											 kwargs...
+											 ) where N 
+
+	
+	n = nr_kPoints_from_mesh(result) 
+
+	return inds_distrib_array(size(result)[1:2], Tuple(n for i=3:N); kwargs...)
+
+end 
 
 
 
 function init_wlo_mesh(nwf::Int, nmesh::Vararg{Int,N};
 											 kwargs...
 											)::Union{Array{ComplexF64,N+2},
-															 DArray{ComplexF64,N+2}
+															 DArray{ComplexF64,N+2},
+															 SharedArray{ComplexF64,N+2},
 															 } where N
 
 	init_storage(ComplexF64, (nwf,nwf), nmesh...; kwargs...)
@@ -2636,15 +2817,19 @@ end
 
 function init_wlo_mesh(dir::Int,
 											 wfs::AbstractArray{ComplexF64,4};
-											 parallel::Bool=false 
+											 parallel::Bool=false,
+											 kwargs...
 											)::Union{Array{ComplexF64,4},
-															 DArray{ComplexF64,4}}
+															 DArray{ComplexF64,4},
+															 SharedArray{ComplexF64,4}
+															 }
 
 	init_wlo_mesh(size(wfs,2), 
 								nr_kPoints_from_mesh(wfs,1),
 								nr_kPoints_from_mesh(wfs,2);
 								parallel=parallel,
-								distr_axis=3-dir
+								distr_axis=3-dir,
+								kwargs...
 								)
 end 
 
@@ -2680,8 +2865,24 @@ function wlo1_on_mesh_inplace(dir1::Int,
 																			DArray{ComplexF64,4}}
 
 	dest = init_wlo_mesh(dir1, WFs; kwargs...)
-
 	overlaps = init_overlaps_line(dir1, WFs; kwargs...)
+
+
+	array_distrib_dest = inds_wlo_mesh_ida(dir1, WFs; kwargs...) 
+	array_distrib_ov = init_overlaps_line_ida(dir1, WFs; kwargs...)
+
+	@show array_distrib_dest 
+	@show array_distrib_ov 
+
+	if WFs isa SubArray{T,N,<:SharedArray} where {T,N} 
+
+
+
+
+	@show typeof(dest)  typeof(overlaps) size(dest) size.(overlaps)
+
+	error() 
+end  
 
 	wlo1_on_mesh_inplace!(dest, overlaps..., WFs, dir1)
 
@@ -2846,7 +3047,7 @@ function localpart_(B::SubOrDArray{<:Number},
 
 end 
 
-function localpart_(B::SubOrArray{<:Number}, 
+function localpart_(B::Union{<:SubOrArray{<:Number}, <:SharedArray{<:Number}},
 										I::Tuple{Vararg{UnitRange{Int}}}, 
 										dir::Int)::SubArray
 
@@ -2864,7 +3065,7 @@ function localpart_(B::SubOrArray{<:Number},
 
 end 
 
-function localpart_(B::SubOrArray{<:Number}, 
+function localpart_(B::Union{<:SubOrArray{<:Number}, <:SharedArray{<:Number}},
 										I::Tuple{Vararg{UnitRange{Int}}}
 									 )::SubArray
 
@@ -2877,6 +3078,27 @@ function localpart_(F::Function, A::SubOrDArray{<:Number}
 									 )::Function 
 
 	I1, I2 = get_big_inds(A) 
+
+	function F2(i1::Int, i2::Int) 
+		
+		F(I1[i1], I2[i2])
+
+	end 
+
+end 
+function localpart_(F::Function, 
+										A::Union{<:SubOrDArray{<:Number},
+														 <:Tuple{Vararg{UnitRange{Int}}}
+														 },
+									 )::Function 
+
+	I1, I2 = get_big_inds(A)
+
+	if A isa SubOrDArray 
+	
+		@show (I1,I2) == get_big_inds(localindices(A))
+	end 
+
 
 	function F2(i1::Int, i2::Int) 
 		
@@ -2928,9 +3150,17 @@ end
 function get_big_inds(A::SubOrDArray{<:Number}
 											 )
 
-	Tuple(select_mesh_dir(localindices(A),d) for d=1:2)
+	get_big_inds(localindices(A))
+
+end  
+
+function get_big_inds(I::Tuple{Vararg{UnitRange{Int}}},
+										 )
+
+	Tuple(select_mesh_dir(I,d) for d=1:2)
 
 end 
+
 
 										
 
@@ -3777,16 +4007,23 @@ function get_wlo_data_mesh1(psiH::AbstractArray{ComplexF64,3},
 end  
 
 
-function get_wlo_data_mesh(psiH::SubOrArray{ComplexF64,4}, 
+function get_wlo_data_mesh(psiH::Union{<:SubOrArray{ComplexF64,4}, 
+																			 <:SharedArray{ComplexF64,4}
+																			 },
 									occupied::Bool,
 									dir1::Int,
 									get_wlo2::Bool;
 									kwargs...
 									)::Tuple
 
+	sh = isa(psiH,SharedArray)
+
+
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
 	w1 = wlo1_on_mesh_inplace(dir1, psi; kwargs...)
+	
+	@assert !sh 
 
 	eigW1 = Wannier_subspaces_on_mesh!(w1; dir=dir1, kwargs...)
 

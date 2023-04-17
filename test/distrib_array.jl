@@ -157,14 +157,14 @@ out_single = WLO.get_wlo_data_mesh(psi1, true, 2, true)
 
 println()  
 
-out_multi = WLO.get_wlo_data_mesh(psi1, true, 2, true; parallel=true)
+out_multi = WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
 @show LinearAlgebra.norm.(out_multi)
 @show typeof.(out_multi)
 
 
 
 @time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
-@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi1, true, 2, true; parallel=true)
+@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
 
 @testset "wlo==wlo_distr" begin 
 

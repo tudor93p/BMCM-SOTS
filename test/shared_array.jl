@@ -9,23 +9,43 @@ include("mock_H.jl")
 
 
 psi1 = WLO.psiH_on_mesh(50, 0 , H) 
+@show typeof(psi1)
 psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)  
-psi3 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true, shared=true)
+@show typeof(psi2)
 
+@testset "simualate ind distrib" begin 
+	
+	for (i,j) in zip(psi2.indices,WLO.inds_distrib_array(
+																											 size(psi1)[1:2],
+																											 size(psi1)[3:4].+1
+																											 ;parallel=true))
+		@test i==j  
+	end  
+
+end 
+
+psi3 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true, shared=true)
+@show typeof(psi3)
+
+#
 #pert = (rand(ComplexF64,size(psi1)),) 
 #
 #psi1 = WLO.psiH_on_mesh(50, 0, pert..., H) 
 #psi2 = WLO.psiH_on_mesh(50, 0, pert..., H; parallel=true) 
+#psi3 = WLO.psiH_on_mesh(50, 0, pert..., H; parallel=true, shared=true)
+#
+
+#println()
+#
+#@time "psi no distr" psi1 = WLO.psiH_on_mesh(500, 0 , H) 
+#@time "psi distr" psi2 = WLO.psiH_on_mesh(500, 0 ,H; parallel=true)
+#@time "psi shared" psi3 = WLO.psiH_on_mesh(500, 0 ,H; parallel=true,shared=true)
+#
+#println()
 #
 
 
-#
-#@time "psi no distr" psi1 = WLO.psiH_on_mesh(100, 0 , H) 
-#@time "psi distr" psi2 = WLO.psiH_on_mesh(100, 0 ,H; parallel=true)
-
-
-
-@testset "psi==psi_distr" begin 
+@testset "psi same" begin 
 
 	@show typeof(psi1) typeof(psi2) typeof(psi3)
 #	@test psi2 isa Array  
@@ -35,46 +55,56 @@ psi3 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true, shared=true)
 
 	@test norm(psi1) > 1e-10 
 	@test norm(psi1-psi2) <1e-10 
+	@test norm(psi1-psi3) <1e-10 
 
 
 end 
 
 println() 
 
-#out_single = WLO.get_wlo_data_mesh(psi1, true, 2, true)
-#@show norm.(out_single)
-#
-#@show typeof.(out_single)
-#
-#println()  
-#
-#out_multi = WLO.get_wlo_data_mesh(psi1, true, 2, true; parallel=true)
-#@show norm.(out_multi)
-#@show typeof.(out_multi)
-#
-#
-#
+out_single = WLO.get_wlo_data_mesh(psi1, true, 2, true)
+@show norm.(out_single)
+
+@show typeof.(out_single)
+
+println()  
+
+psi2 = convert(Array, psi2)
+
+out_multi = WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
+@show norm.(out_multi)
+@show typeof.(out_multi)
+
+println()  
+
+out_shared = WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,
+																	 shared=true)
+@show norm.(out_shared)
+@show typeof.(out_shared)
+
 #@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
-#@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi1, true, 2, true; parallel=true)
+#@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
+#@time "w1+w2 shared"  WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,shared=true)
 #
-#@testset "wlo==wlo_distr" begin 
-#
-##	@test w1_multi isa Array  
-##	@test w1_single isa Array 
-#
-#	for (S,M) in zip(out_single,out_multi)
-#
-#		for (s,m) in zip(S,M) 
-#	
-#			@test norm(s) > 1e-10 
-#			@test norm(s-m) <1e-10  
-#	
-#		end 
-#end 
-#
-#end 
-#
-#
+@testset "wlo same" begin 
+
+#	@test w1_multi isa Array  
+#	@test w1_single isa Array 
+
+for (S,M,SS) in zip(out_single,out_multi,out_shared)
+
+		for (s,m,ss) in zip(S,M,SS) 
+	
+			@test norm(s) > 1e-10 
+			@test norm(s-m) <1e-10  
+			@test norm(s-ss) <1e-10  
+	
+		end 
+end 
+
+end 
+
+
 #
 #
 #

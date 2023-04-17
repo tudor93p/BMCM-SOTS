@@ -13,6 +13,26 @@ end
 
 
 
+@everywhere function H(ij::NTuple{2,Int},
+											 kpoint::Function,#Uni			on{Function,<:AbstractArray{<:Real,4}},
+											 perturb::AbstractArray{<:			Number,4},
+											  )::Matrix{ComplexF64}
+
+												H(kpoint(ij), view(perturb,:,:				,ij...))
+
+											end 
+
+											@everywhere function H(k::AbstractVector{<:Real}, 
+																						 		 pert::AbstractMatrix{<:Number}
+																								  )
+												a = H(k) 
+												
+												a +=													 LinearAlgebra.Hermitian(pert)  
+
+												return a 
+
+											end 	
+
 pmap(H,eachcol(rand(2,10)))
 
 
