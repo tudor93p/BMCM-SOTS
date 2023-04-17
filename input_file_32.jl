@@ -47,15 +47,20 @@ input_checks  = Dict{Symbol,Any}(
 											145, 
 											215, 
 											300,
+											601,
+											1001,
+											2001,
+											3001, # >8 GB 
+											6001,
 											),
 
-		kMesh_model = ["Uniform"],#,"Line"],#["square","sin", "line","expminv"],
+		kMesh_model = ["Uniform","Line","Square","Sin","Expminv"],
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = ["None";
+		preserved_symmetries = [#"None";
 #														[join(c,"+") for c=Combinatorics.powerset(["P", "Ct", "Tt","Mx", "TC2y"],1) if good_comb(c)];
-[join(c,"+") for c=Base.product(["P","Ct","Tt"],["Mx","TC2y"])][:];
+#[join(c,"+") for c=Base.product(["P","Ct","Tt"],["Mx","TC2y"])][:];
 														"All"],
 
 #		preserved_symmetries = ["None", "P", "Mx", "Ct", "Tt", "All"],
@@ -67,9 +72,8 @@ input_checks  = Dict{Symbol,Any}(
 
 		nr_perturb_instances = [1],
 
-#		perturb_strength = 0:0.2:0.8,
-		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true),
-														 0.3:0.1:0.6),
+		perturb_strength = [0],
+#		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true), 0.3:0.1:0.6),
 
 
   		), 

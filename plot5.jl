@@ -3,7 +3,7 @@ import myLibs: ComputeTasks
 import BMCMSOTS, myPlots 
 
 
-include("input_file_5.jl")
+include("input_file_10.jl")
 
 
 tasks = [

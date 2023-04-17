@@ -4,10 +4,13 @@ module WLO
 import LinearAlgebra, Statistics 
 import DistributedArrays 
 using DistributedArrays: 	localindices,localpart,
-													@spawnat, #myid,
+													@spawnat, myid,
 													workers,nworkers,procs,
 													DArray, SubOrDArray,
 													dzeros 
+
+import SharedArrays: SharedArray 
+
 
 import myLibs:Utils,SignalProcessing 
 import myLibs.Parameters:UODict
@@ -2135,7 +2138,7 @@ function psiH_on_mesh(n::Int,
 															 <:AbstractVector{<:AbstractVector{<:Real}}
 															 },
 											args...; kwargs...
-											)::Array{ComplexF64,4}
+											)::AbstractArray{ComplexF64,4}
 
 	psiH_on_mesh(n, get_kij(n,k), args...; kwargs...)
 
@@ -2146,7 +2149,7 @@ function psiH_on_mesh(n::Int,
 											kij::Function,
 											perturb::AbstractArray{ComplexF64,4},
 											H::Function, Hdata...; kwargs...
-											)::Array{ComplexF64,4}
+											)::AbstractArray{ComplexF64,4}
 
 	store_on_mesh(first∘init_eigH, eigH!, 
 								n, tuple, H, kij, perturb, Hdata...; kwargs...)
@@ -2176,7 +2179,7 @@ end
 
 function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; 
 											kwargs...
-											)::Array{ComplexF64,4}
+											)::AbstractArray{ComplexF64,4}
 
 	store_on_mesh(first∘init_eigH, eigH!, n, kij, H, Hdata...; kwargs...)
 

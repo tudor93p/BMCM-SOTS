@@ -55,19 +55,20 @@ input_checks  = Dict{Symbol,Any}(
 											145, 
 											215, 
 											300,
-											433,
 											601,
 											1001,
 											2001,
 											3001, # >8 GB 
+											6001,
 											#8001, # >75 GB
 											#10001 # >45 GB  psi 
 											#20001 # >160 GB
+											25001,
 																																															 ),
 
 
 
-		kMesh_model = ["Line"],#["square","sin", "line","expminv"],
+		kMesh_model = ["Uniform"],#"Line"],#["Square","Sin", "Expminv"],
 
 
 		kPoint_start = [-1], 

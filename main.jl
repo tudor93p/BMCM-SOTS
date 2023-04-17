@@ -7,13 +7,19 @@ import myLibs: ComputeTasks, Utils
 import BMCMSOTS  
 
 
-include("input_file_10.jl")
+include("input_file_32.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
 #				 init(BMCMSOTS,:WannierBands1),
 				 ];
 	
+ComputeTasks.missing_data.(tasks,show_missing=gethostname()=="tudor-HP")
+
+
+
+@assert !in(gethostname(),["tudor-HP","horon"])
+
 
 prep_all = ComputeTasks.get_data_all_prep.(tasks, 
 													 shuffle=true, seed=4, 
@@ -54,7 +60,6 @@ relevant_params(k::Symbol)=[k=>v for v=relevant_params(Val(k))]
 relevant_params(k::Symbol...) = map(relevant_params, k)
 
 
-ComputeTasks.missing_data.(tasks,show_missing=false);
 
 
 for (t,(active,a,k)) in zip(tasks,prep_all)
