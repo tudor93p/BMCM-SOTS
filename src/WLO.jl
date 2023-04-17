@@ -18,7 +18,8 @@ import myLibs.Parameters:UODict
 
 import ..Helpers: PeriodicFuns, Symmetries 
 
-const SubOrArray{T,N} = Union{Array{T,N}, SubArray{T,N}}
+const SubOrArray{T,N} = Union{Array{T,N}, SubArray{T,N,<:Array}}
+const SubOrSArray{T,N} = Union{SharedArray{T,N}, SubArray{T,N,<:SharedArray}}
 
 #===========================================================================#
 #
@@ -1147,39 +1148,7 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function init_storage(T::DataType, 
-											ns::Int...; kwargs...
-																	)::AbstractArray{<:Number}
 
-	init_storage(T, (), ns...)
-
-end 
-
-
-function prep_init_array(
-											s::NTuple{Ns,Int},
-											ns::NTuple{Nn,Int}; 
-											parallel::Bool=false,
-											distr_axis::Int=Nn,
-											kwargs...
-											)::Tuple{NTuple{Ns+Nn,Int}, Vector{Int}, Vector{Int}
-															 } where {Ns,Nn}
-	
-	array_size = (s..., (n-1 for n=ns)...)
-
-	d = ones(Int, Ns+Nn)
-	
-	w = workers()
-
-	parallel || return (array_size, w, d)
-
-	@assert 1<=distr_axis<=Nn
-
-	wmax = min(length(w), array_size[Ns+distr_axis])
-
-	return (array_size, w[1:wmax], setindex!(d, wmax, Ns+distr_axis))
-
-end 
 
 function inds_distrib_array(array_size::NTuple{N,Int},
 														q::AbstractVector{Int},
@@ -1214,13 +1183,52 @@ end
 
 
 
+function init_storage(args...; kwargs...)
 
-function init_storage(T::DataType, 
+	wrapper_ak(init_storage_ak, init_storage, args...; kwargs...)
+
+end 
+
+
+#===========================================================================#
+#
+# prep_init_array and init_storage take identical same args and kwargs
+#
+#---------------------------------------------------------------------------#
+
+
+function prep_init_array(
 											s::NTuple{Ns,Int},
-											ns::Vararg{Int,Nn}; 
+											ns::NTuple{Nn,Int},
+											args...;
+											parallel::Bool=false,
+											distr_axis::Int=Nn,
+											kwargs...
+											)::Tuple{NTuple{Ns+Nn,Int}, Vector{Int}, Vector{Int}
+															 } where {Ns,Nn}
+	
+	array_size = (s..., (n-1 for n=ns)...)
+
+	d = ones(Int, Ns+Nn)
+	
+	w = workers()
+
+	parallel || return (array_size, w, d)
+
+	@assert 1<=distr_axis<=Nn
+
+	wmax = min(length(w), array_size[Ns+distr_axis])
+
+	return (array_size, w[1:wmax], setindex!(d, wmax, Ns+distr_axis))
+
+end 
+
+function init_storage(#T::DataType, 
+											s::NTuple{Ns,Int},
+											ns::NTuple{Nn,Int},
+											T::DataType;
 											parallel::Bool=false,
 											shared::Bool=false,
-#											distr_axis::Int=Nn,
 											kwargs...
 											)::AbstractArray{<:Number,Ns+Nn} where Ns where Nn 
 
@@ -1238,6 +1246,14 @@ function init_storage(T::DataType,
 end 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
 
 function init_storage1(item1::AbstractArray{T,N}, n::Int; kwargs...
 											)::AbstractArray{T,N+1} where T<:Number where N
@@ -1247,10 +1263,38 @@ function init_storage1(item1::AbstractArray{T,N}, n::Int; kwargs...
 end 
 
 
-function init_storage(item1::AbstractArray{T,N}, n::Int; kwargs...
-											)::AbstractArray{T,N+2} where T<:Number where N
 
-	init_storage(T, size(item1), n, n; kwargs...)
+function init_storage_ak(T::DataType, ns::Int...; kwargs...)
+
+	init_storage_ak(T, (), ns...)
+
+end 
+
+function init_storage_ak(T::DataType, 
+												 s::Tuple{Vararg{Int}}, 
+												 n::Vararg{Int}; 
+												 kwargs...)
+
+	init_storage_ak(T, s, n; kwargs...)
+
+end 
+
+function init_storage_ak(T::DataType, 
+												 s::Tuple{Vararg{Int}}, 
+												 n::Tuple{Vararg{Int}}; 
+												 kwargs...)
+
+	(s, n, T), kwargs
+
+end 
+
+
+
+
+
+function init_storage_ak(item1::AbstractArray{T}, n::Int; kwargs...) where T
+
+	init_storage_ak(T, size(item1), n, n; kwargs...)
 
 end 
 
@@ -1269,16 +1313,24 @@ function init_storage(item1::AbstractVector{<:AbstractArray},
 end 
 
 
-function store_on_mesh(get_one::Function, 
-												source::AbstractArray{<:Number},
-											 data...; kwargs...
-												)
-	error()
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
-	store_on_mesh(get_one, nr_kPoints_from_mesh(source), source, data...;
-								kwargs...)
 
-end   
+
+#function store_on_mesh(get_one::Function, 
+#												source::AbstractArray{<:Number},
+#											 data...; kwargs...
+#												)
+#	error()
+#
+#	store_on_mesh(get_one, nr_kPoints_from_mesh(source), source, data...;
+#								kwargs...)
+#
+#end   
 
 function store_on_mesh1(get_one::Function, 
 											 n::Int,
@@ -1296,42 +1348,50 @@ function store_on_mesh1(get_one::Function,
 
 end  
 
-function store_on_mesh(get_one::Function, 
-											 n::Int,
-												source::Union{Function, 
-																		AbstractArray{<:Number},
-																		NTuple{N, <:AbstractArray} where N,
-																		},
-											 data...;
-											 kwargs...
-												)
-
-	error() 
-
-	dest = init_storage(get_one_wrapper(get_one, source, 1,1, data...; 
-																				 kwargs...), n) 
-
-
-	store_on_mesh!(get_one, n, source, dest, data...; kwargs...)
-
-	return dest
-
-end  
+#function store_on_mesh(get_one::Function, 
+#											 n::Int,
+#												source::Union{Function, 
+#																		AbstractArray{<:Number},
+#																		NTuple{N, <:AbstractArray} where N,
+#																		},
+#											 data...;
+#											 kwargs...
+#												)
+#
+#	error() 
+#
+#	dest = init_storage(get_one_wrapper(get_one, source, 1,1, data...; 
+#																				 kwargs...), n) 
+#
+#
+#	store_on_mesh!(get_one, n, source, dest, data...; kwargs...)
+#
+#	return dest
+#
+#end  
 function store_on_mesh(get_one::Function, get_one!::Function,
 											 n::Int,
 											 source,
 											 data...;
 											 kwargs...
 											)
-	sample_out = get_one_wrapper(get_one, source, 1,1, data...)
 
-	dest = init_storage(sample_out, n; kwargs...)
+	a,k = init_storage_ak(get_one_wrapper(get_one, source, 1,1, data...),
+												n; kwargs...)
 
-	array_distrib = inds_distrib_array(size(sample_out), (n, n); kwargs...)
+	dest = init_storage(a...; k...)
+
+	array_distrib = inds_distrib_array(a...; k...) 
+
+@show array_distrib 
+
+	@show typeof(dest) 
 
 	store_on_mesh!!(get_one!, n, source, dest, data...;
 									array_distrib=array_distrib
 									)
+
+	@show dest[1,1,1,1]
 
 	return dest
 
@@ -1394,8 +1454,11 @@ function store_on_mesh!!(get_one!::Function,
 end 
 
 function store_on_mesh!!(get_one!::Function, 
-												source::Union{<:SubOrArray{<:Number},
+												source::Union{
+																			<:SubOrArray{<:Number},
 																			<:AbstractVector{<:SubOrArray},
+																			<:SubOrSArray{<:Number},
+																			<:AbstractVector{<:SubOrSArray},
 																		},
 												dest::AbstractArray=source,
 												data...; kwargs...
@@ -1418,20 +1481,35 @@ function store_on_mesh!!(get_one!::Function, n::Int, args...;
 
 end 
 
-#function store_on_mesh!!(get_one!::Function, 
-#												 inds::Tuple{<:AbstractVector{Int},
-#																		 <:AbstractVector{Int}},
-#												 source,
-#												dest::Union{<:SubOrArray{<:Number},
-#																		<:AbstractVector{<:SubOrArray},
-#																		},
-#												data...; 
-#												kwargs...
-#												)::Nothing  
-#
-#	store_on_mesh!!(get_one!, (), inds, source, dest, data...; kwargs...) 
-#
-#end   
+function _store_on_mesh!!(get_one!::Function, 
+												 inds::Tuple{<:AbstractVector{Int},
+																		 <:AbstractVector{Int}},
+												source::Union{<:Function, 
+																			<:SubOrArray{<:Number},
+																			<:AbstractVector{<:SubOrArray},
+																			<:SubOrSArray{<:Number},
+																			<:AbstractVector{<:SubOrSArray},
+																		},
+												dest::Union{<:SubOrArray{<:Number},
+																		<:AbstractVector{<:SubOrArray},
+																		<:SubOrSArray{<:Number},
+																		<:AbstractVector{<:SubOrSArray},
+																		},
+												data...; 
+												parallel::Bool=false,
+												array_distrib=nothing,
+												kwargs...
+												)::Nothing 
+
+	for j=inds[2], i=inds[1]
+
+		store_on_mesh_one!!(get_one!, source, i, j, dest, data...; kwargs...)
+
+	end 
+
+	return 
+
+end    
 
 function store_on_mesh!!(get_one!::Function, 
 												 inds::Tuple{<:AbstractVector{Int},
@@ -1444,20 +1522,13 @@ function store_on_mesh!!(get_one!::Function,
 																		<:AbstractVector{<:SubOrArray},
 																		},
 												data...; 
-												parallel::Bool=false,
-												array_distrib=[],
 												kwargs...
 												)::Nothing 
 
-	for j=inds[2], i=inds[1]
-
-		store_on_mesh_one!!(get_one!, source, i, j, dest, data...; kwargs...)
-
-	end 
-
-	return 
+	_store_on_mesh!!(get_one!, inds, source, dest, data...; kwargs...)
 
 end   
+
 
 
 
@@ -1507,8 +1578,8 @@ function store_on_mesh!!(get_one!::Function,
 																			<:AbstractArray{<:Number},
 																			<:AbstractVector{<:AbstractArray},
 																		},
-												 dest::Union{<:AbstractVector{<:SharedArray},
-																		 SharedArray{<:Number},
+												 dest::Union{<:AbstractVector{<:SubOrSArray},
+																		 SubOrSArray{<:Number},
 																		 },
 												 # both source and dest may be overwritten
 												data...; # assumes data is read-only 
@@ -1516,7 +1587,12 @@ function store_on_mesh!!(get_one!::Function,
 												kwargs...
 												)::Nothing 
 
-	@assert length(array_distrib)===length(workers())
+	@show array_distrib  workers() 
+
+	@assert length(array_distrib)===nworkers()
+
+	nworkers()==1 && return _store_on_mesh!!(get_one!, inds, source, dest, data...; 
+																					 kwargs...)
 
 	map(workers(),array_distrib
 #			procs(eltype(dest)<:AbstractArray ? dest[1] : dest)
@@ -1524,7 +1600,7 @@ function store_on_mesh!!(get_one!::Function,
 
 		@spawnat p begin   
 
-			store_on_mesh!!(get_one!, 
+			_store_on_mesh!!(get_one!, 
 											map(findall_indexin, get_big_inds(locinds), inds),
 											localpart_(source,locinds),
 											localpart_(dest,locinds),
@@ -1651,6 +1727,8 @@ function store_on_mesh_one!!(
 							i::Int, j::Int,
 							dest::Union{<:SubOrArray{<:Number},
 													<:AbstractVector{<:SubOrArray},
+													<:SubOrSArray{<:Number},
+													<:AbstractVector{<:SubOrSArray},
 													},
 							data...; kwargs...
 												)::Nothing 
@@ -1681,17 +1759,17 @@ end
 
 
 
-function store_on_mesh_one!!(
-							get_one!::Function, 
-							source,
-							i::Int, j::Int,
-							args...; kwargs...
-							)::Nothing 
-
-	store_on_mesh_one!!(get_one!, i, j, source, i, j, args...; kwargs...)
-
-end  
-
+#function store_on_mesh_one!!(
+#							get_one!::Function, 
+#							source,
+#							i::Int, j::Int,
+#							args...; kwargs...
+#							)::Nothing 
+#
+#	store_on_mesh_one!!(get_one!, i, j, source, i, j, args...; kwargs...)
+#
+#end  
+#
 
 
 
@@ -2662,176 +2740,201 @@ end
 #---------------------------------------------------------------------------#
 
 
-#
-#function init_overlaps_line_ida((A,B)::AbstractVector{<:AbstractArray{ComplexF64,N}};
-#											parallel::Bool=false,
-#											distr_axis::Int=6,
-#											kwargs...
-#											) where N 
-#
-#	nmesh = nr_kPoints_from_mesh(A,1) 	
-#
-#	n::Vector{Int} = fill(nmesh,1+parallel)
-#
-#	parallel && setindex!(n, nworkers()+1, distr_axis) 
-#
-#	[
-#	 init_storage(ComplexF64, (nwf,nwf), n...;
-#								parallel=parallel, distr_axis=distr_axis, kwargs...
-#								) for i=1:2
-#	 ]
-#
-#end 
-
-function init_overlaps_line_ida(nwf::Int, nmesh::Int; 
+function init_overlaps_line_ak(nwf::Int, nmesh::Int; 
 											parallel::Bool=false,
 											distr_axis::Int=6,
 											kwargs...
 											)
 
-	n::Vector{Int} = fill(nmesh,1+parallel)
+	parallel && @assert 1<=distr_axis<=2 
 
-	parallel && setindex!(n, nworkers()+1, distr_axis) 
+	ns = parallel ? Tuple(i==distr_axis ? nworkers()+1 : nmesh for i=1:2) : (nmesh,)
 
-	return (ComplexF64, (nwf,nwf), n...), (parallel=parallel, distr_axis=distr_axis, kwargs...)
-
-end 
-
-function init_overlaps_line(nwf::Int, nmesh::Int; 
-											parallel::Bool=false,
-											distr_axis::Int=6,
-											kwargs...
-											)::Vector{<:Union{Array,DArray,SharedArray}}
-
-	n::Vector{Int} = fill(nmesh,1+parallel)
-
-	parallel && setindex!(n, nworkers()+1, distr_axis) 
-
-	[
-	 init_storage(ComplexF64, (nwf,nwf), n...;
-								parallel=parallel, distr_axis=distr_axis, kwargs...
-								) for i=1:2
-	 ]
+	return init_storage_ak(ComplexF64, (nwf,nwf), ns;
+												 parallel=parallel, distr_axis=distr_axis, kwargs...)
 
 end 
 
-#return (T, s, n...),(parallel=parallel,)
+function init_overlaps_line_ak(wfs::AbstractArray{ComplexF64,3},
+													 )
 
-
-function init_overlaps_line(wfs::AbstractArray{ComplexF64,3},
-													 )::Vector{Array{ComplexF64,3}}
-
-	init_overlaps_line(1,wfs)
+	init_overlaps_line_ak(1,wfs)
 
 end  
 
-function init_overlaps_line(
+function init_overlaps_line_ak(
 														wfs::AbstractArray{ComplexF64,N},
 														nmesh::Int,
-													 )::Vector{Array{ComplexF64,3}} where N 
+													 ) where N
 
 	@assert 3<=N<=4 
 
-	init_overlaps_line(size(wfs,2), check_nr_kPoints(nmesh))
+	init_overlaps_line_ak(size(wfs,2), check_nr_kPoints(nmesh))
 
 end 
 
-function init_overlaps_line_ida(
+
+function wlo_filter_distr_kwargs(dir::Int;
+																distr_axis::Int=10,
+																kwargs...
+																)
+
+	(distr_axis=3-dir, kwargs...)
+
+end 
+
+
+
+function init_overlaps_line_ak(
 														dir::Int,
 														wfs::AbstractArray{ComplexF64,N};
 														parallel::Bool=false,
-														dist_axis::Int=10,
 														kwargs...
 														) where N
 
 	@assert 3<=N<=4
 
-	init_overlaps_line_ida(size(wfs,2), nr_kPoints_from_mesh(wfs,dir,N-2);
+	init_overlaps_line_ak(size(wfs,2), nr_kPoints_from_mesh(wfs,dir,N-2);
 								parallel=N==4 && parallel,
-								distr_axis=3-dir,
-								kwargs...
+								wlo_filter_distr_kwargs(dir; kwargs...)...
 								)
 
 
 end  
 
-function init_overlaps_line(
-														dir::Int,
-														wfs::AbstractArray{ComplexF64,N};
-														parallel::Bool=false,
-														dist_axis::Int=10,
-														kwargs...
-														)::Vector{<:Union{Array,DArray,SharedArray}
-																		} where N 
 
-	@assert 3<=N<=4
+function init_overlaps_line(args...; kwargs... 
+														)::Vector{<:Union{Array,DArray,SharedArray}}
 
-	init_overlaps_line(size(wfs,2), nr_kPoints_from_mesh(wfs,dir,N-2);
-								parallel=N==4 && parallel,
-								distr_axis=3-dir,
-								kwargs...
-								)
-
-
-end  
-
-function init_wlo_mesh_ida(result::AbstractArray{ComplexF64,N};
-											 kwargs...
-											 ) where N 
-
+	a,k = init_overlaps_line_ak(args...; kwargs...)
 	
-	n = nr_kPoints_from_mesh(result) 
+	return [init_storage(a...; k...) for i=1:2]
+ 
+end 
 
-	return inds_distrib_array(size(result)[1:2], Tuple(n for i=3:N); kwargs...)
+#function init_overlaps_line(
+#														dir::Int,
+#														wfs::AbstractArray{ComplexF64,N};
+#														parallel::Bool=false,
+#														distr_axis::Int=10,
+#														kwargs...
+#														)::Vector{<:Union{Array,DArray,SharedArray}
+#																		} where N 
+#
+#	@assert 3<=N<=4
+#
+#	init_overlaps_line(size(wfs,2), nr_kPoints_from_mesh(wfs,dir,N-2);
+#								parallel=N==4 && parallel,
+#								distr_axis=3-dir,
+#								kwargs...
+#								)
+#
+#
+#end  
+#
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+#function init_wlo_mesh(nwf::Int, nmesh::Vararg{Int,N};
+#											 kwargs...
+#											)::Union{Array{ComplexF64,N+2},
+#															 DArray{ComplexF64,N+2},
+#															 SharedArray{ComplexF64,N+2},
+#															 } where N
+#
+#	init_storage(ComplexF64, (nwf,nwf), nmesh...; kwargs...)
+#
+#end 
+
+function init_wlo_mesh_ak(nwf::Int, nmesh::Int...; kwargs...)
+
+	init_storage_ak(ComplexF64, (nwf,nwf), nmesh...; kwargs...)
 
 end 
 
-
-
-function init_wlo_mesh(nwf::Int, nmesh::Vararg{Int,N};
-											 kwargs...
-											)::Union{Array{ComplexF64,N+2},
-															 DArray{ComplexF64,N+2},
-															 SharedArray{ComplexF64,N+2},
-															 } where N
-
-	init_storage(ComplexF64, (nwf,nwf), nmesh...; kwargs...)
-
-end 
-
-function init_wlo_mesh(wfs::AbstractArray{ComplexF64,3},
+function init_wlo_mesh_ak(wfs::AbstractArray{ComplexF64,3},
 											 nmesh::Int=nr_kPoints_from_mesh1(wfs),
-											)::Array{ComplexF64,3}
+											)
 
-	init_wlo_mesh(size(wfs,2), check_nr_kPoints(nmesh))
+	init_wlo_mesh_ak(size(wfs,2), check_nr_kPoints(nmesh))
 
-end  
+end   
 
-function init_wlo_mesh(wfs::AbstractArray{ComplexF64,4},
+#function init_wlo_mesh(wfs::AbstractArray{ComplexF64,3},
+#											 nmesh::Int=nr_kPoints_from_mesh1(wfs),
+#											)::Array{ComplexF64,3}
+#
+#	init_wlo_mesh(size(wfs,2), check_nr_kPoints(nmesh))
+#
+#end  
+#
+#function init_wlo_mesh(wfs::AbstractArray{ComplexF64,4},
+#											 nmesh::Int
+#											 )::Array{ComplexF64,4}
+#
+#	init_wlo_mesh(size(wfs,2), check_nr_kPoints(nmesh), nmesh)
+#
+#end  
+function init_wlo_mesh_ak(wfs::AbstractArray{ComplexF64,4},
 											 nmesh::Int
-											 )::Array{ComplexF64,4}
+											 )#::Array{ComplexF64,4}
 
-	init_wlo_mesh(size(wfs,2), check_nr_kPoints(nmesh), nmesh)
+	init_wlo_mesh_ak(size(wfs,2), check_nr_kPoints(nmesh), nmesh)
 
 end  
 
-function init_wlo_mesh(dir::Int,
+function init_wlo_mesh_ak(dir::Int,
 											 wfs::AbstractArray{ComplexF64,4};
 											 parallel::Bool=false,
 											 kwargs...
-											)::Union{Array{ComplexF64,4},
-															 DArray{ComplexF64,4},
-															 SharedArray{ComplexF64,4}
-															 }
+											)
 
-	init_wlo_mesh(size(wfs,2), 
+	init_wlo_mesh_ak(size(wfs,2), 
 								nr_kPoints_from_mesh(wfs,1),
 								nr_kPoints_from_mesh(wfs,2);
-								parallel=parallel,
-								distr_axis=3-dir,
-								kwargs...
+								parallel=parallel, 
+								wlo_filter_distr_kwargs(dir; kwargs...)...
 								)
 end 
+
+function init_wlo_mesh(args...; kwargs...
+											 )::Union{Array{ComplexF64},
+															 DArray{ComplexF64},
+															 SharedArray{ComplexF64}
+															 } 
+
+	wrapper_ak(init_wlo_mesh_ak, init_storage, args...; kwargs...)
+
+end 
+
+#function init_wlo_mesh(dir::Int,
+#											 wfs::AbstractArray{ComplexF64,4};
+#											 parallel::Bool=false,
+#											 kwargs...
+#											)::Union{Array{ComplexF64,4},
+#															 DArray{ComplexF64,4},
+#															 SharedArray{ComplexF64,4}
+#															 }
+#
+#	init_wlo_mesh(size(wfs,2), 
+#								nr_kPoints_from_mesh(wfs,1),
+#								nr_kPoints_from_mesh(wfs,2);
+#								parallel=parallel,
+#								distr_axis=3-dir,
+#								kwargs...
+#								)
+#end 
+#
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -2856,48 +2959,52 @@ end
 #
 #---------------------------------------------------------------------------#
 
+function wrapper_ak(akfun::Function, fun::Function, args...; kwargs...) 
+
+	a, k = akfun(args...; kwargs...)
+
+	return fun(a...; k...) 
+
+end 
+
 
 
 function wlo1_on_mesh_inplace(dir1::Int, 
 															WFs::AbstractArray{ComplexF64,4};
 															kwargs...
 															)::Union{Array{ComplexF64,4},
-																			DArray{ComplexF64,4}}
+																			DArray{ComplexF64,4},
+																			SharedArray{ComplexF64,4}
+																			}
 
-	dest = init_wlo_mesh(dir1, WFs; kwargs...)
+	dest = init_wlo_mesh(dir1, WFs; kwargs...) 
+
 	overlaps = init_overlaps_line(dir1, WFs; kwargs...)
 
 
-	array_distrib_dest = inds_wlo_mesh_ida(dir1, WFs; kwargs...) 
-	array_distrib_ov = init_overlaps_line_ida(dir1, WFs; kwargs...)
+	i = wrapper_ak(init_wlo_mesh_ak, inds_distrib_array, dir1, WFs; kwargs...)
+	
+	j = wrapper_ak(init_overlaps_line_ak, inds_distrib_array, dir1, WFs; kwargs...)
 
-	@show array_distrib_dest 
-	@show array_distrib_ov 
-
-	if WFs isa SubArray{T,N,<:SharedArray} where {T,N} 
-
-
-
-
-	@show typeof(dest)  typeof(overlaps) size(dest) size.(overlaps)
-
-	error() 
-end  
-
-	wlo1_on_mesh_inplace!(dest, overlaps..., WFs, dir1)
+	wlo1_on_mesh_inplace!(dest, overlaps..., WFs, dir1;
+												array_distrib=(i,j)
+												)
 
 	return dest 
 
 end 
 
 
-function wlo1_on_mesh_inplace!(
-						 dest::SubOrArray{ComplexF64,4},
-						 overlaps::SubOrArray{ComplexF64,3},
-						 ov_aux::SubOrArray{ComplexF64,3},
-						 WFs::SubOrArray{ComplexF64,4},
+function _wlo1_on_mesh_inplace!(
+						dest::Td,
+						overlaps::To,
+						ov_aux::Ta,
+						 WFs::Tw,
 						 dir1::Int
-						)::Nothing
+						)::Nothing where {T<:ComplexF64,
+															T4<:Union{SubOrArray{T,4},SubOrSArray{T,4}},
+															T3<:Union{SubOrArray{T,3},SubOrSArray{T,3}},
+															Td<:T4, Tw<:T4, To<:T3, Ta<:T3}
 
 
 	for d=1:2 
@@ -2914,24 +3021,27 @@ function wlo1_on_mesh_inplace!(
 
 end 
 
+function wlo1_on_mesh_inplace!(
+						 dest::SubOrArray{ComplexF64,4},
+						 overlaps::SubOrArray{ComplexF64,3},
+						 ov_aux::SubOrArray{ComplexF64,3},
+						 WFs::SubOrArray{ComplexF64,4},
+						 dir1::Int;
+						 array_distrib=nothing,
+						)::Nothing
 
+	_wlo1_on_mesh_inplace!(dest, overlaps, ov_aux, WFs, dir1) 
 
-
-
-#
-#selectdim(B, d1, I)
-#selectdim(B, d2, I) 
-#
-#			source(big_inds[1][i], big_inds[2][i])
-
+end 
 
 
 function wlo1_on_mesh_inplace!(
 						 dest::SubOrDArray{ComplexF64,4},
 						 overlaps::SubOrDArray{ComplexF64,4},
 						 ov_aux::SubOrDArray{ComplexF64,4},
-						 WFs::AbstractArray{ComplexF64,4},
-						 dir1::Int
+						 WFs::AbstractArray{ComplexF64,4}, #### copied on each core!
+						 dir1::Int;
+						 array_distrib=nothing
 						)::Nothing
 
 	dir2 = 3-dir1 
@@ -2953,11 +3063,48 @@ function wlo1_on_mesh_inplace!(
 
 	end .|> fetch 
 
-
 	return 
 
 end 
 
+function wlo1_on_mesh_inplace!(
+						 dest::SubOrSArray{T,4},
+						 overlaps::SubOrSArray{T,4},
+						 ov_aux::SubOrSArray{T,4},
+						 WFs::SubOrSArray{T,4},
+						 dir1::Int;
+						 array_distrib::Tuple{<:AbstractVector,<:AbstractVector}
+						)::Nothing where T<:ComplexF64
+
+	dir2 = 3-dir1 
+	d2 = get_mesh_dir(dest,dir2) 
+
+	@assert all(==(nworkers())∘length, array_distrib)
+
+
+	@show nworkers()
+#	} where AbstractVector{<:Tuple{Vararg{UnitRange{Int}}}}
+
+
+	map(workers(),array_distrib) do p,locinds
+
+		@spawnat p begin      
+
+			_wlo1_on_mesh_inplace!(
+											localpart_(dest,locinds),
+											only(eachslice(localpart_(overlaps,locinds), dims=d2)),
+											only(eachslice(localpart_(ov_aux,locinds), dims=d2)),
+											localpart_(WFs, locinds, dir2),
+											dir1, 
+											)
+
+		end  
+
+	end .|> fetch 
+
+	return 
+
+end 
 
 
 
@@ -3031,7 +3178,7 @@ end
 
 
 function localpart_(B::SubOrDArray{<:Number}, 
-										)::SubOrArray
+										)::AbstractArray
 
 	localpart(B) 
 
@@ -3039,7 +3186,7 @@ end
 
 function localpart_(B::SubOrDArray{<:Number}, 
 										A::SubOrDArray{<:Number}, args... 
-										)::SubOrArray
+										)::AbstractArray
 
 	@assert same_mesh_distrib(B,A) 
 
@@ -3047,9 +3194,9 @@ function localpart_(B::SubOrDArray{<:Number},
 
 end 
 
-function localpart_(B::Union{<:SubOrArray{<:Number}, <:SharedArray{<:Number}},
+function localpart_(B::Union{<:SubOrArray{<:Number}, <:SubOrSArray{<:Number}},
 										I::Tuple{Vararg{UnitRange{Int}}}, 
-										dir::Int)::SubArray
+										dir::Int)::AbstractArray
 
 	d = get_mesh_dir(I,dir) 
 
@@ -3059,15 +3206,15 @@ end
 
 
 function localpart_(B::SubOrArray{<:Number}, 
-										A::SubOrDArray{<:Number}, dir::Int...)::SubArray
+										A::SubOrDArray{<:Number}, dir::Int...)::AbstractArray
 
 	localpart_(B, localindices(A), dir...)
 
 end 
 
-function localpart_(B::Union{<:SubOrArray{<:Number}, <:SharedArray{<:Number}},
+function localpart_(B::Union{<:SubOrArray{<:Number}, <:SubOrSArray{<:Number}},
 										I::Tuple{Vararg{UnitRange{Int}}}
-									 )::SubArray
+									 )::AbstractArray
 
 	select_mesh_point(B, select_mesh_dir(I,1), select_mesh_dir(I,2))
 
@@ -3120,7 +3267,7 @@ function localpart_(A,
 end 
 
 function localpart_(arrays::AbstractVector{<:AbstractArray},
-										args...)::Vector{<:SubOrArray} 
+										args...)::Vector{<:AbstractArray}
 
 	[localpart_(a, args...) for a in arrays] 
 
@@ -3128,7 +3275,7 @@ end
 
 function localpart_(arrays1::AbstractVector{<:AbstractArray}, 
 										arrays2::AbstractVector{<:SubOrDArray}, 
-										::Vararg)
+										::Vararg)::Vector{<:AbstractArray}
 	
 	@assert same_mesh_distrib(arrays2)
 
@@ -3229,7 +3376,7 @@ end
 	
 function Wannier_subspaces_on_mesh!(W::SubOrArray{ComplexF64,4};
 																		kwargs... 
-																		)::Vector{Array}
+																		)::Vector{<:AbstractArray}
 	
 	@assert !get(kwargs,:parallel,false) 
 
@@ -3240,11 +3387,12 @@ end
 function Wannier_subspaces_on_mesh!(W::SubOrDArray{ComplexF64,4};
 																		dir::Int,
 																		parallel::Bool=true 
-																	 )::Vector{Array}
+																	 )::Vector{<:AbstractArray}
 
 	@assert parallel 
 
-	_Wannier_subspaces_on_mesh!(W; parallel=parallel, distr_axis=3-dir)
+	_Wannier_subspaces_on_mesh!(W; parallel=parallel, 
+															wlo_filter_distr_kwargs(dir)...)
 
 end  
 
@@ -3254,8 +3402,11 @@ function _Wannier_subspaces_on_mesh!(W::AbstractArray{ComplexF64,4};
 
 	nmesh = nr_kPoints_from_mesh(W)
 
+
 	storage = init_storage(init_Wannier_subspaces(select_mesh_point(W,1,1)),
 												 nmesh; kwargs...)
+
+	@show typeof(storage)
 	
 	store_on_mesh!!(Wannier_subspaces!!, nmesh, [W], storage)
 
@@ -3347,7 +3498,7 @@ function wcc2mesh_fromSubspaces1(dir2::Int,
 																kwargs...
 																)::Vector{Array{Float64,3}}
 
-	dist_axis = 3-dir2 
+	distr_axis = 3-dir2 
 
 	n = nr_kPoints_from_mesh(psiH)
 
@@ -3910,18 +4061,22 @@ function Wannier_eigen!!(storage::AbstractVector{<:AbstractArray},
 end 
 
 
-function Wannier_subspaces!!(storage::AbstractVector{<:SubOrArray},
-														 W::AbstractVector{<:SubOrArray},
+function Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
+														 W::AbstractVector{<:AbstractArray}
 														 )::Nothing 
 
 	Wannier_subspaces!!(storage, only(W))
 
 end 
 
-function Wannier_subspaces!!(storage::AbstractVector{<:SubOrArray},
+function Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
 														 W::SubOrArray{<:Number,2},
 														 )::Nothing 
-														 
+
+	for item in storage 
+		@assert item isa SubOrArray
+	end 
+
 	eig = LinearAlgebra.eigen!(W)
 
 	E = get_periodic_eigvals(eig.values)
@@ -4008,7 +4163,7 @@ end
 
 
 function get_wlo_data_mesh(psiH::Union{<:SubOrArray{ComplexF64,4}, 
-																			 <:SharedArray{ComplexF64,4}
+																			 <:SubOrSArray{ComplexF64,4}
 																			 },
 									occupied::Bool,
 									dir1::Int,
@@ -4016,18 +4171,29 @@ function get_wlo_data_mesh(psiH::Union{<:SubOrArray{ComplexF64,4},
 									kwargs...
 									)::Tuple
 
-	sh = isa(psiH,SharedArray)
+	sh = isa(psiH,SubOrSArray)
 
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
 	w1 = wlo1_on_mesh_inplace(dir1, psi; kwargs...)
-	
-	@assert !sh 
+
+	sh && @show typeof(w1) @show typeof(psi)
+
 
 	eigW1 = Wannier_subspaces_on_mesh!(w1; dir=dir1, kwargs...)
 
+	sh && @show typeof(eigW1) typeof.(eigW1) 
+
+	@assert !sh 
+	do_conv = any(isa(x,SubOrDArray) for x in eigW1)
+
+
 	if get_wlo2 
+
+		if do_conv
+			eigW1 = convert(Vector{Array}, eigW1)
+		end 
 
 		return (eigW1, wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi; kwargs...))
 
