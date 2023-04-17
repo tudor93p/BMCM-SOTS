@@ -1153,31 +1153,34 @@ end
 
 # internal 
 function _inds_distrib_array(array_size::NTuple{N,Int},
-														q::AbstractVector{Int},
+														array_workers::AbstractVector{Int},
 														array_distrib::AbstractVector{Int},
-														)::Vector{NTuple{N,UnitRange{Int}}} where N
+														)::Dict{Int, NTuple{N,UnitRange{Int}}
+																		 } where N
 
 	I = findall(>(1), array_distrib)
 
 	t0 = Tuple(1:a for a=array_size)
 
-	isempty(I) && return [t0]
+
+	isempty(I) && return Dict(only(array_workers)=>t0)
 
 	@assert length(I)==1 
 
 	i = only(I)
 
+
 	distr_i = Utils.EqualDistributeBallsToBoxes_cumulRanges(
 																array_size[i], array_distrib[i])
-
-	return [Tuple(i==d ? J : a for (d,a)=enumerate(t0)) for J=distr_i]
+	
+	return Dict(w=>Tuple(i==d ? J : a for (d,a)=enumerate(t0)) for (w,J)=zip(array_workers,distr_i))
 
 end 
 														
 
 function _inds_distrib_array(
 														args_as_inst...; kwargs_as_inst...
-														)::Vector{<:Tuple{Vararg{UnitRange{Int}}}}
+														)::Dict{Int,Tuple{Vararg{UnitRange{Int}}}}
 
 	_inds_distrib_array(_prep_init_array(args_as_inst...; kwargs_as_inst...)...)
 
@@ -1187,7 +1190,7 @@ end
 function inds_distrib_array(args...; 
 														custom_ak::Function=init_storage_ak,
 														kwargs...
-														)::Vector{<:Tuple{Vararg{UnitRange{Int}}}}
+														)::Dict{Int,Tuple{Vararg{UnitRange{Int}}}}
 
 	wrapper_ak(custom_ak, _inds_distrib_array, args...; kwargs...) 
 
@@ -1642,7 +1645,7 @@ function store_on_mesh!!(get_one!::Function,
 																		 SubOrSArray{<:Number},
 																		 },
 												data...; #
-												array_distrib::AbstractVector{<:Tuple{Vararg{UnitRange{Int}}}},
+												array_distrib::Dict{Int,Tuple{Vararg{UnitRange{Int}}}},
 												kwargs...
 												)::Nothing 
 
@@ -1650,16 +1653,22 @@ function store_on_mesh!!(get_one!::Function,
 
 		@assert !isa(d,SubOrDArray)
 
-		isa(d,SubOrArray) && @warn "Large array passed? $(size(d))"
+		isa(d,SubOrArray) || continue 
+	
+		length(d) < max(100, sum(length, dest)/50) && continue 
+
+		@warn "Large array passed? $(size(d))"
 
 	end 
 
-	@assert length(array_distrib)===nworkers()
+	@assert issubset(keys(array_distrib),workers())
 
-	nworkers()==1 && return _store_on_mesh!!(get_one!, inds, source, dest, data...; 
+	length(array_distrib)==1 && return _store_on_mesh!!(get_one!, inds, source, dest, data...; 
 																					 kwargs...)
+	
+	map(filter(in(keys(array_distrib)),workers())) do  p
 
-	map(workers(),array_distrib) do p,locinds
+		locinds = array_distrib[p]
 
 		@spawnat p begin   
 
@@ -2842,7 +2851,9 @@ function init_overlaps_line_ak(nwf::Int, nmesh::Int;
 
 	parallel && @assert 1<=distr_axis<=2 
 
-	ns = parallel ? Tuple(i==distr_axis ? nworkers()+1 : nmesh for i=1:2) : (nmesh,)
+
+
+	ns = parallel ? Tuple(i==distr_axis ? min(nworkers()+1,nmesh) : nmesh for i=1:2) : (nmesh,)
 
 	return init_storage_ak(ComplexF64, (nwf,nwf), ns;
 												 parallel=parallel, distr_axis=distr_axis, kwargs...)
@@ -2932,11 +2943,11 @@ function init_overlaps_line(args...; kwargs...
 end  
 
 function init_overlaps_line_ida(args...; kwargs... 
-														)::Vector{<:Union{Array,DArray,SharedArray}}
+														)#::Vector{<:Union{Array,DArray,SharedArray}}
 
 	wrapper_ak(init_overlaps_line_ak, 
 						 (_init_overlaps_line, _inds_distrib_array), args...; kwargs...)
-	
+
 end 
 
 function Wannier_sector_storage(W::AbstractArray{T,N}
@@ -3137,7 +3148,8 @@ function wlo1_on_mesh_inplace(dir1::Int,
 
 	overlaps,ov_i = init_overlaps_line_ida(dir1, WFs; kwargs...)
 
-	wlo1_on_mesh_inplace!(dest, overlaps..., WFs, dir1; array_distrib=(dest_i,ov_i))
+	wlo1_on_mesh_inplace!(dest, overlaps..., WFs, dir1; 
+												array_distrib=(dest_i,ov_i))
 
 	return dest 
 
@@ -3273,18 +3285,24 @@ function wlo1_on_mesh_inplace!(
 						 ov_aux::SubOrSArray{T,4},
 						 WFs::SubOrSArray{T,4},
 						 dir1::Int;
-						 array_distrib::Tuple{<:AbstractVector{<:NTuple},<:AbstractVector{<:NTuple}}
+						 array_distrib::Tuple{<:AbstractDict,<:AbstractDict},
 						)::Nothing where T<:ComplexF64
 
 
-	@assert all(==(nworkers())∘length, array_distrib)
 
+	@assert all(issubset(keys(a_d),workers()) for a_d=array_distrib)
+
+	@assert Set(keys(array_distrib[1]))==Set(keys(array_distrib[2]))
 
 	nworkers()==1 && return _wlo1_on_mesh_inplace!(dest, overlaps, ov_aux, WFs, dir1)
 
 	dir2 = 3-dir1  
 
-	map(workers(),array_distrib...) do p,li,liov
+	map(filter(in(keys(array_distrib[1])),workers())) do p
+	
+#	map(workers(),array_distrib...) do p,li,liov
+
+		li,liov = getindex.(array_distrib,p)
 
 		li[1]::UnitRange
 		liov[2]::UnitRange
@@ -4488,7 +4506,6 @@ function get_wlo_data_mesh(full_psiH::SubOrSArray{ComplexF64,4},
 																 custom_ak=init_wlo_mesh_ak,
 																 kwargs...,
 																 ) 
-
 	overlaps,ov_distr = init_overlaps_line_ida(dir1, psi; kwargs...)
 
 	wlo1_on_mesh_inplace!(W, overlaps..., psi, dir1; 

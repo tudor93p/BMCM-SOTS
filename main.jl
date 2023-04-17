@@ -2,12 +2,14 @@ import Dates
 
 t0 = Dates.now() 
 
+using Distributed 
+
 import myLibs: ComputeTasks, Utils 
 
 import BMCMSOTS  
 
 
-include("input_file_32.jl")
+include("input_file_10.jl")
 
 tasks = [
 				 init(BMCMSOTS,:CheckZero),
@@ -18,13 +20,13 @@ ComputeTasks.missing_data.(tasks,show_missing=gethostname()=="tudor-HP")
 
 
 
-@assert !in(gethostname(),["tudor-HP","horon"])
+#@assert !in(gethostname(),["tudor-HP","horon"])
 
 
 prep_all = ComputeTasks.get_data_all_prep.(tasks, 
 													 shuffle=true, seed=4, 
 													 mute=false,
-#													 check_data=false,
+													 check_data=false,
 													 )
 
 function relevant_params(criterion::Function, vals::AbstractVector) 
@@ -44,7 +46,8 @@ function relevant_params(::Val{:preserved_symmetries})
 									)
 end  
 
-relevant_params(::Val{:nr_kPoints})=[5] 
+relevant_params(::Val{:nr_kPoints})=filter(>(3),sort(unique([5, nworkers()])))
+
 
 function relevant_params(::Val{:kMesh_model})
 	

@@ -138,9 +138,11 @@ function bound_rescale_kStep(dk::Real,
 											alpha::Real=1
 											)::Float64
 
-	@assert alpha>=0 && dk>=0 
+	@assert alpha>=0 
+	@assert dk>=0 
+#dk>=0 && @warn   "dk<0"
 
-	max(min(alpha*dk,dk_max),dk_min)
+	max(min(alpha*abs(dk),dk_max),dk_min)
 
 end 
 

@@ -16,11 +16,14 @@ psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)
 @testset "simualate ind distrib" begin 
 	
 	
-	for (i,j) in zip(
-									 WLO.init_storage(H(rand(2)), 50; parallel=true).indices,
-									 WLO.inds_distrib_array(H(rand(2)), 50;
-																											 parallel=true))
-		@test i==j  
+	A = WLO.init_storage(H(rand(2)), 50; parallel=true)
+	B = WLO.inds_distrib_array(H(rand(2)), 50; parallel=true)
+
+	@test Set(A.pids)==Set(keys(B))
+
+	for p in A.pids 
+
+		@test A.indices[p]==B[p]
 	end  
 
 end 
@@ -117,7 +120,7 @@ P = (braiding_time = 0.25,
 		 s_Hamilt = 1.0, 
 		 b_Hamilt = 1, 
 		 nr_kPoints = 20,#00, 
-		 kMesh_model = "Line", 
+		 kMesh_model = "Uniform",
 		 kPoint_start = -1, 
 		 preserved_symmetries = "All", 
 		 nr_perturb_strength = 11, 

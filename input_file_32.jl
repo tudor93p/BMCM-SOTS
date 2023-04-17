@@ -42,19 +42,22 @@ input_checks  = Dict{Symbol,Any}(
 					
 		nr_kPoints = vcat(
 											10,
-											50,
-											95,
-											145, 
-											215, 
-											300,
-											601,
-											1001,
-											2001,
-											3001, # >8 GB 
-											6001,
+#											50,
+#											95,
+#											145, 
+#											215, 
+#											300,
+#											601,
+#											#800,
+#											1001,
+#											2001,
+#											3001, # >8 GB 
+#											6001,
 											),
 
-		kMesh_model = ["Uniform","Line","Square","Sin","Expminv"],
+		kMesh_model = ["Uniform","Line",#"Square",#"Sin",
+#									 "Expminv"
+									 ],
 
 		kPoint_start = [-1], 
 

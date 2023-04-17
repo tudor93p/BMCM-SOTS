@@ -687,7 +687,10 @@ function threestep_find_ks(Hdata, (nks,k0),
 																							dk_from_gap_1, extrema_dk;
 																							optim_tol=1e-8
 																							)
-	if nks[2]==nks[3]
+
+	if nks[2]==nks[3] 
+	@assert isapprox(sum_kSteps(ks_2,nks[3]),2pi,atol=1e-8) (ks_2[1],ks_2[end])
+
 		return (gaps_2, ks_2, dk_from_gap_2, (nks[2],k0), sector)
 	end 
 
@@ -712,6 +715,8 @@ function threestep_find_ks(Hdata, (nks,k0),
 																							optim_tol=1e-14
 																						)
 
+	@assert isapprox(sum_kSteps(ks_3,nks[3]),2pi,atol=1e-8) (ks_3[1],ks_3[end])
+	
 	return (gaps_3, ks_3, dk_from_gap_3,
 					(nks[3],k0),
 					sector)
