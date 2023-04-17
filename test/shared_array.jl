@@ -16,8 +16,8 @@ psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)
 @testset "simualate ind distrib" begin 
 	
 	for (i,j) in zip(psi2.indices,WLO.inds_distrib_array(
-																											 size(psi1)[1:2],
-																											 size(psi1)[3:4].+1
+																											 view(psi1,:,:,1,1),
+																											 WLO.nr_kPoints_from_mesh(psi1)
 																											 ;parallel=true))
 		@test i==j  
 	end  
@@ -25,6 +25,7 @@ psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)
 end 
 
 psi3 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true, shared=true)
+
 @show typeof(psi3)
 
 #
@@ -98,6 +99,8 @@ for (S,M,SS) in zip(out_single,out_multi,out_shared)
 		for (s,m,ss) in zip(S,M,SS) 
 	
 			@test norm(s) > 1e-10 
+			@test norm(ss) > 1e-10 
+			@test norm(m) > 1e-10 
 			@test norm(s-m) <1e-10  
 			@test norm(s-ss) <1e-10  
 	
