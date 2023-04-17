@@ -857,18 +857,55 @@ function set_results_twodir!(results::AbstractDict, nk::Int, k0::Real,
 
 
 end 
+function assert_typeof_results(eigW1nus::Tuple{Vararg{<:AbstractArray}}
+															 )
+
+	assert_typeof_results(eigW1nus...)
+
+end 
+
+function assert_typeof_results(eigW1::AbstractVector{<:AbstractArray},
+															 nus::AbstractVector{<:AbstractArray}
+															 )
+
+	@assert length(eigW1)==4 
+	@assert length(nus)==2 
+
+	for nu in nus 
+		@assert eltype(nu) <: Real 
+	end   
+
+	for e in eigW1 
+		@assert eltype(e) <: Number 
+	end  
+
+	return 
+
+end 
 
 function set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
 													trial::Int,i_ps::Int,dir1::Int,
+													data::Vararg{Tuple}
+													)::Nothing
+
+	assert_typeof_results.(data)
+
+	_set_results_onedir!(results, nk, k0, trial, i_ps, dir1, data...)
+
+end 
+
+function _set_results_onedir!(results::AbstractDict, nk::Int, k0::Real,
+													trial::Int,i_ps::Int,dir1::Int,
 													(eigW1_occup,nus2pm)::Tuple{
 																<:AbstractVector{<:AbstractArray},
-																<:AbstractVector{<:AbstractArray{<:Real,3}}
+																<:AbstractVector{<:AbstractArray}
 																			},
 													(eigW1_unocc,eta2pm)::Tuple{
 																<:AbstractVector{<:AbstractArray},
-																<:AbstractVector{<:AbstractArray{<:Real,3}}
+																<:AbstractVector{<:AbstractArray},
 																			},
 													)::Nothing
+
 
 #	WannierGap 					
 	if haskey(results,"WannierGap")
@@ -1107,7 +1144,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	parallel=false#nprocs()>=4
 	parallel2=false# nprocs()>=4
 	parallel3=nworkers()>=3
-
+	shared=true 
 
 
 	zero_strength, rest_strengths = Base.Iterators.peel(strengths)
@@ -1122,7 +1159,8 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------ no perturbation --------- #
 
-	psi = MODEL.get_psiH(P, nk, k0_or_kxy; parallel=parallel3)
+	psi = MODEL.get_psiH(P, nk, k0_or_kxy; 
+											 parallel=parallel3, shared=shared)
 
 
 	if light_calc
@@ -1130,7 +1168,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 		(parallel|parallel2) && @warn "Nothing to parallelize"
 
 		getset_results_onedir_occ!(results, psi, 1, nk, k0_, 1, s1;
-															 parallel=parallel3)#verbose=true)
+															 parallel=parallel3,shared=shared)#verbose=true)
 		#		getset_results_onedir_occ!(results, psi, 2, nk, k0_, 1, s1; verbose=true)
 
 	else 
@@ -1192,13 +1230,13 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
 				psi = MODEL.get_psiH(P, nk, k0_or_kxy, perturb0, ps;
-														 parallel=parallel3)
+														 parallel=parallel3, shared=shared)
 			
 				if light_calc 
 					parallel2 && @warn "Nothing to parallelize"
 
 					getset_results_onedir_occ!(results, psi, 1, nk, k0_, j, i;
-																		parallel=parallel3)
+																		 parallel=parallel3, shared=shared)
 
 	#				getset_results_onedir_occ!(results, psi, 2, nk, k0_, j, i)
 	

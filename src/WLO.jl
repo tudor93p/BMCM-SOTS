@@ -2,14 +2,13 @@ module WLO
 #############################################################################
 
 import LinearAlgebra, Statistics 
-import DistributedArrays 
-using DistributedArrays: 	localindices,localpart,
-													@spawnat, myid,
-													workers,nworkers,procs,
-													DArray, SubOrDArray,
-													dzeros 
 
-import SharedArrays: SharedArray 
+import SharedArrays: SharedArray  
+
+import Distributed: @spawnat, myid, workers,nworkers,procs
+import DistributedArrays: 	DArray, SubOrDArray, localindices,localpart, dzeros 
+
+
 
 
 import myLibs:Utils,SignalProcessing 
@@ -3749,42 +3748,20 @@ function wcc2mesh_fromSubspaces1!(
 					kwargs_w2;
 					kwargs...)
 
-
-
 	wbb,wbb_distr = init_storage_ida(psiH, data_dir1[1];
 																	 custom_ak=Wannier_band_basis0_ak,
 																	 kwargs...) 
-
-	@show size(wbb) 
-
-
 	n = nr_kPoints_from_mesh(psiH) 
 
 	map([1,3]) do sector  
 	
 		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
-		#		dir1 = 3-dir2 
 
-		@show LinearAlgebra.norm(wbb) 
 		store_on_mesh!!(Wannier_band_basis0!, n, tuple, 
 										wbb, psiH, data_dir1[sector];
 										array_distrib=wbb_distr)
 
-		@show LinearAlgebra.norm(wbb) 
-
-		@show LinearAlgebra.norm.(overlaps)
-		@show LinearAlgebra.norm(w2) 
-
-		@show w2[1] 
-		@show w2[100] 
 		wlo1_on_mesh_inplace!(w2, overlaps..., wbb, dir2; kwargs_w2...)
-		
-		@show w2[1] 
-		@show w2[100]
-
-
-		@show LinearAlgebra.norm.(overlaps)
-		@show LinearAlgebra.norm(w2)
 
 		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
 												 n, w2; kwargs...)
@@ -4520,14 +4497,16 @@ function get_wlo_data_mesh(full_psiH::SubOrSArray{ComplexF64,4},
 
 	dir2 = 3-dir1 
 
-	w_distr2 = inds_distrib_array(dir2, psi; custom_ak=init_wlo_mesh_ak, kwargs...)
+	wbb_a, = Wannier_band_basis0_ak(psi, eigW1[1])
+
+	w_distr2 = inds_distrib_array(dir2, wbb_a...; custom_ak=init_wlo_mesh_ak, kwargs...) 
+
 
 	wcc2 = wcc2mesh_fromSubspaces1!(Wannier_sector_storage(W),
 																	Wannier_sector_storage.(overlaps),
 																	dir2, eigW1, psi, 
 																	(array_distrib=(w_distr2,ov_distr),);
 																	kwargs...)
-
 	
 	return (eigW1, wcc2) 
 
@@ -4604,7 +4583,7 @@ function Wannier_band_basis0_ak(
 														 nmesh::Int=nr_kPoints_from_mesh(psiH);
 														 kwargs...
 														 ) where N 
-	@show size(psiH) size(W1wf_)
+
 	@assert 2<=N<=4
 
 	init_storage_ak(ComplexF64, (size(psiH,1),size(W1wf_,2)), nmesh, nmesh;

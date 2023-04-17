@@ -85,9 +85,9 @@ out_shared = WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,
 @show norm.(out_shared)
 @show typeof.(out_shared)
 
-#@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
-#@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
-#@time "w1+w2 shared"  WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,shared=true)
+@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
+@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
+@time "w1+w2 shared"  WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,shared=true)
 #
 @testset "wlo same" begin 
 
@@ -110,27 +110,25 @@ end
 end 
 
 
-#
-#
-#
-#P = (braiding_time = 0.25, 
-#		 s0_Hamilt = 0.1, 
-#		 s_Hamilt = 1.0, 
-#		 b_Hamilt = 1, 
-#		 nr_kPoints = 500, 
-#		 kMesh_model = "Line", 
-#		 kPoint_start = -1, 
-#		 preserved_symmetries = "All", 
-#		 nr_perturb_strength = 11, 
-#		 max_perturb_strength = 0.6, 
-#		 nr_perturb_instances = 1, 
-#		 perturb_strength = 0.3,
-#		 ) 
-#
-#
-#
-#obs=["D48"]
-#
-#@time data1 = ChecksWLO.Compute_(P, obs; observables=obs) 
-#
-#
+
+P = (braiding_time = 0.25, 
+		 s0_Hamilt = 0.1, 
+		 s_Hamilt = 1.0, 
+		 b_Hamilt = 1, 
+		 nr_kPoints = 20,#00, 
+		 kMesh_model = "Line", 
+		 kPoint_start = -1, 
+		 preserved_symmetries = "All", 
+		 nr_perturb_strength = 11, 
+		 max_perturb_strength = 0.6, 
+		 nr_perturb_instances = 1, 
+		 perturb_strength = 0.3,
+		 ) 
+
+
+
+obs=["D48"]
+
+@time data1 = ChecksWLO.Compute_(P, obs; observables=obs) 
+
+
