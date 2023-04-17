@@ -1057,7 +1057,7 @@ end
 
 
 function select_mesh_point(
-							data::AbstractVector{<:SubOrArray}, args...
+													 data::AbstractVector{<:Union{SubOrArray,SubOrSArray}}, args...
 													 )::Vector{<:AbstractArray}
 	
 	[select_mesh_point(d,args...) for d in data]
@@ -1124,8 +1124,11 @@ end
 
 function get_one_wrapper!(storage::AbstractArray,
 													get_one!::Function,
-												data::Union{<:SubOrArray{<:Number},
+												data::Union{
+																		<:SubOrArray{<:Number},
 																		<:AbstractVector{<:SubOrArray},
+																		<:SubOrSArray{<:Number},
+																		<:AbstractVector{<:SubOrSArray},
 																		},
 												 i::Int, 
 												 j::Int,
@@ -1607,17 +1610,25 @@ function store_on_mesh!!(get_one!::Function,
 												 inds::Tuple{<:AbstractVector{Int},
 																		 <:AbstractVector{Int}},
 												source::Union{<:Function, 
-																			<:AbstractArray{<:Number},
-																			<:AbstractVector{<:AbstractArray},
+																		 <:AbstractVector{<:SubOrSArray},
+																		 SubOrSArray{<:Number},
 																		},
-												 dest::Union{<:AbstractVector{<:SubOrSArray},
+												 dest::Union{
+																		 <:AbstractVector{<:SubOrSArray},
 																		 SubOrSArray{<:Number},
 																		 },
-												 # both source and dest may be overwritten
-												data...; # assumes data is read-only 
+												data...; #
 												array_distrib::AbstractVector{<:Tuple{Vararg{UnitRange{Int}}}},
 												kwargs...
 												)::Nothing 
+
+	for d in data 
+
+		@assert !isa(d,SubOrDArray)
+
+		isa(d,SubOrArray) && @warn "Large array passed? $(size(d))"
+
+	end 
 
 	@show array_distrib  workers() 
 
@@ -3166,15 +3177,17 @@ function wlo1_on_mesh_inplace!(
 #	} where AbstractVector{<:Tuple{Vararg{UnitRange{Int}}}}
 
 
-	map(workers(),array_distrib) do p,locinds
+	map(workers(),array_distrib...) do p,li,liov
 
+		@assert eltype(li)<:UnitRange 
+		@assert eltype(liov)<:UnitRange 
 		@spawnat p begin      
 
 			_wlo1_on_mesh_inplace!(
-											localpart_(dest,locinds),
-											only(eachslice(localpart_(overlaps,locinds), dims=d2)),
-											only(eachslice(localpart_(ov_aux,locinds), dims=d2)),
-											localpart_(WFs, locinds, dir2),
+														 localpart_(dest,li),
+											only(eachslice(localpart_(overlaps,liov), dims=d2)),
+											only(eachslice(localpart_(ov_aux,liov), dims=d2)),
+											localpart_(WFs, li, dir2),
 											dir1, 
 											)
 
@@ -3595,63 +3608,54 @@ end
 function wcc2mesh_fromSubspaces1(dir2::Int,
 																 data_dir1::AbstractVector{<:AbstractArray},
 																psiH::AbstractArray{<:Number,4};
-																distr_axis::Int=3-dir2,
-																kwargs...
+																kwargs_...
 																)::Vector{Array{Float64,3}}
 
-	distr_axis = 3-dir2 
+
+	kwargs = wlo_filter_distr_kwargs(dir2; kwargs_...)
 
 	n = nr_kPoints_from_mesh(psiH)
 
-	wbb = init_storage(get_one_wrapper(Wannier_band_basis0, 
+	wbb,wbb_distr = init_storage_ida(get_one_wrapper(Wannier_band_basis0, 
 																	 tuple, 1, 1, 
 																	psiH, data_dir1[1],), n; 
-										 distr_axis=distr_axis,kwargs...)
+										 kwargs...)
 	
-	w2 = init_wlo_mesh(dir2, wbb; kwargs...)
+	#w2 = init_wlo_mesh(dir2, wbb; kwargs...)
 
-	overlaps = init_overlaps_line(dir2, wbb; kwargs...) 
+
+	w2,w2_distr = init_storage_ida(dir2, wbb;
+																 custom_ak=init_wlo_mesh_ak,
+																 kwargs...,
+																 ) 
+
+#	overlaps = init_overlaps_line(dir2, wbb; kwargs...) 
+	overlaps,ov_distr = init_overlaps_line_ida(dir2, wbb; kwargs...)
 
 
 	return map([1,3]) do sector  
 	
 		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
 		#		dir1 = 3-dir2 
-#		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH; kwargs...)
-#
-	#wbb = Wannier_band_basis_mesh(data_dir1[1], psiH; distr_axis=distr_axis, kwargs...) 
 
 		store_on_mesh!!(Wannier_band_basis0!, n, tuple, 
-										wbb, psiH, data_dir1[sector])
+										wbb, psiH, data_dir1[sector];
+										array_distrib=wbb_distr)
 
-		wlo1_on_mesh_inplace!(w2, overlaps..., wbb, dir2)
-
+		wlo1_on_mesh_inplace!(w2, overlaps..., wbb, dir2;
+													array_distrib=(w2_distr,ov_distr)
+													)
 
 		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
-												 n, w2; distr_axis=3-dir2, kwargs...)
+												 n, w2; kwargs...)
 
+	end  
 
-	end 
-
-
-
-#	map([1,3]) do sector  
-#
-#		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
-#		#		dir1 = 3-dir2
-#		
-#		w2 = wlo2_on_mesh(dir2, data_dir1[sector], psiH; kwargs...)
-#
-#		store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
-#												 nr_kPoints_from_mesh(psiH),
-#												 w2; 
-#											distr_axis=3-dir2,
-#												 kwargs...)
-#
-#
-#	end 
 
 end 
+
+
+
 
 
 function wcc2mesh_fromSubspaces1(dir2::Int,
@@ -3814,7 +3818,7 @@ function get_periodic_eigvals!(dst::AbstractVector{Float64},
 end 
 
 
-function get_periodic_eigvals!(W::SubOrArray{<:Number,2}
+function get_periodic_eigvals!(W::Union{SubOrArray{<:Number,2},SubOrSArray{<:Number,2}},
 															 )::Vector{Float64}
 
 	get_periodic_eigvals(LinearAlgebra.eigvals!(W))
@@ -4162,6 +4166,14 @@ function Wannier_eigen!!(storage::AbstractVector{<:AbstractArray},
 end 
 
 
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+
 function Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
 														 W::AbstractVector{<:AbstractArray}
 														 )::Nothing 
@@ -4178,6 +4190,26 @@ function Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
 		@assert item isa SubOrArray
 	end 
 
+	_Wannier_subspaces!!(storage, W) 
+
+end 
+
+function Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
+														 W::SubOrSArray{<:Number,2},
+														 )::Nothing 
+
+	for item in storage 
+		@assert item isa SubOrSArray
+	end  
+
+	_Wannier_subspaces!!(storage, W) 
+
+end 
+
+function _Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
+															W::AbstractMatrix{<:Number},
+														 )::Nothing  
+
 	eig = LinearAlgebra.eigen!(W)
 
 	E = get_periodic_eigvals(eig.values)
@@ -4190,6 +4222,13 @@ function Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
 
 end 
 
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -4272,27 +4311,15 @@ function get_wlo_data_mesh(psiH::Union{<:SubOrArray{ComplexF64,4},
 									kwargs...
 									)::Tuple
 
-	sh = isa(psiH,SubOrSArray)
-
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 
 	w1 = wlo1_on_mesh_inplace(dir1, psi; kwargs...)
 
-	sh && @show typeof(w1) typeof(psi)
-
-
 	eigW1 = Wannier_subspaces_on_mesh!(w1; dir=dir1, kwargs...)
-
-	sh && @show typeof(eigW1) typeof.(eigW1) 
-
-	@assert !sh  
-
-	do_conv = any(isa(x,SubOrDArray) for x in eigW1)
-
 
 	if get_wlo2 
 
-		if do_conv
+		if any(isa(x,SubOrDArray) for x in eigW1)
 			eigW1 = convert(Vector{Array}, eigW1)
 		end 
 
