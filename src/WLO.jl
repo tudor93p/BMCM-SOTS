@@ -1521,8 +1521,8 @@ end
 
 
 function store_on_mesh(get_one::Function, get_one!::Function,
-												source::Union{<:SubOrArray{<:Number},
-																			<:AbstractVector{<:SubOrArray},
+												source::Union{<:AbstractArray{<:Number},
+																			<:AbstractVector{<:AbstractArray},
 																		},
 												data...; kwargs...
 												)::AbstractArray 
@@ -3673,6 +3673,8 @@ function _Wannier_subspaces_on_mesh!(W::Union{SubOrArray{ComplexF64,4},
 																		 )::Vector{<:AbstractArray}
 
 
+	@show size(W) 
+	@show size.(init_Wannier_subspaces(W; kwargs...))
 	store_on_mesh!!(Wannier_subspaces!!, W, 
 									init_Wannier_subspaces(W; kwargs...))
 
@@ -3686,7 +3688,7 @@ function _Wannier_subspaces_on_mesh!(W::SubOrSArray{ComplexF64,4};
 	storage, (storage_i,) = init_storage_ida(init_Wannier_subspaces0(W),
 																					 nr_kPoints_from_mesh(W);
 																					 kwargs...)
-
+	@show size(storage)
 	store_on_mesh!!(Wannier_subspaces!!, W, storage; array_distrib=storage_i)
 
 end 
@@ -3776,7 +3778,7 @@ end
 #---------------------------------------------------------------------------#
 
 function wcc2mesh_fromSubspaces1(dir2::Int,
-																 data_dir1::AbstractVector{<:AbstractArray},
+																 (psiW,nuW)::AbstractVector{<:AbstractArray},
 																psiH::AbstractArray{<:Number,4};
 																kwargs_...
 																)::Vector{<:AbstractArray{Float64,3}}
@@ -3784,51 +3786,49 @@ function wcc2mesh_fromSubspaces1(dir2::Int,
 
 	kwargs = wlo_filter_distr_kwargs(dir2; kwargs_...)
 
-	#w2 = init_wlo_mesh(dir2, wbb; kwargs...)
+	wbb_a, = Wannier_band_basis0_ak(psiH, 
+																	psi_sorted_energy(psiW; halfspace=true))
 
-	wbb_a, = Wannier_band_basis0_ak(psiH, data_dir1[1])
 
 	w2,w2_distr = init_storage_ida(dir2, wbb_a...;
 																 custom_ak=init_wlo_mesh_ak,
 																 kwargs...,
 																 ) 
 
-#	overlaps = init_overlaps_line(dir2, wbb; kwargs...) 
-overlaps,ov_distr = init_overlaps_line_ida(dir2, wbb_a...; kwargs...)
+	overlaps,ov_distr = init_overlaps_line_ida(dir2, wbb_a...; kwargs...)
 
-	return wcc2mesh_fromSubspaces1!(
-					w2, overlaps, 
-					dir2, data_dir1, psiH,
-	(array_distrib=(w2_distr,ov_distr),);
-					kwargs...)
+	return wcc2mesh_fromSubspaces1!(w2, overlaps, 
+																	dir2, psiW, psiH, 
+																	(array_distrib=(w2_distr,ov_distr),); 
+																	kwargs...) 
 
 end 
 
-
 function wcc2mesh_fromSubspaces1!(
 					w2, overlaps, 
-					dir2, data_dir1, psiH,
+					dir2, psiW, psiH,
 					kwargs_w2;
 					kwargs...)
 
-	wbb,wbb_distr = init_storage_ida(psiH, data_dir1[1];
-																	 custom_ak=Wannier_band_basis0_ak,
+	@assert size(psiW)[1:2] ==(2,2) 
+
+
+	wbb_distr = inds_distrib_array(psiH, psiW;
+																custom_ak=Wannier_band_basis0_ak,
 																	 kwargs...) 
 
+	@warn "psi overwritten, dir2=$dir2"
 
+	store_on_mesh!!(Wannier_band_basis0!, psiW, psiH; array_distrib=wbb_distr) 
 
-	return map([1,3]) do sector  
+	return map([true,false]) do sector  
 	
-		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
-
-		store_on_mesh!!(Wannier_band_basis0!, tuple, 
-										wbb, psiH, data_dir1[sector];
-										array_distrib=wbb_distr)
+		wbb = psi_sorted_energy(psiH; halfspace=true, occupied=sector) 
 
 		wlo1_on_mesh_inplace!(w2, overlaps..., wbb, dir2; kwargs_w2...)
 
-		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
-												 nr_kPoints_from_mesh(psiH), w2; kwargs...)
+		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!, 
+												 w2; kwargs...)
 
 	end  
 
@@ -4304,13 +4304,14 @@ function init_Wannier_subspaces0(W::AbstractMatrix{t},
 
 	n = LinearAlgebra.checksquare(W) 
 
-	m = div(n,2)
+#	m = div(n,2) # halfspace
+	m = n 
 
 	T = promote_type(t,Float64)
 
 	return [
 					Matrix{T}(undef, n, m), Vector{Float64}(undef, m),
-					Matrix{T}(undef, n, m), Vector{Float64}(undef, m),
+#					Matrix{T}(undef, n, m), Vector{Float64}(undef, m),
 					]
 
 end 
@@ -4347,19 +4348,6 @@ function Wannier_eigen!(storage::AbstractVector{<:AbstractArray},
 
 end 
 
-function Wannier_eigen!!(storage::AbstractVector{<:AbstractArray},
-														W::AbstractMatrix,
-													)
-
-	eig = LinearAlgebra.eigen!(W)
-
-	E = get_periodic_eigvals(eig.values)
-
-	eigH!(storage, eig.vectors, E) 
-
-	return 
-
-end 
 
 
 #===========================================================================#
@@ -4410,11 +4398,46 @@ function _Wannier_subspaces!!(storage::AbstractVector{<:AbstractArray},
 
 	E = get_periodic_eigvals(eig.values)
 
-	eigH!(view(storage,1:2), eig.vectors, E; halfspace=true, occupied=false)
+#	eigH!(view(storage,1:2), eig.vectors, E; halfspace=true, occupied=false)
+#	eigH!(view(storage,3:4), eig.vectors, E; halfspace=true, occupied=true)
 
-	eigH!(view(storage,3:4), eig.vectors, E; halfspace=true, occupied=true)
+	eigH!(storage, eig.vectors, E; halfspace=false, rev=true)
 
 	return 
+
+end 
+
+#function sep_Wannier_subspaces(A::AbstractArray{<:Number},
+#															 d::Int
+#															 )::AbstractVector{<:AbstractArray}
+#
+#
+#	N = size(A,d) 
+#
+#	u = sortperm_energy(N; halfspace=true,occupied=true) 
+#	o = sortperm_energy(N; halfspace=true,occupied=false) 
+#
+#	return [selectdim(A, 2, o), 
+#					selectdim(A, 2, u), 
+#					]
+#
+#
+#end 
+function sep_Wannier_subspaces((psi,E)::AbstractVector{<:AbstractArray},
+															 )::AbstractVector{<:AbstractArray}
+
+
+	N = size(E,1) 
+	@assert size(psi,2)==N 
+
+	o = sortperm_energy(N; halfspace=true,occupied=true) 
+	u = sortperm_energy(N; halfspace=true,occupied=false) 
+
+	return [selectdim(psi, 2, o), selectdim(E, 1, o), 
+
+					selectdim(psi, 2, u), selectdim(E, 1, u),
+					]
+
 
 end 
 
@@ -4509,22 +4532,25 @@ function get_wlo_data_mesh(full_psiH::SubOrArray{ComplexF64,4},
 
 	w1 = wlo1_on_mesh_inplace(dir1, psi; kwargs...)
 
+
 	eigW1 = Wannier_subspaces_on_mesh!(w1; dir=dir1, kwargs...)
+
+	do_conv = any(isa(x,SubOrDArray) for x in eigW1) 
+	if do_conv 
+		eigW1 = convert(Vector{Array}, eigW1)
+	end  
+	
+	eigW1_ret = sep_Wannier_subspaces(eigW1) 
 
 	if get_wlo2 
 
-		do_conv = any(isa(x,SubOrDArray) for x in eigW1)
-		if do_conv 
-			eigW1 = convert(Vector{Array}, eigW1)
-		end  
-
 		wcc2 = wcc2mesh_fromSubspaces1(3-dir1, eigW1, psi; kwargs...)
 
-		return (eigW1, do_conv ? convert(Vector{Array}, wcc2) : wcc2) 
+		return (eigW1_ret, do_conv ? convert(Vector{Array}, wcc2) : wcc2) 
 
 	else 
 
-		return (eigW1, fill(zeros(0,0,0),0))
+		return (eigW1_ret, fill(zeros(0,0,0),0))
 
 	end
 
@@ -4560,6 +4586,7 @@ function get_wlo_data_mesh(full_psiH::SubOrSArray{ComplexF64,4},
 																 custom_ak=init_wlo_mesh_ak,
 																 kwargs...,
 																 ) 
+
 	overlaps,ov_distr = init_overlaps_line_ida(dir1, psi; kwargs...)
 
 	wlo1_on_mesh_inplace!(W, overlaps..., psi, dir1; 
@@ -4568,24 +4595,26 @@ function get_wlo_data_mesh(full_psiH::SubOrSArray{ComplexF64,4},
 
 	eigW1 = Wannier_subspaces_on_mesh!(W; dir=dir1, kwargs...)
 
+	eigW1_ret = sep_Wannier_subspaces(eigW1) 
 
-	get_wlo2 || return (eigW1, fill(zeros(0,0,0),0))
+	get_wlo2 || return (eigW1_ret, fill(zeros(0,0,0),0))
 
 
 	dir2 = 3-dir1 
 
-	wbb_a, = Wannier_band_basis0_ak(psi, eigW1[1])
+	wbb_a, = Wannier_band_basis0_ak(psi, 
+																	psi_sorted_energy(eigW1[1]; halfspace=true))
 
 	w_distr2 = inds_distrib_array(dir2, wbb_a...; custom_ak=init_wlo_mesh_ak, kwargs...) 
 
 
 	wcc2 = wcc2mesh_fromSubspaces1!(Wannier_sector_storage(W),
 																	Wannier_sector_storage.(overlaps),
-																	dir2, eigW1, psi, 
+																	dir2, eigW1[1], psi, 
 																	(array_distrib=(w_distr2,ov_distr),);
 																	kwargs...)
 	
-	return (eigW1, wcc2) 
+	return (eigW1_ret, wcc2) 
 
 
 end 
@@ -4623,6 +4652,18 @@ function Wannier_band_basis0!(
 	LinearAlgebra.mul!(A, get_item_ij(i, psiH), get_item_ij(i, W1wf_))
 
 end 
+ 
+	#source, dest 
+#	store_on_mesh!!(Wannier_band_basis0!, psiW, psiH; array_distrib=wbb_distr) 
+function Wannier_band_basis0!( 
+#															dest, source 
+															psiH::AbstractMatrix{ComplexF64},
+														 W1wf_::AbstractMatrix{ComplexF64},
+														 )::AbstractMatrix{ComplexF64}
+
+	copy!(psiH, Wannier_band_basis0(psiH, W1wf_))
+
+end 
 
 function Wannier_band_basis0!(
 															A::AbstractMatrix{ComplexF64},
@@ -4641,7 +4682,7 @@ function Wannier_band_basis0(i::Int,
 														 W1wf_::AbstractArray{ComplexF64,3},
 														 )::Matrix{ComplexF64}
 
-	get_item_ij(i, psiH) * get_item_ij(i, W1wf_)
+	Wannier_band_basis0(get_item_ij(i, psiH),  get_item_ij(i, W1wf_))
 
 end 
 
@@ -4650,10 +4691,20 @@ function Wannier_band_basis0(ij::Tuple{Int,Int},
 														 W1wf_::AbstractArray{ComplexF64,4},
 														 )::Matrix{ComplexF64}
 
-	get_item_ij(ij, psiH) * get_item_ij(ij, W1wf_)
+	Wannier_band_basis0(get_item_ij(ij, psiH),
+											get_item_ij(ij, W1wf_)
+											)
 
 end  
 
+function Wannier_band_basis0(
+														 psiH::AbstractMatrix{ComplexF64},
+														 W1wf_::AbstractMatrix{ComplexF64},
+														 )::Matrix{ComplexF64}
+
+		psiH *  W1wf_
+
+end  
 function Wannier_band_basis0_ak(
 														 psiH::AbstractArray{ComplexF64,N},
 														 W1wf_::AbstractArray{ComplexF64,N},

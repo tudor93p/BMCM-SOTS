@@ -107,9 +107,10 @@ out_shared = WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,
 @show norm.(out_shared)
 @show typeof.(out_shared)
 
-#@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
-#@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
-#@time "w1+w2 shared"  WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,shared=true)
+
+@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
+@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
+@time "w1+w2 shared"  WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,shared=true)
 ##  
 #
 #saved_I = [[[rand(a) for a in axes(k2)] for k2=k1] for k1=out_single]
@@ -130,7 +131,10 @@ function same_saved_vals(out)
 map(saved_A,saved_I,out) do V1,k1,v1 
 	map(V1,k1,v1) do V2,k2,v2 
 
-		V2≈v2[k2...]
+		isapprox(V2,v2[k2...],atol=1e-8) && return true 
+#		@show norm(V2) norm(v2[k2...])
+#		@show norm(V2-v2[k2...]) k1 k2 
+		return false 
 		
 	end |> all 
 end  |> all
@@ -155,12 +159,30 @@ for (S,M,SS) in zip(out_single,out_multi,out_shared)
 		end 
 end 
 
+
+#(pp,ep,pm,em),nu2= out_single
+#
+#for (i1,j1) in [ [1,2],[2,1]], (i2,j2) in [ [1,2],[2,1]], i3j3 in 	[	[1,2],[2,1] ]
+#
+#	if same_saved_vals([[(pp,pm)[i1],
+#												 (ep,em)[i2],
+#												 (pp,pm)[j1],
+#												 (ep,em)[j2]], nu2[i3j3]])
+#
+#		@show i1 i2 i3j3
+#	end 
+#end 
+#
+#
+#end 
+#
+#error() 
+
 for out in (out_single, out_shared, out_multi)
 
 	@test same_saved_vals(out)
 
 end 
-
 end 
 
 
