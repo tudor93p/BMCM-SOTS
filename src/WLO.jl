@@ -1341,10 +1341,17 @@ function _init_storage(#T::DataType,
 
 	shared || return dzeros(T, array_size, array_workers, array_distrib)
 
-#	fn = abspath(replace(string("Data/",mod(time(),1e6)),"."=>""))
 
-	return SharedArray{T}(#fn,
-												array_size; pids=union(myid(), array_workers))
+
+	p = mkpath(abspath("Data/SharedArrays"))
+
+	fn = joinpath(p,replace(string(mod(time(),1e6)),"."=>"")*".tmp")
+
+	return SharedArray{T}(fn,
+												array_size; 
+												pids=union(myid(), array_workers),
+												mode="w+",
+												)
 
 end 
 
