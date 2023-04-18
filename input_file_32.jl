@@ -49,11 +49,11 @@ input_checks  = Dict{Symbol,Any}(
 											300,
 											601,
 											1001,
-											2001,
-											3001, # >8 GB 
-											6001,
-											10_001,
-											20_001,
+											2001,	# <= 60GB
+#											3001, # > 60GB
+#											6001,
+#											10_001,
+#											25_001,
 											),
 
 		kMesh_model = ["Uniform",#"Line",#"Square",#"Sin",
@@ -63,7 +63,10 @@ input_checks  = Dict{Symbol,Any}(
 		kPoint_start = [-1], 
 
 		preserved_symmetries = ["None";
-														[join(c,"+") for c=Combinatorics.powerset(["P", "Ct", "Tt","Mx", "TC2y"],1) if good_comb(c)];
+["P", "Ct", "Tt","Mx", "TC2y"];
+["Ct+Mx","Tt+Mx"];
+join(["P", "Ct", "Tt","Mx", "TC2y"],"+");
+#														[join(c,"+") for c=Combinatorics.powerset(["P", "Ct", "Tt","Mx", "TC2y"],1) if good_comb(c)];
 #[join(c,"+") for c=Base.product(["P","Ct","Tt"],["Mx","TC2y"])][:];
 														"All"],
 
