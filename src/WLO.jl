@@ -1343,14 +1343,14 @@ function _init_storage(#T::DataType,
 
 
 
-	p = mkpath(abspath("Data/SharedArrays"))
+#	p = mkpath(abspath("Data/SharedArrays"))
 
-	fn = joinpath(p,replace(string(mod(time(),1e6)),"."=>"")*".tmp")
+#	fn = joinpath(p,replace(string(mod(time(),1e6)),"."=>"")*".tmp")
 
-	return SharedArray{T}(fn,
+	return SharedArray{T}(#fn,
 												array_size; 
 												pids=union(myid(), array_workers),
-												mode="w+",
+#												mode="w+",
 												)
 
 end 
@@ -3814,6 +3814,8 @@ function wcc2mesh_fromSubspaces1!(
 	wbb,wbb_distr = init_storage_ida(psiH, data_dir1[1];
 																	 custom_ak=Wannier_band_basis0_ak,
 																	 kwargs...) 
+
+
 
 	return map([1,3]) do sector  
 	

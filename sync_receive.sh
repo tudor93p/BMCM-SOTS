@@ -15,10 +15,11 @@ subfolder=""
 #subfolder=BMCMSOTS/CalcWLO/
 #subfolder=BMCMSOTS/ChecksWLO/
 
-
+#
+#remotefolder="/net/horon/scratch/pahomit/Camera/"
+#localfolder="/media/tudor/Tudor/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/Camera/"
 
 remotefolder="/net/horon/scratch/pahomit/BMCM-SOTS/Data/${subfolder}"
-
 
 localfolder="/media/tudor/Tudor/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/Data/${subfolder}"
 
@@ -57,7 +58,7 @@ echo $remotefolder
 #echo
 #echo "***** Receiving remote data *****"
 #rsync -azh $src $dest 
-
+#
 
 echo
 echo "***** Receiving remote data produced since $since *****"
