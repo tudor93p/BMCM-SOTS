@@ -55,6 +55,38 @@ end
 #
 #---------------------------------------------------------------------------#
 
+function same_procs(ads::Tuple{Vararg{<:AbstractDict}})::Bool
+
+	s1 = Set(keys(ads[1]))
+
+	for i=2:length(ads) 
+
+		s1==Set(keys(ads[i])) || return false 
+
+	end  
+
+	return true 
+
+end 
+
+
+function same_mesh_distrib(a::AbstractDict,
+								b::AbstractDict
+								)::Bool  
+
+	same_procs((a,b)) || return false 
+
+	for (k,va) in pairs(a) 
+
+		va==b[k] || return false 
+
+	end 
+
+	return true 
+
+end 
+
+
 
 function same_mesh_distrib(A::SubOrDArray,
 													 B::SubOrDArray,
@@ -71,7 +103,9 @@ function same_mesh_distrib(A::SubOrDArray,
 
 end  
 	
-function same_mesh_distrib(arrays::AbstractVector{<:SubOrDArray}
+function same_mesh_distrib(arrays::Union{<:AbstractVector{<:Union{<:SubOrDArray, <:AbstractDict}, },
+																				 <:Tuple{Vararg{<:AbstractDict}}}
+
 													 )::Bool
 
 	for i=2:length(arrays)
@@ -1151,24 +1185,36 @@ end
 #---------------------------------------------------------------------------#
 
 
+function check_parallel_possible(;parallel::Bool=false, kwargs...)::Bool
+
+	parallel && nworkers()>1 
+
+end  
+
+
+
+
+
 # internal 
 function _inds_distrib_array(array_size::NTuple{N,Int},
 														array_workers::AbstractVector{Int},
-														array_distrib::AbstractVector{Int},
+														array_distrib::AbstractVector{Int};
+														kwargs...
 														)::Dict{Int, NTuple{N,UnitRange{Int}}
 																		 } where N
 
+	
+	parallel = check_parallel_possible(;kwargs...)
+
 	I = findall(>(1), array_distrib)
+
+	@assert length(I)==parallel 
 
 	t0 = Tuple(1:a for a=array_size)
 
-
-	isempty(I) && return Dict(only(array_workers)=>t0)
-
-	@assert length(I)==1 
+	parallel || return Dict(only(array_workers)=>t0)
 
 	i = only(I)
-
 
 	distr_i = Utils.EqualDistributeBallsToBoxes_cumulRanges(
 																array_size[i], array_distrib[i])
@@ -1182,7 +1228,8 @@ function _inds_distrib_array(
 														args_as_inst...; kwargs_as_inst...
 														)::Dict{Int,Tuple{Vararg{UnitRange{Int}}}}
 
-	_inds_distrib_array(_prep_init_array(args_as_inst...; kwargs_as_inst...)...)
+	_inds_distrib_array(_prep_init_array(args_as_inst...; kwargs_as_inst...)...;
+											kwargs_as_inst...)
 
 end 
 
@@ -1250,7 +1297,6 @@ function _prep_init_array(
 											s::NTuple{Ns,Int},
 											ns::NTuple{Nn,Int},
 											args...;
-											parallel::Bool=false,
 											distr_axis::Int=Nn,
 											kwargs...
 											)::Tuple{NTuple{Ns+Nn,Int}, Vector{Int}, Vector{Int}
@@ -1259,12 +1305,17 @@ function _prep_init_array(
 	array_size = (s..., (n-1 for n=ns)...)
 
 	d = ones(Int, Ns+Nn)
-	
-	w = workers()
 
-	parallel || return (array_size, w, d)
+
+	parallel = check_parallel_possible(;kwargs...)
+
+
+
+	parallel || return (array_size, [myid()], d) # just the master proc
 
 	@assert 1<=distr_axis<=Nn
+	
+	w = workers()    
 
 	wmax = min(length(w), array_size[Ns+distr_axis])
 
@@ -1450,11 +1501,9 @@ function store_on_mesh(get_one::Function, get_one!::Function,
 																	n; 
 																	kwargs...)
 
-	store_on_mesh!!(get_one!, n, source, dest, data...;
-									array_distrib=array_distrib
-									)
+	store_on_mesh!!(get_one!, n, source, dest, data...; 
+									array_distrib=array_distrib)
 
-	return dest
 
 end  
 
@@ -1504,39 +1553,28 @@ function store_on_mesh!!(get_one!::Function,
 												source::Function, 
 												dest::AbstractArray,
 												data...; kwargs...
-												)::Nothing  
+												)::AbstractArray
 
-	store_on_mesh!!(get_one!,
-									nr_kPoints_from_mesh(dest),
-									source,
-									dest, 
-									data...; kwargs...)
+	store_on_mesh!!(get_one!, nr_kPoints_from_mesh(dest),
+									source, dest, data...; kwargs...) 
 
 end 
 
 function store_on_mesh!!(get_one!::Function, 
-												source::Union{
-																			<:SubOrArray{<:Number},
-																			<:AbstractVector{<:SubOrArray},
-																			<:SubOrSArray{<:Number},
-																			<:AbstractVector{<:SubOrSArray},
-																		},
+												source::AbstractArray,
 												dest::AbstractArray=source,
 												data...; kwargs...
-												)::Nothing  
+												)::AbstractArray
 
-	store_on_mesh!!(get_one!,
-									nr_kPoints_from_mesh(dest),
-									source,
-									dest, 
-									data...; kwargs...)
+	store_on_mesh!!(get_one!, nr_kPoints_from_mesh(source),
+									source, dest, data...; kwargs...)
 
 end 
 
 
 
 function store_on_mesh!!(get_one!::Function, n::Int, args...; 
-												 kwargs...)::Nothing 
+												 kwargs...)::AbstractArray
 
 	store_on_mesh!!(get_one!, (1:n-1,1:n-1), args...; kwargs...)
 
@@ -1552,16 +1590,14 @@ function _store_on_mesh!!(get_one!::Function,
 																			<:AbstractVector{<:SubOrSArray},
 																		},
 												dest::Union{<:SubOrArray{<:Number},
-#																		<:AbstractVector{<:SubOrArray},
 																		<:SubOrSArray{<:Number},
-																		<:AbstractVector{<:AbstractArray},#SubOrSArray},
-#																		<:AbstractVector{<:SubOrSArray},
+																		<:AbstractVector{<:AbstractArray},
 																		},
 												data...; 
 												parallel::Bool=false,
 												array_distrib=nothing,
 												kwargs...
-												)::Nothing 
+												)::AbstractArray
 
 	for j=inds[2], i=inds[1]
 
@@ -1569,7 +1605,7 @@ function _store_on_mesh!!(get_one!::Function,
 
 	end 
 
-	return 
+	return dest 
 
 end    
 
@@ -1585,7 +1621,7 @@ function store_on_mesh!!(get_one!::Function,
 																		},
 												data...; 
 												kwargs...
-												)::Nothing 
+												)::AbstractArray
 
 	_store_on_mesh!!(get_one!, inds, source, dest, data...; kwargs...)
 
@@ -1610,7 +1646,7 @@ function store_on_mesh!!(get_one!::Function,
 												data...; # assumes data is read-only 
 												array_distrib=nothing,
 												kwargs...
-												)::Nothing 
+												)::AbstractArray
 
 	map(procs(eltype(dest)<:AbstractArray ? dest[1] : dest)) do p
 
@@ -1629,7 +1665,7 @@ function store_on_mesh!!(get_one!::Function,
 
 	end .|> fetch 
 
-	return 
+	return dest 
 
 end   
 
@@ -1647,7 +1683,7 @@ function store_on_mesh!!(get_one!::Function,
 												data...; #
 												array_distrib::Dict{Int,Tuple{Vararg{UnitRange{Int}}}},
 												kwargs...
-												)::Nothing 
+												)::AbstractArray
 
 	for d in data 
 
@@ -1661,12 +1697,7 @@ function store_on_mesh!!(get_one!::Function,
 
 	end 
 
-	@assert issubset(keys(array_distrib),workers())
-
-	length(array_distrib)==1 && return _store_on_mesh!!(get_one!, inds, source, dest, data...; 
-																					 kwargs...)
-	
-	map(filter(in(keys(array_distrib)),workers())) do  p
+	map(procs_(array_distrib)) do p 
 
 		locinds = array_distrib[p]
 
@@ -1683,7 +1714,7 @@ function store_on_mesh!!(get_one!::Function,
 
 	end .|> fetch 
 
-	return 
+	return dest 
 
 end   
 
@@ -2456,13 +2487,8 @@ end
 function enpsiH_on_mesh(n::Int, k0::Real, H::Function, Hdata...; kwargs...
 												)::Vector{Array}
 
-	kij = get_kij(n,k0)  
 
-	storage = init_storage(init_eigH(kij, H, Hdata...; kwargs...), n; kwargs...)
-
-	store_on_mesh!!(eigH!, n, kij, storage, H, Hdata...; kwargs...)
-
-	return storage 
+	store_on_mesh(init_eigH, eigH!, n, get_kij(n,k0), H, Hdata...; kwargs...)
 
 end 
 
@@ -2556,10 +2582,9 @@ function symmetrize_on_mesh!(A::AbstractArray{ComplexF64,4},
 																									 <:AbstractVector{Int}}},
 														 (op,fij)::NTuple{2,Function}; # symm;
 														 kwargs...
-														 )::Nothing
+														 )::AbstractArray
 
-	store_on_mesh!!(symmetrize_on_mesh_one!, inds, fij, A, A, op;
-								 kwargs...)
+	store_on_mesh!!(symmetrize_on_mesh_one!, inds, fij, A, A, op; kwargs...)
 
 end 
 
@@ -3257,8 +3282,6 @@ function wlo1_on_mesh_inplace!(
 						 array_distrib=nothing
 						)::Nothing
 
-	dir2 = 3-dir1 
-
 	map(procs(dest)) do p
 
 		@spawnat p begin      
@@ -3267,7 +3290,7 @@ function wlo1_on_mesh_inplace!(
 											localpart(dest),
 											localpart(overlaps),
 											localpart(ov_aux),
-											localpart_(WFs, dest, dir2),
+											localpart_(WFs, dest, 3-dir1),
 											dir1, 
 											)
 
@@ -3279,6 +3302,9 @@ function wlo1_on_mesh_inplace!(
 
 end 
 
+
+
+
 function wlo1_on_mesh_inplace!(
 						 dest::SubOrSArray{T,4},
 						 overlaps::SubOrSArray{T,4},
@@ -3288,24 +3314,9 @@ function wlo1_on_mesh_inplace!(
 						 array_distrib::Tuple{<:AbstractDict,<:AbstractDict},
 						)::Nothing where T<:ComplexF64
 
-
-
-	@assert all(issubset(keys(a_d),workers()) for a_d=array_distrib)
-
-	@assert Set(keys(array_distrib[1]))==Set(keys(array_distrib[2]))
-
-	nworkers()==1 && return _wlo1_on_mesh_inplace!(dest, overlaps, ov_aux, WFs, dir1)
-
-	dir2 = 3-dir1  
-
-	map(filter(in(keys(array_distrib[1])),workers())) do p
+	map(procs_(array_distrib)) do p 
 	
-#	map(workers(),array_distrib...) do p,li,liov
-
 		li,liov = getindex.(array_distrib,p)
-
-		li[1]::UnitRange
-		liov[2]::UnitRange
 
 		@spawnat p begin      
 
@@ -3313,7 +3324,7 @@ function wlo1_on_mesh_inplace!(
 														 localpart_(dest,li),
 											localpart_(overlaps,liov), 
 											localpart_(ov_aux,liov), 
-											localpart_(WFs, li, dir2),
+											localpart_(WFs, li, 3-dir1),
 											dir1, 
 											)
 
@@ -3347,7 +3358,16 @@ function nr_kPoints_from_mesh(W::AbstractArray{<:Number,N})::Int where N
 
 end 
 
-function nr_kPoints_from_mesh(W, args::Int...)::Int 
+function nr_kPoints_from_mesh(W::AbstractVector{<:AbstractArray},
+																			args::Int...)::Int 
+
+	only(unique(nr_kPoints_from_mesh(w, args...) for w=W))
+
+end 
+
+function nr_kPoints_from_mesh(W::Union{<:AbstractArray{<:Number},
+																			<:Tuple{Vararg{Int}}
+																			}, args::Int...)::Int 
 
 	select_size_dir(W, args...) + 1
 
@@ -3396,6 +3416,40 @@ function get_mesh_dir(A::Union{NTuple{N,<:Union{Int,UnitRange{Int}}},
 	get_mesh_dir(N, args...)
 
 end  
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
+
+function procs_(array_distrib::AbstractDict)::Vector{Int}
+
+	k = keys(array_distrib) 
+
+	@assert issubset(k,procs())  
+
+	return sort!(vcat(k...))
+
+end 
+
+function procs_(array_distribs::Tuple{Vararg{<:AbstractDict}}
+								)::Vector{Int}
+
+	@assert same_procs(array_distribs)
+	
+	return procs_(array_distribs[1])
+
+end 
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
 
 
 
@@ -3579,25 +3633,6 @@ end
 
 
 
-
-#function Wannier_subspaces_on_mesh!(W::SubOrArray{ComplexF64,4};
-#																		kwargs...
-#																		)#::Vector{<:Array}
-#
-#	storage = init_storage(init_Wannier_subspaces(select_mesh_point(W,1,1)),
-#												 nr_kPoints_from_mesh(W);
-#												 parallel=false,
-#												 )
-#
-#	store_on_mesh!!(Wannier_subspaces!!, 
-#									nr_kPoints_from_mesh(W), 
-#									[W],
-#									storage)
-#
-#	return storage 
-#
-#end  
-	
 function Wannier_subspaces_on_mesh!(W::SubOrArray{ComplexF64,4};
 																		kwargs... 
 																		)::Vector{<:AbstractArray}
@@ -3627,14 +3662,9 @@ function _Wannier_subspaces_on_mesh!(W::Union{SubOrArray{ComplexF64,4},
 																		 kwargs...
 																		 )::Vector{<:AbstractArray}
 
-	nmesh = nr_kPoints_from_mesh(W)
 
-	storage = init_storage(init_Wannier_subspaces(select_mesh_point(W,1,1)), nmesh; 
-												 kwargs...)
-	
-	store_on_mesh!!(Wannier_subspaces!!, nmesh, [W], storage)
-
-	return storage 
+	store_on_mesh!!(Wannier_subspaces!!, W, 
+									init_Wannier_subspaces(W; kwargs...))
 
 end 
 
@@ -3642,13 +3672,12 @@ function _Wannier_subspaces_on_mesh!(W::SubOrSArray{ComplexF64,4};
 																		 kwargs...
 																		)::Vector{SharedArray}
 
-	nmesh = nr_kPoints_from_mesh(W)
 
-	storage, storage_i = init_storage_ida(init_Wannier_subspaces(select_mesh_point(W,1,1)), nmesh; kwargs...)
+	storage, (storage_i,) = init_storage_ida(init_Wannier_subspaces0(W),
+																					 nr_kPoints_from_mesh(W);
+																					 kwargs...)
 
-	store_on_mesh!!(Wannier_subspaces!!, nmesh, [W], storage; array_distrib=storage_i[1])
-
-	return storage 
+	store_on_mesh!!(Wannier_subspaces!!, W, storage; array_distrib=storage_i)
 
 end 
 
@@ -3775,23 +3804,21 @@ function wcc2mesh_fromSubspaces1!(
 	wbb,wbb_distr = init_storage_ida(psiH, data_dir1[1];
 																	 custom_ak=Wannier_band_basis0_ak,
 																	 kwargs...) 
-	n = nr_kPoints_from_mesh(psiH) 
 
-	map([1,3]) do sector  
+	return map([1,3]) do sector  
 	
 		#		sectors: (wf_plus, nu_plus, wf_minus, nu_minus)
 
-		store_on_mesh!!(Wannier_band_basis0!, n, tuple, 
+		store_on_mesh!!(Wannier_band_basis0!, tuple, 
 										wbb, psiH, data_dir1[sector];
 										array_distrib=wbb_distr)
 
 		wlo1_on_mesh_inplace!(w2, overlaps..., wbb, dir2; kwargs_w2...)
 
 		return store_on_mesh(get_periodic_eigvals∘Matrix, get_periodic_eigvals!,
-												 n, w2; kwargs...)
+												 nr_kPoints_from_mesh(psiH), w2; kwargs...)
 
 	end  
-
 
 end 
 
@@ -4244,7 +4271,23 @@ function choose_Wannier_subspace(s::Function)
 
 end 
 
-function init_Wannier_subspaces(W::AbstractMatrix{t},
+function init_Wannier_subspaces(W::AbstractArray{<:Number,4};
+																kwargs...
+																)::Vector{<:AbstractArray} 
+ 
+	init_storage(init_Wannier_subspaces0(W), 
+							 nr_kPoints_from_mesh(W);
+							 kwargs...)
+
+end 
+function init_Wannier_subspaces0(W::AbstractArray{<:Number,4},
+																)::Vector{<:Array} 
+ 
+
+	init_Wannier_subspaces0(select_mesh_point(W,1,1))
+
+end 
+function init_Wannier_subspaces0(W::AbstractMatrix{t},
 																)::Vector{<:Array} where t<:Number 
 
 	n = LinearAlgebra.checksquare(W) 
@@ -4427,7 +4470,6 @@ function get_wlo_data_mesh1(psiH::AbstractArray{ComplexF64,3},
 
 	storage = [similar(W1),Matrix{Float64}(undef,size(W1)[2:3])]
 
-#	storage = init_storage1(init_Wannier_subspaces(getWi(1)), nk)
 
 	store_on_mesh1!!(Wannier_eigen!, nk, getWi, storage)
 
@@ -4683,6 +4725,8 @@ function Wannier_band_basis(k::AbstractVector{<:Real},
 														H::Function,
 														Hdata...)::Matrix{ComplexF64}
 
+
+	error() 
 
 	psi_H, E, W1, psi_W1, nu, out = Wannier_band_basis0(k, dir1, subspace, H, Hdata...)
 

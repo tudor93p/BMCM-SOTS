@@ -1,4 +1,6 @@
 using Distributed 
+
+@everywhere using Distributed 
 @everywhere using DistributedArrays, SharedArrays, LinearAlgebra
 import BMCMSOTS: WLO , ChecksWLO 
 
@@ -18,13 +20,29 @@ psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)
 	
 	A = WLO.init_storage(H(rand(2)), 50; parallel=true)
 	B = WLO.inds_distrib_array(H(rand(2)), 50; parallel=true)
+	@show A.indices[:] B 
 
 	@test Set(A.pids)==Set(keys(B))
+@show A.pids  
 
-	for p in A.pids 
+for (i,p) in zip(A.indices,A.pids)
 
-		@test A.indices[p]==B[p]
-	end  
+		@test i==B[p] 
+	end 
+
+	map(zip(A.indices,A.pids)) do (i,p) 
+
+		@spawnat p begin 
+
+			@assert DistributedArrays.localindices(A)==B[p]==i 
+			println("tested $p")
+
+		end   
+
+	end  .|> fetch  
+
+
+
 
 end 
 

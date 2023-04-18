@@ -26,7 +26,7 @@ ComputeTasks.missing_data.(tasks,show_missing=gethostname()=="tudor-HP")
 prep_all = ComputeTasks.get_data_all_prep.(tasks, 
 													 shuffle=true, seed=4, 
 													 mute=false,
-													 check_data=false,
+#													 check_data=false,
 													 )
 
 function relevant_params(criterion::Function, vals::AbstractVector) 
