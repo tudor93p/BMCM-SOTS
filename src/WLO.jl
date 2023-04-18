@@ -1699,12 +1699,17 @@ function store_on_mesh!!(get_one!::Function,
 
 		@assert !isa(d,SubOrDArray)
 
-		isa(d,SubOrArray) || continue 
+		isa(d,SubOrSArray) && continue 
 	
+		@assert !isa(d, SubOrDArray)
+
+		isa(d,SubOrArray) || continue 
+		
 		length(d) < max(100, sum(length, dest)/50) && continue 
 
-		@warn "Large array passed? $(size(d))"
+		@warn "Large non-shared array passed? $(size(d))"
 
+		@show typeof(d)
 	end 
 
 	map(procs_(array_distrib)) do p 
@@ -3673,8 +3678,6 @@ function _Wannier_subspaces_on_mesh!(W::Union{SubOrArray{ComplexF64,4},
 																		 )::Vector{<:AbstractArray}
 
 
-	@show size(W) 
-	@show size.(init_Wannier_subspaces(W; kwargs...))
 	store_on_mesh!!(Wannier_subspaces!!, W, 
 									init_Wannier_subspaces(W; kwargs...))
 
@@ -3687,8 +3690,8 @@ function _Wannier_subspaces_on_mesh!(W::SubOrSArray{ComplexF64,4};
 
 	storage, (storage_i,) = init_storage_ida(init_Wannier_subspaces0(W),
 																					 nr_kPoints_from_mesh(W);
-																					 kwargs...)
-	@show size(storage)
+																					 kwargs...) 
+
 	store_on_mesh!!(Wannier_subspaces!!, W, storage; array_distrib=storage_i)
 
 end 
@@ -3817,7 +3820,7 @@ function wcc2mesh_fromSubspaces1!(
 																custom_ak=Wannier_band_basis0_ak,
 																	 kwargs...) 
 
-	@warn "psi overwritten, dir2=$dir2"
+#	@warn "psi overwritten, dir2=$dir2"
 
 	store_on_mesh!!(Wannier_band_basis0!, psiW, psiH; array_distrib=wbb_distr) 
 

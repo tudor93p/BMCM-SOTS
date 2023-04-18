@@ -42,27 +42,28 @@ input_checks  = Dict{Symbol,Any}(
 					
 		nr_kPoints = vcat(
 											10,
-#											50,
-#											95,
-#											145, 
-#											215, 
-#											300,
-#											601,
-#											#800,
-#											1001,
-#											2001,
-#											3001, # >8 GB 
-#											6001,
+											50,
+											95,
+											145, 
+											215, 
+											300,
+											601,
+											1001,
+											2001,
+											3001, # >8 GB 
+											6001,
+											10_001,
+											20_001,
 											),
 
-		kMesh_model = ["Uniform","Line",#"Square",#"Sin",
+		kMesh_model = ["Uniform",#"Line",#"Square",#"Sin",
 #									 "Expminv"
 									 ],
 
 		kPoint_start = [-1], 
 
-		preserved_symmetries = [#"None";
-#														[join(c,"+") for c=Combinatorics.powerset(["P", "Ct", "Tt","Mx", "TC2y"],1) if good_comb(c)];
+		preserved_symmetries = ["None";
+														[join(c,"+") for c=Combinatorics.powerset(["P", "Ct", "Tt","Mx", "TC2y"],1) if good_comb(c)];
 #[join(c,"+") for c=Base.product(["P","Ct","Tt"],["Mx","TC2y"])][:];
 														"All"],
 

@@ -4,7 +4,9 @@ module ChecksWLO
 
 using Distributed 
 
-import LinearAlgebra, Combinatorics, Random , Dates 
+import LinearAlgebra, Combinatorics, Random , Dates  
+import SharedArrays: SharedArray 
+
 
 using OrderedCollections: OrderedDict 
 
@@ -112,7 +114,7 @@ end
 
 function get_perturb_on_mesh(P::UODict, seed::Int...;
 														 kwargs...
-														 )::Vector{Array{ComplexF64,4}} 
+														 )::Vector{<:AbstractArray{ComplexF64,4}} 
 	
 	get_perturb_on_mesh(preserved_symmetries(P), 
 											nr_kPoints(P),
@@ -126,7 +128,7 @@ end
 function get_perturb_on_mesh(
 										 symms::AbstractString, 
 										 args...; kwargs...
-										 )::Vector{Array{ComplexF64,4}} 
+										 )::Vector{<:AbstractArray{ComplexF64,4}} 
 
 	all_symms_preserved(symms) && return [zeros(ComplexF64,4,4,n-1,n-1)] 
 
@@ -138,24 +140,37 @@ function get_perturb_on_mesh_(
 										 symms::AbstractString, 
 										 n::Int, k0::Real,
 										 nr_pert::Int,
-										 seed::Int
-										 )::Vector{Array{ComplexF64,4}} 
+										 seed::Int; kwargs...
+										 )::Vector{<:AbstractArray{ComplexF64,4}} 
 
 	Random.seed!(seed)  
 
-	return get_perturb_on_mesh_(symms, n, k0, nr_pert)
+	return get_perturb_on_mesh_(symms, n, k0, nr_pert;
+															kwargs...)
 
 end  
 
 function get_perturb_on_mesh_(
 										 symms::AbstractString, 
 										 n::Int, k0::Real,
-										 nr_pert::Int,
-										 )::Vector{Array{ComplexF64,4}}
+										 nr_pert::Int;
+										 parallel::Bool=false,
+										 shared::Bool=false,
+										 )::Vector{<:AbstractArray{ComplexF64,4}}
 
 	@assert !all_symms_preserved(symms) # safety -- methods changed
-	
-	randperts = [CalcWLO.get_perturb_on_mesh_(symms,n,k0) for i=1:nr_pert] 
+
+
+#	randperts = [CalcWLO.get_perturb_on_mesh_(symms,n,k0; kwargs...) for i=1:nr_pert] 
+
+	randperts = map(1:nr_pert) do i 
+		
+		p = CalcWLO.get_perturb_on_mesh_(symms,n,k0)
+		
+		return (parallel&shared) ?  SharedArray(p) : p 
+
+	end 
+		
 
 	for i=2:nr_pert 
 
@@ -1200,8 +1215,10 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	# ------------- with perturbation -------------- # 
 
-	trials = get_perturb_on_mesh(P, 3268) # seed ensures results recovered
-
+	trials = get_perturb_on_mesh(P, 3268;
+															 parallel=parallel3,
+															 shared=shared,
+															 ) # seed ensures results recovered
 	
 	if parallel #---- parallel evaluation ---#
 
@@ -1230,7 +1247,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 				psi = MODEL.get_psiH(P, nk, k0_or_kxy, perturb0, ps;
 														 parallel=parallel3, shared=shared)
-			
+		
 				if light_calc 
 					parallel2 && @warn "Nothing to parallelize"
 
