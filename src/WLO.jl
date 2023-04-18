@@ -1341,7 +1341,10 @@ function _init_storage(#T::DataType,
 
 	shared || return dzeros(T, array_size, array_workers, array_distrib)
 
-	return SharedArray{T}(array_size; pids=union(myid(), array_workers))
+#	fn = abspath(replace(string("Data/",mod(time(),1e6)),"."=>""))
+
+	return SharedArray{T}(#fn,
+												array_size; pids=union(myid(), array_workers))
 
 end 
 
