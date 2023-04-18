@@ -11,19 +11,19 @@ include("mock_H.jl")
 
 
 psi1 = WLO.psiH_on_mesh(50, 0 , H) 
-@show typeof(psi1)
+#@show typeof(psi1)
 psi2 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true)  
-@show typeof(psi2)
+#@show typeof(psi2)
 
 @testset "simualate ind distrib" begin 
 	
 	
 	A = WLO.init_storage(H(rand(2)), 50; parallel=true)
 	B = WLO.inds_distrib_array(H(rand(2)), 50; parallel=true)
-	@show A.indices[:] B 
+#	@show A.indices[:] B 
 
 	@test Set(A.pids)==Set(keys(B))
-@show A.pids  
+#@show A.pids  
 
 for (i,p) in zip(A.indices,A.pids)
 
@@ -48,7 +48,7 @@ end
 
 psi3 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true, shared=true)
 
-@show typeof(psi3)
+#@show typeof(psi3)
 
 #
 #pert = (rand(ComplexF64,size(psi1)),) 
@@ -70,7 +70,7 @@ psi3 = WLO.psiH_on_mesh(50, 0 ,H; parallel=true, shared=true)
 
 @testset "psi same" begin 
 
-	@show typeof(psi1) typeof(psi2) typeof(psi3)
+#	@show typeof(psi1) typeof(psi2) typeof(psi3)
 #	@test psi2 isa Array  
 #	@test psi1 isa Array 
 #	@show norm(psi1)
@@ -107,10 +107,36 @@ out_shared = WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,
 @show norm.(out_shared)
 @show typeof.(out_shared)
 
-@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
-@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
-@time "w1+w2 shared"  WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,shared=true)
+#@time "w1+w2 single" WLO.get_wlo_data_mesh(psi1, true, 2, true)
+#@time "w1+w2 multi"  WLO.get_wlo_data_mesh(psi2, true, 2, true; parallel=true)
+#@time "w1+w2 shared"  WLO.get_wlo_data_mesh(psi3, true, 2, true; parallel=true,shared=true)
+##  
 #
+#saved_I = [[[rand(a) for a in axes(k2)] for k2=k1] for k1=out_single]
+saved_I = [[[2, 1, 31, 39], [1, 49, 20], [2, 1, 18, 12], [1, 5, 8]], [[1, 32, 20], [1, 29, 25]]]
+saved_A = [[0.8229190893452871 + 0.0im, -0.0005759792681799602, 0.8879534901117178 + 0.0im, -0.04298684727137591], [0.20088572895758233, 0.2906207697957816]];
+
+function get_saved_vals(out)
+map(saved_I,out) do k1,v1 
+	map(k1,v1) do k2,v2 
+
+		v2[k2...]
+		
+	end 
+end 
+end 
+function same_saved_vals(out)
+
+map(saved_A,saved_I,out) do V1,k1,v1 
+	map(V1,k1,v1) do V2,k2,v2 
+
+		V2≈v2[k2...]
+		
+	end |> all 
+end  |> all
+end 
+
+
 @testset "wlo same" begin 
 
 #	@test w1_multi isa Array  
@@ -127,6 +153,12 @@ for (S,M,SS) in zip(out_single,out_multi,out_shared)
 			@test norm(s-ss) <1e-10  
 	
 		end 
+end 
+
+for out in (out_single, out_shared, out_multi)
+
+	@test same_saved_vals(out)
+
 end 
 
 end 
