@@ -1,3 +1,4 @@
+include("../input_file_10.jl") 
 using Distributed 
 
 @everywhere using Distributed 

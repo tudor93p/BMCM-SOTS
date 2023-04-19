@@ -49,10 +49,10 @@ input_checks  = Dict{Symbol,Any}(
 											300,
 											601,
 											1001,
-											2001,	# <= 60GB
-#											3001, # > 60GB
-#											6001,
-#											10_001,
+											2001,	# 
+											3001, # 55 GB 
+											6001,	# 165 GB 
+#											10_001, # 300 GB  
 #											25_001,
 											),
 
@@ -79,7 +79,7 @@ join(["P", "Ct", "Tt","Mx", "TC2y"],"+");
 
 		nr_perturb_instances = [1],
 
-		perturb_strength = [0],
+		perturb_strength = round.(LinRange(0, 0.6, 21),digits=2),
 #		perturb_strength =  vcat(Utils.uniqlogsp(1e-4,0.2,8,3; Trunc=true), 0.3:0.1:0.6),
 
 

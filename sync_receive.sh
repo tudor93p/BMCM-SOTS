@@ -1,6 +1,5 @@
 #cmd: rsync options source destination
 
-#host="rick"
 host='horon'
 #host='plumpy'
 #host='nut'

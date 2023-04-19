@@ -1,3 +1,5 @@
+#include("../input_file_9.jl") 
+
 import myPlots 
 import BMCMSOTS: RibbonWLO , MB , WLO
 
@@ -16,7 +18,7 @@ P = (width=10,
 observables=RibbonWLO.calc_observables 
 
 data = RibbonWLO.Compute(P; observables=observables)
-
+#
 #	nk = RibbonWLO.nr_kPoints(P) 
 #
 #	w = RibbonWLO.width(P) 
@@ -41,7 +43,7 @@ data = RibbonWLO.Compute(P; observables=observables)
 ##		set_results_onedir!(results, dir1, data)
 #
 #end  
-
+#
 
 
 #
@@ -63,18 +65,18 @@ data = RibbonWLO.Compute(P; observables=observables)
 #
 #	end 
 #end 
-
-t0 = init(BMCMSOTS, :RibbonPolarization)  
-
-mt = init(BMCMSOTS, :RibbonPolarization_vsX; X=:braiding_time)
-
-pdata = map([merge(t0.get_plotparams(P),Dict("k"=>2.3)),
-		 delete!(t0.get_plotparams(P),"k")]) do P1 
-
-mt.plot(t0.get_plotparams(P))
-
-end 
-
-
-
-#myPlots.plot(tasks)
+#
+#t0 = init(BMCMSOTS, :RibbonPolarization)  
+#
+#mt = init(BMCMSOTS, :RibbonPolarization_vsX; X=:braiding_time)
+#
+#pdata = map([merge(t0.get_plotparams(P),Dict("k"=>2.3)),
+#		 delete!(t0.get_plotparams(P),"k")]) do P1 
+#
+#mt.plot(t0.get_plotparams(P))
+#
+#end 
+#
+#
+#
+##myPlots.plot(tasks)

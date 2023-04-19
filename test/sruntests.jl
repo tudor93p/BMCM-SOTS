@@ -1,4 +1,4 @@
-include("../input_file_10.jl") 
+#include("../input_file_10.jl") 
 
 import BMCMSOTS 
 
@@ -17,7 +17,7 @@ for fn in [
 "shared_array",
 #"adaptive_cluster",
 #"adaptive",
-#"ribbon",
+"ribbon",
 #
 
 #"wlos_MBvBBH",

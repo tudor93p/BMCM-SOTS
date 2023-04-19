@@ -452,12 +452,18 @@ function get_perturb_on_mesh1(nr_at::Int, #nr_orb::Int,
 														 seed::Int=1993)::Array{ComplexF64,3}
 
 
+	nr_orb::Int = 4
+	size_H = nr_at*nr_orb 
+
+
 	Random.seed!(seed)
 
-	perturb0 = rand(ComplexF64,4,4) 
-	perturb0 .+= perturb0' 
+	perturb0 = rand(ComplexF64,nr_orb,nr_orb)  
 
-	perturb1 = rand(ComplexF64,4,4) 
+	perturb0 .+= perturb0' 
+	
+
+	perturb1 = rand(ComplexF64,nr_orb,nr_orb) 
 
 	LinearAlgebra.normalize!(perturb0)
 	LinearAlgebra.normalize!(perturb1)
@@ -465,11 +471,11 @@ function get_perturb_on_mesh1(nr_at::Int, #nr_orb::Int,
 	perturb0 .*= s 
 	perturb1 .*= s 
 
-	perturb = zeros(ComplexF64, 4nr_at, 4nr_at, nk-1)
+	perturb = zeros(ComplexF64, size_H, size_H, nk-1)
 
 	for j=1:nr_at  
 
-		J = TBmodel.Hamilt_indices(1:4,j,4)
+		J = TBmodel.Hamilt_indices(1:nr_orb,j,nr_orb)
 
 		for k=axes(perturb,3) 
 
@@ -477,13 +483,13 @@ function get_perturb_on_mesh1(nr_at::Int, #nr_orb::Int,
 
 			if j<nr_at 
 				setindex!(perturb, perturb1, 
-								J, TBmodel.Hamilt_indices(1:4,j+1,4), k)
+								J, TBmodel.Hamilt_indices(1:nr_orb,j+1,nr_orb), k)
 
 				end 
 			if j>1
 
 				setindex!(perturb, perturb1', 
-								J, TBmodel.Hamilt_indices(1:4,j-1,4), k)
+								J, TBmodel.Hamilt_indices(1:nr_orb,j-1,nr_orb), k)
 
 			end 
 
@@ -600,14 +606,16 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	strength = 1e-10 + (all_symms_preserved(P) ? 0 : perturb_strength(P))
 
 
-	perturb = get_perturb_on_mesh1(w, nk, strength)
+#	perturb = get_perturb_on_mesh1(w, nk, strength)
 
 
 	for dir1 in 1:2
 
 		h = Bloch_Hamilt(w, dir1, P)
 
-		data = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, perturb, h))
+#		data = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, perturb, h))
+
+		data = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, h))
 	
 		set_results_onedir!(results, dir1, data)
 

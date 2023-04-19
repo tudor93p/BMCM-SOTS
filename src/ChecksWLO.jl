@@ -1192,7 +1192,7 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	end 
 
 
-
+	GC.gc()  # crucial for large nk
 
 
 	if all_symms_preserved(P) 
@@ -1245,8 +1245,9 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 	
 			for (i,ps) in zip(s2e,rest_strengths) 
 	
-				psi = MODEL.get_psiH(P, nk, k0_or_kxy, perturb0, ps;
-														 parallel=parallel3, shared=shared)
+				psi .= MODEL.get_psiH(P, nk, k0_or_kxy, perturb0, ps;
+														 parallel=parallel3, shared=shared,
+														 ) # reuse array -- could do inplace
 		
 				if light_calc 
 					parallel2 && @warn "Nothing to parallelize"
@@ -1261,11 +1262,15 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 					getset_results!(results, psi, nk, k0_, j, i; parallel=parallel2)
 				end 
 
+				GC.gc()  # crucial for large nk
 			end  
 	
 		end # ---------#  
 
 	end 
+
+	clear!(:psi)
+	GC.gc()
 
 	return results
 
