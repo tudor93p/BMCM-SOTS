@@ -174,6 +174,9 @@ function symmetrize_HC!(A::AbstractMatrix, args...)::Nothing
 
 end 
 
+
+
+
 function normalize!(A::AbstractMatrix, args...)::Nothing
 
 	LinearAlgebra.normalize!(A)

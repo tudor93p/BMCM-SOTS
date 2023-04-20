@@ -560,21 +560,61 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function symmetrize_on_mesh!(
-														 A::AbstractArray{ComplexF64,4},
+function symmetrize_on_mesh_args(
+														 A::AbstractArray{ComplexF64,N},
 														 opers::AbstractString,
 														 n::Int, k0::Real,
-														 )::Nothing 
+														 args...
+														 ) where N 
+
+	@assert 3<=N<=4
+
+	map(sepSymmString(opers)) do op
+
+		(getOp_uniqueInds(op,N-2,n,k0), (getOpFun(op), getOp_fij(op,n,k0)))
+
+	end  
+
+end   
+
+
+function symmetrize_on_mesh!(
+														 A::AbstractArray{ComplexF64,N},
+														 opers::AbstractString,
+														 n::Int, k0::Real,
+														 B::AbstractArray{ComplexF64,N}=A,
+														 )::AbstractArray{ComplexF64,N} where N
+
+	@assert 3<=N<=4
 
 	for op in sepSymmString(opers)
 
 		WLO.symmetrize_on_mesh!(A,
-														getOp_uniqueInds(op,n,k0),
+														getOp_uniqueInds(op,N-2,n,k0),
 														(getOpFun(op), getOp_fij(op,n,k0)),
+														B,
 														)
 
 	end  
 
+	return A 
+
+end  
+
+
+function symmetrize_on_mesh!(
+														 A::AbstractArray{ComplexF64,N},
+														 args::AbstractVector{<:Tuple},
+														 B::AbstractArray{ComplexF64,N}=A,
+														 )::AbstractArray{ComplexF64,N} where N
+
+	for a in args 
+		
+		WLO.symmetrize_on_mesh!(A, a..., B,)
+
+	end  
+
+	return A 
 
 end  
 
@@ -924,14 +964,13 @@ end
 
 
 
-MxRepr = kron(Groups.PauliMatrix(0),Groups.PauliMatrix(1))
-MyRepr = kron(Groups.PauliMatrix(3),Groups.PauliMatrix(2))
-CtRepr = kron(Groups.PauliMatrix(1),Groups.PauliMatrix(2))
-PRepr = kron(Groups.PauliMatrix(1),Groups.PauliMatrix(3))
-#MzRepr = kron  
-TtRepr = kron(Groups.PauliMatrix(0),Groups.PauliMatrix(1))
-TR2yRepr = kron(Groups.PauliMatrix(0),Groups.PauliMatrix(0))
-TR2xRepr = kron(Groups.PauliMatrix(3),Groups.PauliMatrix(3))
+MxRepr = Groups.GammaMatrix(0,1)
+MyRepr = Groups.GammaMatrix(3,2)
+CtRepr = Groups.GammaMatrix(1,2)
+PRepr = Groups.GammaMatrix(1,3)
+TtRepr = Groups.GammaMatrix(0,1)
+TR2yRepr = Groups.GammaMatrix(0,0)
+TR2xRepr = Groups.GammaMatrix(3,3)
 
 fij_identity(k::NTuple{2,Int}, ::Function)::NTuple{2,Int} = k 
 
@@ -1169,9 +1208,15 @@ function getOp_fij(op::AbstractString)::Function
 
 #	function fij(ind_minusk::Function)::Function 
 
-		fij_(k::Vararg{Int,2})::NTuple{2,Int} = fij_(k) 
+		function fij_(k::Vararg{Int,N})::NTuple{N,Int} where N 
 
-		fij_(k::NTuple{2,Int})::NTuple{2,Int} = fij1(k, ind_minusk)
+			fij_(k) 
+
+		end 
+
+		function fij_(k::NTuple{N,Int})::NTuple{N,Int} where N
+			fij1(k, ind_minusk)
+		end 
 
 	end 
 
@@ -1193,21 +1238,30 @@ getOp_fij(op::AbstractString, args...)::Function = getOp_fij(op)(args...)
 # returns the indices {I} such that {I, f(I)} covers the entire space
 
 
-function getOp_uniqueInds(op::AbstractString)::Function   
+function getOp_uniqueInds(op::AbstractString, D::Int)::Function   
 
-	f11 = getOpFun(op, "fij_")((1,1),-)
+	f1 = getOpFun(op, "fij_")(Tuple(1 for d=1:D),-)
 
 	return function uniqueInds_oper(n::Int, k0::Real
-																	)::Tuple{<:AbstractVector{Int}, 
-																					 <:AbstractVector{Int}
-																					}
+																	)::Tuple{Vararg{AbstractVector{Int}}}
+
 		ui0 = Base.OneTo(n-1)
 
-		all(==(1),f11) && return (ui0, ui0)
+		if all(==(1),f1) 
+			
+			return Tuple(ui0 for d=1:D)
 
-		all(==(-1),f11) && return (WLO.uniqueInds_kMirror(n,k0), ui0)
+		elseif all(==(-1),f1) 
+			
+#			return (WLO.uniqueInds_kMirror(n,k0), ui0)
 
-		return Tuple(f==-1 ? WLO.uniqueInds_kMirror(n,k0) : ui0 for f=f11)
+			return tuple(WLO.uniqueInds_kMirror(n,k0), (ui0 for d=2:D)...)
+
+		else 
+		
+			return Tuple(f==-1 ? WLO.uniqueInds_kMirror(n,k0) : ui0 for f=f1)
+
+		end 
 
 	end  
 
@@ -1216,11 +1270,11 @@ end
 
 
 
-function getOp_uniqueInds(op::AbstractString, n::Int, k0::Real
-													 )::Tuple{<:AbstractVector{Int},
-																		<:AbstractVector{Int}}
+function getOp_uniqueInds(op::AbstractString, D::Int,
+													n::Int, k0::Real
+													)::Tuple{Vararg{<:AbstractVector{Int}}}
 	
-	getOp_uniqueInds(op)(n, k0)
+	getOp_uniqueInds(op, D)(n, k0)
 
 end 
 

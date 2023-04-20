@@ -451,9 +451,13 @@ function init_eigH(k::AbstractVector, H::Function, data...; kwargs...)
 
 end 
 
-function init_eigH(ij::NTuple{2,Int},
+function init_eigH(ij::NTuple{N,Int},
 									 H::Function, kij::Function, 
-									 perturb::AbstractArray{ComplexF64,4}, Hdata...; kwargs...)
+									 perturb::AbstractArray{ComplexF64,M}, 
+									 Hdata...; kwargs...) where {N,M}
+
+	@assert N==M-2 
+	@assert 3<=M<=4 
 
 	init_eigH(select_mesh_point(perturb,ij); kwargs...)
 
@@ -1790,17 +1794,35 @@ end
 
 function store_on_mesh1!!(get_one!::Function, 
 												source::SubOrArray{<:Number},
+												dest::Union{<:SubOrArray{<:Number},
+																		<:AbstractVector{<:SubOrArray}
+																		}=source,
 												args...; kwargs...
 												)::AbstractArray 
 
 	store_on_mesh1!!(get_one!, nr_kPoints_from_mesh1(source), 
-									 source, args...; kwargs...)
+									 source, dest, args...; kwargs...)
 
 end  
 
 
 function store_on_mesh1!!(get_one!::Function, 
 													nk::Int,
+													args...; kwargs...)::AbstractArray
+
+	store_on_mesh1!!(get_one!, 1:nk-1, args...; kwargs...)
+
+end 
+function store_on_mesh1!!(get_one!::Function, 
+													(inds,)::Tuple{<:AbstractVector{Int}},
+													args...; kwargs...)::AbstractArray
+
+	store_on_mesh1!!(get_one!, inds, args...; kwargs...)
+
+end 
+
+function store_on_mesh1!!(get_one!::Function, 
+													inds::AbstractVector{<:Int},
 												source::Union{<:Function, 
 																			<:SubOrArray{<:Number},
 																			<:AbstractVector{<:SubOrArray},
@@ -1813,7 +1835,7 @@ function store_on_mesh1!!(get_one!::Function,
 												data...; kwargs...
 												)::AbstractArray
 
-	for i=1:nk-1
+	for i in inds 
 
 		store_on_mesh1_one!!(get_one!, source, i, dest, data...; kwargs...)
 
@@ -2406,14 +2428,8 @@ function psiH_on_mesh1(n::Int, k0::Real,
 
 	@assert !get(kwargs,:parallel,false) "Not implemented" 
 
-	kij = get_kij(n,k0)  
-
-	WFs = init_storage1(init_eigH(kij(1), H, Hdata...; kwargs...)[1], n; 
-													 kwargs...)
-
-	store_on_mesh1!!(eigH!, n, identity, WFs, H, kij, perturb, Hdata...; kwargs...)
-
-	return WFs 
+	store_on_mesh1(first∘init_eigH, eigH!, n, 
+								 tuple, H, get_kij(n,k0), perturb, Hdata...; kwargs...)
 
 end  
 
@@ -2424,15 +2440,6 @@ end
 #
 #---------------------------------------------------------------------------#
 
-function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; 
-											kwargs...
-											)::Union{Array{ComplexF64,4},SharedArray{ComplexF64,4}} 
-
-	out = store_on_mesh(first∘init_eigH, eigH!, n, kij, H, Hdata...; kwargs...)
-
-	return out isa SubOrDArray ? convert(Array, out) : out 
-
-end  
 function psiH_on_mesh(n::Int, 
 											k::Union{<:Real,
 															 <:AbstractVector{<:AbstractVector{<:Real}}
@@ -2445,14 +2452,24 @@ function psiH_on_mesh(n::Int,
 end 
 
 
+function psiH_on_mesh(n::Int, kij::Function, H::Function, Hdata...; 
+											kwargs...
+											)::Union{Array{ComplexF64,4},SharedArray{ComplexF64,4}} 
+
+	out = store_on_mesh(first∘init_eigH, eigH!, n, 
+											kij, H, Hdata...; kwargs...)
+
+	return out isa SubOrDArray ? convert(Array, out) : out 
+
+end  
 function psiH_on_mesh(n::Int, 
 											kij::Function,
 											perturb::AbstractArray{ComplexF64,4},
 											H::Function, Hdata...; kwargs...
 											)::Union{Array{ComplexF64,4},SharedArray{ComplexF64,4}} 
 
-	out = store_on_mesh(first∘init_eigH, eigH!, 
-								n, tuple, H, kij, perturb, Hdata...; kwargs...) 
+	out = store_on_mesh(first∘init_eigH, eigH!, n, 
+											tuple, H, kij, perturb, Hdata...; kwargs...) 
 
 	return out isa SubOrDArray ? convert(Array, out) : out 
 ##
@@ -2577,18 +2594,34 @@ end
 function symmetrize_on_mesh!(A::AbstractArray{ComplexF64,4},
 														 inds::Union{Int,Tuple{<:AbstractVector{Int},
 																									 <:AbstractVector{Int}}},
-														 (op,fij)::NTuple{2,Function}; # symm;
+														 (op,fij)::NTuple{2,Function},
+														 B::AbstractArray{ComplexF64,4}=A;
 														 kwargs...
 														 )::AbstractArray
 
-	store_on_mesh!!(symmetrize_on_mesh_one!, inds, fij, A, A, op; kwargs...)
+	store_on_mesh!!(symmetrize_on_mesh_one!, inds, fij, A, B, op; kwargs...)
 
 end 
 
+function symmetrize_on_mesh!(A::AbstractArray{ComplexF64,3},
+														 inds::Union{Int,Tuple{<:AbstractVector{Int}}},
+														 (op,fij)::NTuple{2,Function},# symm;
+														 B::AbstractArray{ComplexF64,3}=A;
+														 kwargs...
+														 )::AbstractArray
+
+	store_on_mesh1!!(symmetrize_on_mesh_one!, inds, fij, A, B, op; kwargs...)
+
+end 
+
+
 function symmetrize_on_mesh_one!(Aij::AbstractMatrix{ComplexF64},
-									opij::NTuple{2,Int}, 
-									seed::AbstractArray{<:Number,4},
-									op::Function; kwargs...)::Nothing
+									opij::NTuple{N,Int}, 
+									seed::AbstractArray{<:Number,M},
+									op::Function; kwargs...)::Nothing where {N,M}
+
+	@assert 3<=M<=4 
+	@assert N==M-2 
 
 	Symmetries.symmetrize!!(Aij, select_mesh_point(seed, opij), op;
 													kwargs...)
@@ -4452,9 +4485,6 @@ function get_wlo_data_mesh1(psiH::AbstractArray{ComplexF64,3},
 																		#Array{ComplexF64,3},
 																		Array{Float64,2},
 																		}
-
-
-
 
 	psi = psi_sorted_energy(psiH; halfspace=true, occupied=occupied) 
 

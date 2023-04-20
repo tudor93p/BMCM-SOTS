@@ -106,7 +106,21 @@ function all_symms_preserved(P::UODict)::Bool
 
 	all_symms_preserved(preserved_symmetries(P))
 
+end  
+
+function no_symms_preserved(P::UODict)::Bool 
+
+	no_symms_preserved(preserved_symmetries(P))
+
+end  
+
+function no_symms_preserved(s::AbstractString)::Bool 
+
+	s  == "None" 
+
 end 
+
+
 function all_symms_preserved(s::AbstractString)::Bool
 
 	s=="All"

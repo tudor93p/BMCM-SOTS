@@ -11,14 +11,18 @@ import myLibs.Parameters: UODict
 
 import ..FILE_STORE_METHOD
 
-import ..WLO, ..Helpers#, ..Symmetries
+import ..WLO, ..Helpers 
+import .Helpers: Symmetries
 
 import ..CalcWLO 
 import ..CalcWLO: MODEL 
 
 import ..WLO: nr_kPoints, kPoint_start 
 
-import ..CalcWLO: all_symms_preserved, fn_legend, fn_nolegend, add_legend!, perturb_strength
+import ..CalcWLO: all_symms_preserved, 
+									fn_legend, fn_nolegend, add_legend!, 
+									perturb_strength, preserved_symmetries,
+									all_symms_preserved, no_symms_preserved
 
 #===========================================================================#
 #
@@ -104,11 +108,6 @@ get_target = prep_obs ∘ Helpers.f_get_target(:observables)
 #
 #---------------------------------------------------------------------------#
 
-function no_symms_preserved(P::UODict)::Bool 
-
-	P[:preserved_symmetries] == "None" 
-
-end 
 
 
 #===========================================================================#
@@ -446,56 +445,92 @@ function set_results_onedir!(results::AbstractDict,
 end 
 
 
-function get_perturb_on_mesh1(nr_at::Int, #nr_orb::Int,
-														 nk::Real, 
+function get_perturb_on_mesh1(
+															nr_at::Int, #nr_orb::Int, 
+															opers::AbstractString,
+														 nk::Int, k0::Real,
 														 s::Real,
 														 seed::Int=1993)::Array{ComplexF64,3}
 
 
-	nr_orb::Int = 4
+	nr_orb::Int = 4 
+
 	size_H = nr_at*nr_orb 
+
+	
+	all_symms_preserved(opers) && return zeros(ComplexF64, size_H, size_H, nk-1)
+
 
 
 	Random.seed!(seed)
 
-	perturb0 = rand(ComplexF64,nr_orb,nr_orb)  
 
-	perturb0 .+= perturb0' 
+
+#	perturb0 = WLO.store_on_mesh!!(Symmetries.symmetrize_HC!,
+#																 rand(ComplexF64,nr_orb,nr_orb,nk-1),
+#																 )
+#	
+#	perturb1 = rand(ComplexF64, nr_orb, nr_orb, nk-1)
+#
+#	LinearAlgebra.normalize!(perturb0)
+#	LinearAlgebra.normalize!(perturb1)
+#
+#	perturb0 .*= s 
+#	perturb1 .*= s 
+#
+# 	# below: construct such that peturb has the same structure 
+# 	# 							for various system sizes 
+#
+#	for j_at=1:nr_at  
+#
+#		J_at = TBmodel.Hamilt_indices(1:nr_orb, j_at, nr_orb)
+#
+#		for k=axes(perturb,3) 
+#
+#			setindex!(perturb, selectdim(perturb0, 3, k), J_at, J_at, k)
+#
+#			if j_at<nr_at 
+#				setindex!(perturb, selectdim(perturb1, 3, k),
+#								J_at, TBmodel.Hamilt_indices(1:nr_orb, j_at+1, nr_orb), k)
+#
+#				end 
+#			if j_at>1
+#
+#				setindex!(perturb, selectdim(perturb1, 3, k)',
+#								J_at, TBmodel.Hamilt_indices(1:nr_orb, j_at-1, nr_orb), k)
+#
+#			end 
+#
+#		end 
+#
+#	end 
+
 	
 
-	perturb1 = rand(ComplexF64,nr_orb,nr_orb) 
+	perturb = WLO.store_on_mesh1!!(Symmetries.symmetrize_HC!,
+													rand(ComplexF64, size_H, size_H, nk-1) 
+													)
 
-	LinearAlgebra.normalize!(perturb0)
-	LinearAlgebra.normalize!(perturb1)
 
-	perturb0 .*= s 
-	perturb1 .*= s 
+	inds = TBmodel.Hamilt_indices_all(1:nr_orb, 1:nr_at; iter="atoms")
 
-	perturb = zeros(ComplexF64, size_H, size_H, nk-1)
+	if !CalcWLO.no_symms_preserved(opers)
+		
+		@assert opers in ("P","Ct")
 
-	for j=1:nr_at  
+		symm_args = MODEL.symmetrize_on_mesh_args(perturb, opers, nk, k0) 
 
-		J = TBmodel.Hamilt_indices(1:nr_orb,j,nr_orb)
+		for J_at in inds,I_at in inds 
 
-		for k=axes(perturb,3) 
-
-			setindex!(perturb, perturb0, J, J, k)
-
-			if j<nr_at 
-				setindex!(perturb, perturb1, 
-								J, TBmodel.Hamilt_indices(1:nr_orb,j+1,nr_orb), k)
-
-				end 
-			if j>1
-
-				setindex!(perturb, perturb1', 
-								J, TBmodel.Hamilt_indices(1:nr_orb,j-1,nr_orb), k)
-
-			end 
+			MODEL.symmetrize_on_mesh!(view(perturb,I_at,J_at,:), symm_args)
 
 		end 
 
 	end 
+
+	WLO.store_on_mesh1!!(Symmetries.normalize!, perturb) 
+
+	perturb .*= s/nr_at 
 
 	return perturb 
 
@@ -527,6 +562,8 @@ function add_perturb_wrapper(h0::Function)::Function
 		h0(k)
 
 	end 
+
+	h((i,)::Tuple{Int}, args...)::Matrix{ComplexF64} = h(i, args...)
 
 	function h(i::Int, get_k::Function, perturb::AbstractArray{<:Number, 3}
 						 )::Matrix{ComplexF64}
@@ -597,30 +634,29 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 
 	k0 = kPoint_start(P)
 
+	symms = preserved_symmetries(P) 
+
 #	results = init_results(w, get_target(target; kwargs...))
 	results = init_results(w, get_target(calc_observables; kwargs...))
 
 
-	@assert all_symms_preserved(P)|no_symms_preserved(P)
 
-	strength = 1e-10 + (all_symms_preserved(P) ? 0 : perturb_strength(P))
-
-
-#	perturb = get_perturb_on_mesh1(w, nk, strength)
+	strength = (all_symms_preserved(P) ? 0 : perturb_strength(P))
 
 
-	for dir1 in 1:2
+	perturb = get_perturb_on_mesh1(w, symms, nk, k0, strength)
+
+	for dir1 in 1:1
 
 		h = Bloch_Hamilt(w, dir1, P)
 
-#		data = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, perturb, h))
+		data = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, perturb, h))
 
-		data = WLO.get_wlo_data_mesh1(WLO.psiH_on_mesh1(nk, k0, h))
-	
 		set_results_onedir!(results, dir1, data)
 
 	end 
 
+	results["perturb"]=perturb 
 
 	return results
 

@@ -5,20 +5,34 @@ import BMCMSOTS: RibbonWLO , MB , WLO
 
 import myLibs:TBmodel,Lattices 
 
-P = (width=10,
+observables=RibbonWLO.calc_observables  
+
+for ps = LinRange(0,1,15)
+
+P = (width=200,
 			braiding_time = 0.25, 
 			s0_Hamilt = 0.1, s_Hamilt = 1, b_Hamilt = 1, 
-			kPoint_start = -1, nr_kPoints = 10, 
+			kPoint_start = -1, nr_kPoints = 50, 
 #			preserved_symmetries = "All",#Ct",#"None",#"Ct",  
 #			preserved_symmetries = "Ct",
-			preserved_symmetries = "None",
+			preserved_symmetries = "P",
 			nr_perturb_strength = 3, max_perturb_strength = 0.4, 
-			nr_perturb_instances = 1, perturb_strength = 0.2,) 
+			nr_perturb_instances = 1, perturb_strength = ps,) 
 
-observables=RibbonWLO.calc_observables 
 
-data = RibbonWLO.Compute(P; observables=observables)
-#
+data = RibbonWLO.Compute(P; observables=observables)["WannierBands1"]
+
+nu = [data[1,1], data[end,1]]
+
+println(ps,"\t",findmin(Utils.dist_periodic(nu,0.5,1)))
+
+end 
+
+
+
+
+
+
 #	nk = RibbonWLO.nr_kPoints(P) 
 #
 #	w = RibbonWLO.width(P) 
