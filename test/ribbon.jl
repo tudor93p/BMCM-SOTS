@@ -9,13 +9,13 @@ observables=RibbonWLO.calc_observables
 
 for ps = LinRange(0,1,15)
 
-P = (width=200,
+P = (width=60,
 			braiding_time = 0.25, 
 			s0_Hamilt = 0.1, s_Hamilt = 1, b_Hamilt = 1, 
-			kPoint_start = -1, nr_kPoints = 50, 
+			kPoint_start = -1, nr_kPoints = 150, 
 #			preserved_symmetries = "All",#Ct",#"None",#"Ct",  
 #			preserved_symmetries = "Ct",
-			preserved_symmetries = "P",
+			preserved_symmetries = "Ct",
 			nr_perturb_strength = 3, max_perturb_strength = 0.4, 
 			nr_perturb_instances = 1, perturb_strength = ps,) 
 

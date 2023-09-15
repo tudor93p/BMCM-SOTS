@@ -17,6 +17,8 @@ import ..WLO, ..Helpers
 
 import ..MB; MODEL=MB
 #import ..BBH; MODEL=BBH 
+#import ..ChiralPwave; MODEL=ChiralPwave
+
 
 import ..WLO: nr_kPoints, kPoint_start 
 import ..Helpers: Symmetries, AdaptiveMesh 
@@ -97,7 +99,7 @@ end
 
 function preserved_symmetries(P::UODict)::String 
 
-	P[:preserved_symmetries]
+	get(P, :preserved_symmetries, "All")
 
 end 
 

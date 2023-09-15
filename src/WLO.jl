@@ -6,12 +6,12 @@ import LinearAlgebra, Statistics
 import SharedArrays: SharedArray  
 
 import Distributed: @spawnat, myid, workers,nworkers,procs
-import DistributedArrays: 	DArray, SubOrDArray, localindices,localpart, dzeros 
+import DistributedArrays: DArray, SubOrDArray, localindices,localpart, dzeros 
 
 
 
 
-import myLibs:Utils,SignalProcessing 
+import myLibs: Utils, SignalProcessing, Algebra 
 import myLibs.Parameters:UODict
 
 
@@ -43,7 +43,9 @@ end
 
 function kPoint_start(P::UODict)::Float64
 
-	pi*P[:kPoint_start]
+	#	pi*P[:kPoint_start] 
+	
+	pi*get(P,:kPoint_start,-1)
 
 end  
 
@@ -1613,7 +1615,7 @@ function store_on_mesh!!(get_one!::Function,
 end 
 
 
-
+# adapted to myLibs.MeshInPlace
 function store_on_mesh!!(get_one!::Function, n::Int, args...; 
 												 kwargs...)::AbstractArray
 
@@ -1621,6 +1623,7 @@ function store_on_mesh!!(get_one!::Function, n::Int, args...;
 
 end 
 
+# adapted to myLibs.MeshInPlace
 function _store_on_mesh!!(get_one!::Function, 
 												 inds::Tuple{<:AbstractVector{Int},
 																		 <:AbstractVector{Int}},
@@ -1650,6 +1653,9 @@ function _store_on_mesh!!(get_one!::Function,
 
 end    
 
+
+
+# adapted to myLibs.MeshInPlace
 function store_on_mesh!!(get_one!::Function, 
 												 inds::Tuple{<:AbstractVector{Int},
 																		 <:AbstractVector{Int}},
@@ -2144,127 +2150,13 @@ function wlo_from_mesh(
 	
 end  
 
-#
-#function matmulpairs!(dst::AbstractArray{T,3},
-#											src::AbstractArray{T,3},
-#											N::Int=size(src,3)
-#											)::AbstractMatrix{T} where T<:Number 
-#
-#	N == 1 && return selectdim(src,3,1)
-#	
-#	offset = isodd(N) 
-#
-#	offset && copy!(selectdim(dst,3,1), selectdim(src,3,1))
-#
-#	for (i,i2) in zip(1+offset:div(N,2)+offset,2+offset:2:N)
-#
-#		LinearAlgebra.mul!(selectdim(dst,3,i),
-#											 selectdim(src,3,i2-1),
-#											 selectdim(src,3,i2)
-#											 )
-#	end 
-#
-#	matmulpairs!(src, dst, div(N+1,2))
-#
-#end 
+function matmulpairs!(args...; kwargs...)
 
-function matmulpairs!(aux::AbstractArray{T,3},
-											matrices::Vararg{<:AbstractMatrix{T},N}
-											)::AbstractMatrix{T} where T<:Number where N 
-
-	for i=1:div(N,2) 
-
-		LinearAlgebra.mul!(selectdim(aux,3,i),matrices[2i-1],matrices[2i])
-
-	end 
-
-	isodd(N) && copy!(selectdim(aux,3,div(N+1,2)), matrices[N])
-
-	return matmulpairs!(aux, div(N+1,2))
-
-end 
-
-function matmulpairs!(dst::AbstractArray{T,3},
-											src::AbstractArray{T,3},
-											inds_src::AbstractVector{Int},
-											i0::Int...
-											)::AbstractMatrix{T} where T<:Number  
-
-	matmulpairs!(dst, selectdim(src,3,inds_src), i0...)
+	error("Moved to Algebra")
 
 end 
 
 
-function matmulpairs!(dst::AbstractArray{T,3},
-											src::AbstractArray{T,3},
-											i0::Int=1,
-											)::AbstractMatrix{T} where T<:Number 
-	
-	Npairs,offset = divrem(size(src,3),2)
-
-	Npairs==0 && return selectdim(src,3,1)
-
-	offset==1 && copy!(selectdim(dst,3,i0), selectdim(src,3,1)) 
-									# not touched at this iteration 
-
-# dst[i0:imax] will contain the results 
-	imax = i0+Npairs+offset-1
-
-	for (i,i2) in zip(i0+offset:imax, 2+offset:2:size(src,3))
-
-		LinearAlgebra.mul!(selectdim(dst,3,i),
-											 selectdim(src,3,i2-1),
-											 selectdim(src,3,i2)
-											 )
-	end 
-
-	return matmulpairs!(dst, dst, i0:imax, 1+imax*(size(dst,3)-i0+1>imax))
-
-end 
-
-
-
-function matmulpairs!(data::AbstractArray{T,3}, # overwritten 
-											 stop::Int 
-											)::AbstractMatrix{T} where T<:Number 
-
-#	stop = size(data,3)-1
-
-	N::Int = stop 
-
-	N>1 && @assert stop<size(data,3) "Extra space needed for storage" 
-
-
-	while N>1 
-
-		for (j,k) in zip(stop:-1:stop-div(N,2)+1, stop-2:-2:stop-N)
-	
-			LinearAlgebra.mul!(selectdim(data, 3, mod(j,size(data,3))+1),
-												 selectdim(data, 3, mod(k,size(data,3))+1),
-												 selectdim(data, 3, mod(k+1,size(data,3))+1),
-												 )
-	
-		end 
-	
-	
-		if isodd(N) 
-	
-			copy!(selectdim(data, 3, mod(stop-div(N,2), size(data,3))+1),
-						selectdim(data, 3, mod(stop-N, size(data,3))+1))
-	
-		end  
-	
-		stop = mod(stop,size(data,3))+1
-	
-		N = div(N+1,2)
-
-	end 
-	
-	
-	return selectdim(data,3,stop)
-
-
-end  
 
 
 #===========================================================================#
@@ -2726,7 +2618,7 @@ function wlo_from_ov!(
 							ov_inds::AbstractVector{Int}...
 							)::AbstractMatrix{ComplexF64}
 
-	matmulpairs!(ov_aux, overlaps, ov_inds...)
+	Algebra.matmulpairs!(ov_aux, overlaps, ov_inds...)
 
 end  
 
@@ -2806,7 +2698,7 @@ function wlo1_on_mesh1_inplace!(
 	for m=2:nr_kPoints_from_mesh1(overlaps)-1
 
 		copy!(select_mesh_point(dest, m),
-						matmulpairs!(ov_aux,
+						Algebra.matmulpairs!(ov_aux,
 											 inv(select_mesh_point(overlaps, m-1)),
 											 select_mesh_point(dest, m-1),
 											 select_mesh_point(overlaps, m-1),
@@ -4424,10 +4316,11 @@ function sep_Wannier_subspaces((psi,E)::AbstractVector{<:AbstractArray},
 
 
 	N = size(E,1) 
+
 	@assert size(psi,2)==N 
 
-	o = sortperm_energy(N; halfspace=true,occupied=true) 
-	u = sortperm_energy(N; halfspace=true,occupied=false) 
+	o = sortperm_energy(N; halfspace=true, occupied=true) 
+	u = sortperm_energy(N; halfspace=true, occupied=false) 
 
 	return [selectdim(psi, 2, o), selectdim(E, 1, o), 
 
@@ -4510,19 +4403,25 @@ function get_wlo_data_mesh(full_psiH::SubOrArray{ComplexF64,4},
 									kwargs...
 									)::Tuple
 
+
 	psi = psi_sorted_energy(full_psiH; halfspace=true, occupied=occupied) 
+
 
 	w1 = wlo1_on_mesh_inplace(dir1, psi; kwargs...)
 
 
 	eigW1 = Wannier_eigen_on_mesh!(w1; dir=dir1, kwargs...)
 
-	do_conv = any(isa(x,SubOrDArray) for x in eigW1) 
+
+	do_conv = any(isa(x,SubOrDArray) for x in eigW1)   
+
 	if do_conv 
 		eigW1 = convert(Vector{Array}, eigW1)
 	end  
 	
 	eigW1_ret = sep_Wannier_subspaces(eigW1) 
+
+
 
 	if get_wlo2 
 
@@ -4576,6 +4475,7 @@ function get_wlo_data_mesh(full_psiH::SubOrSArray{ComplexF64,4},
 												)
 
 	eigW1 = Wannier_eigen_on_mesh!(W; dir=dir1, kwargs...)
+
 
 	eigW1_ret = sep_Wannier_subspaces(eigW1) 
 
@@ -4787,65 +4687,6 @@ end
 function IPR(out::AbstractVector)::Float64
 
 	(1/sum(abs2∘abs2, out) - 1)/(length(out) - 1)
-
-end 
-
-
-function Wannier_band_basis(k::AbstractVector{<:Real}, 
-														dir1::Int, 
-														subspace::Union{Real,Function},
-														storage::AbstractVector,
-														H::Function,
-														Hdata...)::Matrix{ComplexF64}
-
-
-	error() 
-
-	psi_H, E, W1, psi_W1, nu, out = Wannier_band_basis0(k, dir1, subspace, H, Hdata...)
-
-####
-	@assert nu ≈ get_periodic_eigvals(LinearAlgebra.diag(psi_W1' * W1 * psi_W1))
-
-		eig = LinearAlgebra.eigen(W1)
-
-	@assert only(nu)==get_periodic_eigvals(eig.values[argmax(abs.(overlap(eig.vectors,psi_W1))[:])])
-
-@assert E ≈ LinearAlgebra.diag(psi_H' * H(k, Hdata...) * psi_H)
-
-#	error()
-
-#	println(abs(only(diff(E))))
-###
-
-
-
-	dir2 = 3-dir1  
-
-
-	push!(storage, [only(nu),
-											
-									copy(k),
-
-									dir2, 
-
-									only(eachcol(out)),
-
-									E,
-
-									only(eachcol(psi_W1)), 
-
-									psi_H 
-									
-									]
-
-				)
-
-
-### 
-
-
-
-return copy(out)
 
 end 
 

@@ -18,7 +18,7 @@ using myLibs.ComputeTasks: CompTask
 import myPlots
 using myPlots: PlotTask 
 
-import ..ChecksWLO, ..Helpers, ..CalcWLO, ..WLO, ..RibbonWLO
+import ..ChecksWLO, ..Helpers, ..CalcWLO, ..WLO, ..RibbonWLO, ..FiniteSyst
 
 using ..Helpers.hParameters: Calculation  
 
@@ -1547,8 +1547,24 @@ end
 
 
 
+#===========================================================================#
+#
+function Spectrum0D(init_dict::AbstractDict;
+										operators::AbstractVector{<:AbstractString}=String[], 
+									kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
 
 
+	task = CompTask(Calculation("Finite 0D system", FiniteSyst, init_dict;
+															operators=operators,
+															kwargs...))
+
+	return PlotTask(task, 
+									[(:oper, operators), (:enlim, [-2,2])],
+									myPlots.TypicalPlots.oper(task.get_data; vsdim=2))
+
+end
 
 
 

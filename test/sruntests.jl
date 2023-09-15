@@ -17,15 +17,15 @@ for fn in [
 #"shared_array",
 #"adaptive_cluster",
 #"adaptive",
-"ribbon",
+#"ribbon",
 #
 
 #"wlos_MBvBBH",
 
 
+#"simple_wlos",
 
-
-
+"finite",
 
 
 ]

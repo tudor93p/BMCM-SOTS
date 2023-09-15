@@ -478,6 +478,18 @@ function get_hoppf(P::UODict)::Function
 end  
 
 
+
+function get_Hopping(P::UODict)::Dict{Symbol,Any}
+
+	Dict{Symbol,Any}(
+													:Hopping => get_hoppf(P),
+													:nr_orb => 4,
+													)
+
+end 
+
+
+
 #===========================================================================#
 #
 #
@@ -701,7 +713,7 @@ function plot_Wx_Wy_old(ax,
 #	Ws = get_Wx_Wy(th, K)  
 #
 #
-#	alt_path = "/media/tudor/Tudor/Work/2018_Higher-Order-Topology/MajoranaBraiding/Data/WLO1path/"
+#	alt_path = "/mnt/Work/2018_Higher-Order-Topology/MajoranaBraiding/Data/WLO1path/"
 #
 #	alt_Ws = map([0,1]) do d 
 #		t = replace(string(round(th/2pi,digits=3)),'.'=>'p')
@@ -972,7 +984,9 @@ TtRepr = Groups.GammaMatrix(0,1)
 TR2yRepr = Groups.GammaMatrix(0,0)
 TR2xRepr = Groups.GammaMatrix(3,3)
 
-fij_identity(k::NTuple{2,Int}, ::Function)::NTuple{2,Int} = k 
+function fij_identity(k::NTuple{N,Int}, ::Function)::NTuple{N,Int} where N 
+	k 
+end 
 
 
 

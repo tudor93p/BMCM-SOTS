@@ -3,7 +3,7 @@ module BMCMSOTS
 
 const MBPATH = if gethostname()=="tudor-HP" 
 	
-		"/media/tudor/Tudor/Work/2018_Higher-Order-Topology/codes/BMCMSOTS"
+		"/mnt/Work/2018_Higher-Order-Topology/codes/BMCMSOTS"
 
 									else 
 
@@ -13,7 +13,7 @@ const MBPATH = if gethostname()=="tudor-HP"
 
 #const PATH_SNAKE = if gethostname()=="tudor-HP" 
 #	
-#				"/media/tudor/Tudor/Work/2020_Snake-states/SnakeStates"
+#				"/mnt/Work/2020_Snake-states/SnakeStates"
 #
 #									else 
 #
@@ -45,13 +45,16 @@ include("WLO.jl")
 include("MB.jl")
 include("BBH.jl")
 
+include("ChiralPwave.jl")
 
 
 include("CalcWLO.jl")
-include("CalcWLOadapt.jl")
+#include("CalcWLOadapt.jl")
 include("RibbonWLO.jl")
 
-include("ChecksWLO.jl")
+include("ChecksWLO.jl") 
+
+include("FiniteSyst.jl")
 
 include("TasksPlots.jl")
 

@@ -1,9 +1,8 @@
-# adapted from /media/tudor/Tudor/Work/2020_Snake-states/SnakeStates/Helpers 
+# adapted from /mnt/Work/2020_Snake-states/SnakeStates/Helpers 
 #
 module hParameters
 #############################################################################
 
-#using Constants: DATAROOT 
 
 import ...DATAROOT 
 
@@ -325,7 +324,6 @@ function Calculation(M::Module; kwargs...)
 end 
 
 function Calculation(name::AbstractString, M::Module; kwargs...)
-
 	Parameters.Calculation(name, 
 												 ParamFlow(M; kwargs...), M; kwargs...)
 
