@@ -53,6 +53,7 @@ end
 
 lattice(P::UODict)::Lattices.Lattice = lattice(linear_size(P))
 
+PosAtoms = Lattices.PosAtoms∘lattice 
 
 #function Bloch_Hamilt(P::UODict)::Function 
 #
@@ -113,13 +114,12 @@ function get_operators(operator_names::AbstractVector{<:AbstractString},
 		d,f = myPlots.Transforms.parse_fstr_Cartesian(n)
 
 		if d>0 
-			@show n d f 
 
 			return Operators.Position(d, atoms; kwargs..., fpos=f)
 
 		end 
 
-		for (N,S) in (("LocalDOS",:LDOS),("IPR",:IPR))
+		for (N,S) in (("LocalPsi2",:LDOS),("IPR",:IPR))
 
 			n==N && return getfield(Operators, S)(; kwargs...)
 

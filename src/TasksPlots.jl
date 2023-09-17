@@ -11,9 +11,10 @@ module TasksPlots
 import LsqFit 
 
 
-import myLibs: Utils, ComputeTasks, SignalProcessing 
+import myLibs: Utils, ComputeTasks, SignalProcessing, Lattices
 
 using myLibs.ComputeTasks: CompTask   
+import myLibs.ComputeTasks: add_line!# , get_linedata
 
 import myPlots
 using myPlots: PlotTask 
@@ -871,7 +872,7 @@ function RibbonPolarization_vsX(init_dict::AbstractDict;
 	
 						)
 	
-			ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero
+			add_line!(out, P, X, "x") # also in plotdict_checkzero
 	
 			return out 
 	
@@ -1413,7 +1414,7 @@ function CheckZero_atPS_vsX(init_dict::AbstractDict;
 #										transf_data=apply_log10abs!
 #										)
 
-		ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero
+		add_line!(out, P, X, "x") # also in plotdict_checkzero
 
 		return xline_ifXisN!(out, X)
 
@@ -1527,7 +1528,7 @@ function CheckZero_atPS_vsX_atYs(init_dict::AbstractDict;
 
 							)
 
-	ComputeTasks.add_line!(out, P, X, "x") # also in plotdict_checkzero 
+	add_line!(out, P, X, "x") # also in plotdict_checkzero 
 
 	return xline_ifXisN!(out, X)
 
@@ -1560,11 +1561,225 @@ function Spectrum0D(init_dict::AbstractDict;
 															operators=operators,
 															kwargs...))
 
+	pyscript,pyplot = myPlots.TypicalPlots.oper(task.get_data; vsdim=2)
+
 	return PlotTask(task, 
 									[(:oper, operators), (:enlim, [-2,2])],
-									myPlots.TypicalPlots.oper(task.get_data; vsdim=2))
+									pyscript, 
+									Base.Fix2(delete!, "xlim") ∘ pyplot
+									)
 
 end
+
+
+#===========================================================================#
+#
+function LocalOper0D(init_dict::AbstractDict;
+									 operators::AbstractVector{<:AbstractString}=String[],
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	pt0 = Spectrum0D(init_dict; operators=operators, kwargs...)
+
+	return PlotTask(pt0, (:localobs, operators),
+									myPlots.TypicalPlots.localobs(pt0, FiniteSyst; 
+																								vsdim=2
+																							 )...)
+
+
+end
+
+
+
+
+
+
+
+
+#===========================================================================#
+#
+function LocalOper0D_oneState(init_dict::AbstractDict;
+												 operators::AbstractVector{<:AbstractString}=String[],
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	pt0 = Spectrum0D(init_dict; operators=operators, kwargs...)
+
+	default_oper = myPlots.Sliders.pick_local(operators)[1] 
+
+#	md,sd = Helpers.main_secondary_dimensions()
+
+#	nr_regions = 10 
+
+
+	function plot(P::AbstractDict)::Dict 
+
+		obs = get(P, "localobs", default_oper)
+
+		Data, good_P = pt0.get_data(P; mute=false, fromPlot=true,
+															    target=obs, get_good_P=true)
+
+		p = Utils.adapt_merge(P, 
+													"Energy"=>get(P, "Energy", 0),
+													"k"=>get(P, "k", sum(extrema(Data["kLabels"]))/2),
+													"E_width"=>get(P, "E_width", 0.02),
+													"k_width"=>get(P, "k_width", 0.03)
+													)
+
+		state_index = argmax(myPlots.Transforms.SamplingWeights(p; vsdim=2, Data=Data, get_k=true)[:])
+
+
+		klab,Elab = map(["Energy","kLabels"]) do s 
+
+				string(s[1],"=",myPlots.Transforms.nr2str(Data[s][state_index])) 
+				
+			end
+
+
+
+		return Dict{String,Any}(
+				"xy"=>FiniteSyst.PosAtoms(good_P...),
+				"z"=> copy(selectdim(Data[obs], 2, state_index)),
+				"zlabel" => myPlots.join_label(obs, Elab, "i=$state_index"),
+				)
+
+	end
+
+
+	return PlotTask(pt0, 
+									[(:localobs, operators),],
+									"LocalObservables", plot)
+
+
+end
+
+function extract_oper_check(data::AbstractDict,
+														oper::AbstractString;
+														warn::Bool=false
+														)::String 
+	
+	if haskey(data, oper) 
+	
+		count(>(1),size(data[oper]))<=1 && return oper
+	
+		warn && @warn "Operator '$oper' is not a number. Return Energy"
+	
+	else 
+
+		warn&& oper!="-" && @warn "Operator '$oper' does not exist. Return Energy"
+
+	end 
+
+	return "Energy"
+
+end 
+		
+function get_extract_oper_both(P::AbstractDict;
+													kwargs...
+													)::NTuple{3,Function}
+
+	get_extract_oper_both(P, get(P,"oper","Energy"); kwargs...)
+
+end 
+
+
+function get_extract_oper_both(P::AbstractDict,
+													oper::AbstractString;
+													kwargs...
+													)::NTuple{3,Function}
+
+	function extract_oper(data::AbstractDict, args...
+												)::Tuple{Vector{Float64},String}
+	
+		lab = extract_oper_check(data, oper; kwargs...)
+		
+		x = data[lab][sort!(partialsortperm(data["Energy"],1:2,by=abs2))]
+
+		return (x,lab)
+
+
+#		dAB = Dict("|A|"=>abs(xA), "|B|"=>abs(xB))
+
+#		x, lab = myPlots.Transforms.choose_obs_i(P, dAB, lab; f="sum")
+
+#		return x, myPlots.join_label(lab) 
+
+	end 
+
+	function get_data((x,lab)::Tuple{T,String}
+										)::T where T<:AbstractVector{<:Real}
+		x
+
+	end 
+
+	get_label((x,lab)::Tuple{AbstractVector{<:Real},String})::String = lab 
+
+	return extract_oper, get_data, get_label  
+
+end 
+
+#===========================================================================#
+#
+function OperMZMs_vsX(init_dict::AbstractDict;
+										 operators::AbstractVector{<:AbstractString}=String[],
+													X::Symbol,
+													kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
+
+	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
+						Calculation("Operator on the MZMs vs $X",
+												FiniteSyst, init_dict;
+												operators=operators,
+												kwargs...),
+					 [X=>1],[1=>[1,2]],["State index"])
+ 
+
+	function plot(P::AbstractDict)::Dict
+
+		extract_oper, get_numeric, get_label = get_extract_oper_both(P) 
+
+		Data = task.get_data(P; fromPlot=true, apply_rightaway=extract_oper)
+		
+
+		ylabel = only(unique(get_label.(Data)))
+
+
+		out = Dict{String,Any}(
+						"labels" => ["A","B"],
+						"ys" => construct_Z(get_numeric, Data)["z"],
+						"xs" => [out_dict["y"],out_dict["y"]],
+						"xlabel"=> out_dict["ylabel"],
+						)
+
+		if ylabel=="Energy"
+
+			out["ylabel"] = "\$\\log_{10}|E|\$"
+
+			out["ys"] = apply_log10abs.(eachrow(out["ys"]))
+
+		else 
+			out["ylabel"] = ylabel 
+		end 
+
+		add_line!(out, P, X, "x")
+		return out
+
+	end 
+
+	return PlotTask(task, 
+									[#("simple_fct",), 
+									 (:oper, operators),("obs_index",3),
+#									 ("smoothen",),
+									 ], 
+									"Operators_vsX", plot) 
+
+end 
+
+
+
 
 
 

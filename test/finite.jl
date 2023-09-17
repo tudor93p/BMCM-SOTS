@@ -1,4 +1,4 @@
-import BMCMSOTS: FiniteSyst  
+import BMCMSOTS: FiniteSyst, MB
 
 import myPlots  
 
@@ -13,30 +13,50 @@ P = (
 		 )
 
 
+@show MB.magnetic_field(P) MB.spin_singlet(P) 
+
+
+println(round.(MB.magnetic_field(P)./maximum(abs,MB.magnetic_field(P)),digits=3))
+
+
 
 #data = FiniteSyst.Compute(P)
 #@show keys(data)
 
 
 
-task1 = init(BMCMSOTS, :Spectrum0D)
+tasks = [
+				 init(BMCMSOTS, :Spectrum0D),
+#				 init(BMCMSOTS, :LocalOper0D),
+#				 init(BMCMSOTS, :LocalOper0D_oneState),
+#				 init(BMCMSOTS, :OperMZMs_vsX; X=:width),
+				 ]
 
 
-pP = task1.get_plotparams(P) 
+Data =map(tasks) do task1
+	pP = tasks[1].get_plotparams(P) 
 
+
+	pP = Utils.adapt_merge(pP, "oper"=> "IPR")
+
+	println() 
 @show pP 
 
 data = task1.get_data(pP,fromPlot=true,mute=false) 
 
 data |> keys |> println 
 
+task1.plot(pP) |>   keys |> println
+
+return task1.plot(pP) 
 
 
 
+end 
 
 
 
-myPlots.plot(task1)
+#myPlots.plot(tasks)
 
 
 

@@ -26,7 +26,10 @@ input_checks  = Dict{Symbol,Any}(
 		
 		b_Hamilt = [1],
 
-		width = [5,10,20,30],
+		width = vcat(5:5:45,
+								60,
+								70,
+								),
 				
   		), 
 
@@ -46,7 +49,7 @@ input_checks  = Dict{Symbol,Any}(
 
 		),
 
-	:operators => ["IPR", "x", "|x|", "y", "|y|", "LocalDOS"],
+	:operators => ["IPR", "x", "|x|", "y", "|y|", "LocalPsi2"],
 
 
 	

@@ -496,6 +496,26 @@ end
 #
 #---------------------------------------------------------------------------#
 
+function magnetic_field(P::UODict)::Vector{Float64}
+
+	bsss_cycle(parse_MB_params(params_fromP(P)))[1:2]
+
+end 
+
+function spin_singlet(P::UODict)::Vector{Float64}
+
+	bsss_cycle(parse_MB_params(params_fromP(P)))[4:5]
+
+end 
+
+
+
+#===========================================================================#
+#
+#
+#
+#---------------------------------------------------------------------------#
+
 
 
 

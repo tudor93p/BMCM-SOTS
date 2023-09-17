@@ -3,13 +3,14 @@ import myLibs: ComputeTasks
 import BMCMSOTS, myPlots 
 
 
-include("input_file_1.jl")
+include("input_file_11.jl")
 
 
 
 tasks = [
-				 init(BMCMSOTS, :WannierBands1),
-
+				 init(BMCMSOTS, :Spectrum0D),
+				 init(BMCMSOTS, :LocalOper0D),
+				 init(BMCMSOTS, :OperMZMs_vsX; X=:width),
 			];
 
 

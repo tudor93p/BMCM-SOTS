@@ -4,4 +4,5 @@ Data/
 .*.swp
 Manifest.toml 
 .fuse_hid* 
-nohup.out
+nohup.out 
+*.pdf
