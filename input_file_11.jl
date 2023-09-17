@@ -13,7 +13,7 @@ import myLibs: Utils
 
 
 
-input_checks  = Dict{Symbol,Any}(
+input_dict  = Dict{Symbol,Any}(
 
   :allparams => (
 
@@ -81,8 +81,8 @@ input_checks  = Dict{Symbol,Any}(
 function init( target_module::Module, target_function::Symbol ;
 							other_kwargs...)
 ###
-	args = (input_checks,)
-	kwargs = input_checks 
+	args = (input_dict,)
+	kwargs = input_dict 
 ###
 
 	task = getproperty(target_module.TasksPlots, target_function)

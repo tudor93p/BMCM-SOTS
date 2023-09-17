@@ -1,3 +1,4 @@
+import BMCMSOTS 
 import BMCMSOTS: FiniteSyst, MB
 
 import myPlots  

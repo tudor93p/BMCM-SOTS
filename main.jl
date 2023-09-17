@@ -11,11 +11,12 @@ import BMCMSOTS
 
 
 
-include("input_file_32.jl")
+include("input_file_11.jl")
 
 tasks = [
-				 init(BMCMSOTS,:CheckZero),
+#				 init(BMCMSOTS,:CheckZero),
 #				 init(BMCMSOTS,:WannierBands1),
+					init(BMCMSOTS,:Spectrum0D),				 
 				 ];
 	
 ComputeTasks.missing_data.(tasks,show_missing=false)#gethostname()=="tudor-HP")
@@ -45,7 +46,7 @@ end
 function relevant_params(::Val{:preserved_symmetries})
 
 	relevant_params(==("All"),
-									input_checks[:allparams][:preserved_symmetries] 
+									input_dict[:allparams][:preserved_symmetries] 
 									)
 end  
 
@@ -55,9 +56,13 @@ relevant_params(::Val{:nr_kPoints})=filter(>(3),sort(unique([5, nworkers()])))
 function relevant_params(::Val{:kMesh_model})
 	
 	relevant_params(==("uniform")∘lowercase,
-									get(input_checks[:allparams],:kMesh_model,["Uniform"])
+									get(input_dict[:allparams],:kMesh_model,["Uniform"])
 									)
 end 
+
+
+relevant_params(::Val{:braiding_time})=input_dict[:allparams][:braiding_time]
+relevant_params(::Val{:s_Hamilt})=input_dict[:allparams][:s_Hamilt]
 
 relevant_params(k::Symbol)=[k=>v for v=relevant_params(Val(k))]
 
@@ -74,7 +79,10 @@ for (t,(active,a,k)) in zip(tasks,prep_all)
 
 	P, = ComputeTasks.get_first_paramcomb(t) 
 
-	for q in Base.product(relevant_params(:kMesh_model, :preserved_symmetries, :nr_kPoints)...)
+	for q in Base.product(relevant_params(
+#					:kMesh_model, :preserved_symmetries, :nr_kPoints
+					:braiding_time,	:s_Hamilt,	
+																				)...)
 
 		t.get_data(Utils.adapt_merge(P,q...); force_comp=true, mute=false)
 	
