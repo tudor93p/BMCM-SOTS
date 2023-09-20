@@ -18,19 +18,18 @@ input_dict  = Dict{Symbol,Any}(
   :allparams => (
 
 
-	 braiding_time = [1/8],
+		 braiding_time = Utils.uniqlinsp(1/8,3/8,57,3,Trunc=true),
 
 		s0_Hamilt = [0.0],
 		
-		s_Hamilt = [1],
+		s_Hamilt = [0],
 		
 		b_Hamilt = [1],
 
 		width = vcat(
-								 5:5:45,
-								60,
-								70:5:85,
-								100,115
+								 5,
+								 25,
+#								 40,
 								),
 				
   		), 
@@ -51,7 +50,7 @@ input_dict  = Dict{Symbol,Any}(
 
 		),
 
-	:operators => String["IPR", "x", "|x|", "y", "|y|", "LocalPsi2"],
+	:operators => String["IPR"],
 
 
 	

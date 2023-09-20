@@ -11,16 +11,19 @@ server=pahomit@$host.ethz.ch
 
 subfolder=""
 
+
+subfolder=BMCMSOTS/FiniteSyst/
+
 #subfolder=BMCMSOTS/CalcWLO/
 #subfolder=BMCMSOTS/ChecksWLO/
 
 #
 #remotefolder="/net/horon/scratch/pahomit/Camera/"
-#localfolder="/media/tudor/Tudor/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/Camera/"
+#localfolder="/mnt/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/Camera/"
 
 remotefolder="/net/horon/scratch/pahomit/BMCM-SOTS/Data/${subfolder}"
 
-localfolder="/media/tudor/Tudor/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/Data/${subfolder}"
+localfolder="/mnt/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/Data/${subfolder}"
 
 
 src="${server}:${remotefolder}"

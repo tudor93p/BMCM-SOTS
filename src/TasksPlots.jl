@@ -303,7 +303,7 @@ function plotdict_checkzero(
 		"xlabel" => xlabel * " " * tex("\\lambda"),
 		)
 
-	ComputeTasks.add_line!(out, P, "perturb_strength", "x")
+	add_line!(out, P, "perturb_strength", "x")
 
 	return out 
 
@@ -1676,13 +1676,13 @@ function extract_oper_check(data::AbstractDict,
 
 end 
 		
-function get_extract_oper_both(P::AbstractDict;
-													kwargs...
-													)::NTuple{3,Function}
-
-	get_extract_oper_both(P, get(P,"oper","Energy"); kwargs...)
-
-end 
+#function get_extract_oper_both(P::AbstractDict;
+#													kwargs...
+#													)::NTuple{3,Function}
+#
+#	get_extract_oper_both(P, get(P,"oper","Energy"); kwargs...)
+#
+#end 
 
 
 function get_extract_oper_both(P::AbstractDict,
@@ -1698,13 +1698,6 @@ function get_extract_oper_both(P::AbstractDict,
 		x = data[lab][sort!(partialsortperm(data["Energy"],1:2,by=abs2))]
 
 		return (x,lab)
-
-
-#		dAB = Dict("|A|"=>abs(xA), "|B|"=>abs(xB))
-
-#		x, lab = myPlots.Transforms.choose_obs_i(P, dAB, lab; f="sum")
-
-#		return x, myPlots.join_label(lab) 
 
 	end 
 
@@ -1739,9 +1732,11 @@ function OperMZMs_vsX(init_dict::AbstractDict;
 
 	function plot(P::AbstractDict)::Dict
 
-		extract_oper, get_numeric, get_label = get_extract_oper_both(P) 
+		oper = get(P,"oper","Energy")
 
-		Data = task.get_data(P; fromPlot=true, apply_rightaway=extract_oper)
+		extract_oper, get_numeric, get_label = get_extract_oper_both(P, oper)
+
+		Data = task.get_data(P; target=oper, fromPlot=true, apply_rightaway=extract_oper)
 		
 
 		ylabel = only(unique(get_label.(Data)))
@@ -1780,27 +1775,131 @@ end
 
 
 
+function restrict_energy(e::AbstractVector{<:Real},
+												 P::AbstractDict
+												 )::Union{Colon,BitVector}
+
+	s = get(P,"smooth",0)
+
+	return s>0 ? restrict_energy(e, s) : Colon() 
+
+end 
+
+function restrict_energy(e::AbstractVector{<:Real},
+												 s::Real
+												 )::BitVector
+
+	ae = abs.(e) 
+
+	m,M = extrema(ae) 
+	
+	return ae .< (M*(1-s) +m*s)*1.001  
+
+end 
+
+#===========================================================================#
+#
+function Spectrum0D_vsX(init_dict::AbstractDict;
+										operators::AbstractVector{<:AbstractString}=String[], 
+										X::Symbol,
+									kwargs...)::PlotTask
+#
+#---------------------------------------------------------------------------#
 
 
+	task, out_dict, construct_Z, = ComputeTasks.init_multitask(
+						Calculation("Spectrum 0D vs $X",
+												FiniteSyst, init_dict;
+												operators=operators,
+												kwargs...),
+					 [X=>1])
 
 
+	function plot(P::AbstractDict)::Dict
+
+		oper = get(P,"oper","-")
+
+		function apply_rightaway(data::AbstractDict, args...
+														 )::Tuple{Vector,Vector,String}
+		
+			i = restrict_energy(data["Energy"],P)
+							
+			E = data["Energy"][i]
+
+			if haskey(data,oper) 
+
+				return (E, data[oper][i], oper) 
+
+			else 
+
+				return (E, zeros(Int,length(E)), "-")
+
+			end 
 
 
+		end 
 
 
+		Data = task.get_data(P; target=oper, fromPlot=true,
+												 apply_rightaway=apply_rightaway)
+
+	
+		N = sum(length∘first, Data)
+
+		x = zeros(N) 
+		y = zeros(N) 
+		z = zeros(N) 
+
+		n::Int = 1
+
+		for (xi,(yi,zi,)) in zip(out_dict["x"],Data)
+
+			i = n:n + length(yi) - 1 
+
+			x[i] .= xi 
+
+			setindex!(y, yi, i)
+			setindex!(z, zi, i)
+
+			n += length(yi) 
+
+		end 
+
+		@assert y≈vcat(first.(Data)...)
+		@assert z≈vcat([d[2] for d in Data]...)
+
+		out = Dict{String,Any}(
+
+							"x" => x,
+							"y" => y,
+
+							)
+
+		add_line!(out, P, X, "x")
+
+		zlim = extrema(z)  
+
+		if zlim[1]<zlim[2]
+
+			out["z"] = z 
+			out["zlabel"] = only(unique(last.(Data)))
+			out["zlim"] = zlim 
+
+		end 
+
+		return out 
 
 
+	end  
+
+	return PlotTask(task, 
+									[(:oper, operators), (:enlim, [-2,2]), ("smoothen",)],
+									"Scatter_vsEnergy",
+									plot,
+									)
 
 
-
-
-
-
-
-
-
-
-
+end 
 
 
 

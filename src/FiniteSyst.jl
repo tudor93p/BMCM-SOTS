@@ -207,6 +207,29 @@ end
 #
 #---------------------------------------------------------------------------#
 
+
+function get_target(target::Nothing=nothing; kwargs...)::Vector{String}
+
+	union(calc_observables,vcat(get(kwargs, :operators, String[])))
+
+end 
+
+
+function get_target(target::Union{AbstractVector{<:AbstractString},
+																	AbstractString};
+															kwargs...
+										)::Vector{String}
+
+	union(calc_observables,intersect(get_target(;kwargs...), vcat(target)))
+
+end 
+
+
+
+
+
+
+
 #===========================================================================#
 #
 # FoundFiles &  Read 
@@ -216,16 +239,10 @@ end
 
 function FoundFiles(P::UODict; 
 										target=nothing, get_fname::Function, 
-										operators::AbstractVector{<:AbstractString},
 										kwargs...)::Bool
 
-#	FoundFiles0(get_fname(P), 
-#							calc_observables
-##							get_target(target; kwargs...),
-#							)
-
 	ReadWrite.FoundFiles_PhysObs(get_fname(P), 
-															 union(calc_observables, operators),
+															 get_target(target; kwargs...),
 															 FILE_STORE_METHOD)
 
 end
@@ -235,13 +252,10 @@ end
 
 
 function Read(P::UODict; target=nothing, get_fname::Function, 
-										operators::AbstractVector{<:AbstractString},
 							kwargs...)::Dict 
 
-#	Read0(get_fname(P), get_target(target; kwargs...))
-
 	ReadWrite.Read_PhysObs(get_fname(P), 
-												 union(calc_observables, operators),
+												 get_target(target; kwargs...),
 												 FILE_STORE_METHOD)
 
 

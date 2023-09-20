@@ -95,10 +95,20 @@ tiers3 = [Dict(
 
 
 
+tiers4 = [
+					Dict(
+							 "toad"=>3,
+							 "yoshi"=>1,
+							 "spaceml4"=>1,
+							 "nut"=>1,
+							 "kis"=>1,
+							 )
+					]
 
 
 
-tiers = tiers1 
+
+tiers = tiers4
 #tiers = tiers2
 #tiers=tiers3 
 
