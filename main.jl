@@ -23,11 +23,11 @@ ComputeTasks.missing_data.(tasks,show_missing=false)#gethostname()=="tudor-HP")
 
 
 
-#@assert !in(gethostname(),["tudor-HP","horon"])
+@assert !in(gethostname(),["tudor-HP","horon"])
 
 
 prep_all = ComputeTasks.get_data_all_prep.(tasks, 
-#													 shuffle=true, 
+													 shuffle=true, 
 													 seed=4, 
 													 mute=false,
 #													 check_data=false,

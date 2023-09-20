@@ -1,4 +1,7 @@
-#!/home/tudor/apps/julia/julia-1.8.5/bin/julia
+#!/home/tudor/.juliaup/bin/julia
+
+
+
 
 path = [
 				"/mnt/Work/2018_Higher-Order-Topology/codes/BMCMSOTS/",
@@ -97,11 +100,12 @@ tiers3 = [Dict(
 
 tiers4 = [
 					Dict(
-							 "toad"=>3,
-							 "yoshi"=>1,
-							 "spaceml4"=>1,
-							 "nut"=>1,
-							 "kis"=>1,
+							 "toad"=>47,
+							 "yoshi"=>60,
+#							 "spaceml4"=>3,
+							 "nut"=>10,
+							 "kis"=>7,
+							 "horon"=>2,
 							 )
 					]
 

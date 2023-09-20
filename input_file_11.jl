@@ -18,11 +18,11 @@ input_dict  = Dict{Symbol,Any}(
   :allparams => (
 
 
-	 braiding_time = [1/8],
+	 braiding_time = [0,1/8],
 
 		s0_Hamilt = [0.0],
 		
-		s_Hamilt = [1],
+		s_Hamilt = [0,1],
 		
 		b_Hamilt = [1],
 
@@ -30,7 +30,7 @@ input_dict  = Dict{Symbol,Any}(
 								 5:5:45,
 								60,
 								70:5:85,
-								100,115
+								100,115,
 								),
 				
   		), 
@@ -51,7 +51,7 @@ input_dict  = Dict{Symbol,Any}(
 
 		),
 
-	:operators => String["IPR", "x", "|x|", "y", "|y|", "LocalPsi2"],
+	:operators => String[],#"IPR", "x", "|x|", "y", "|y|", "LocalPsi2"],
 
 
 	

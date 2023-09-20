@@ -18,18 +18,18 @@ input_dict  = Dict{Symbol,Any}(
   :allparams => (
 
 
-		 braiding_time = Utils.uniqlinsp(1/8,3/8,57,3,Trunc=true),
+		 braiding_time = Utils.uniqlinsp(1/8,1/4,63,4,Trunc=true),
 
 		s0_Hamilt = [0.0],
 		
-		s_Hamilt = [0],
+		s_Hamilt = [0,1],
 		
 		b_Hamilt = [1],
 
 		width = vcat(
 								 5,
-								 25,
-#								 40,
+#								 25,
+								50,
 								),
 				
   		), 
@@ -37,7 +37,7 @@ input_dict  = Dict{Symbol,Any}(
 
 	:digits => (
 
-			braiding_time = (1,3),
+			braiding_time = (1,4),
 
 			s0_Hamilt = (1,2), 
 

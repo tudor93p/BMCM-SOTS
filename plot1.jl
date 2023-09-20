@@ -9,7 +9,6 @@ include("input_file_11.jl")
 
 tasks = [
 				 init(BMCMSOTS, :Spectrum0D),
-				 init(BMCMSOTS, :LocalOper0D),
 				 init(BMCMSOTS, :OperMZMs_vsX; X=:width),
 			];
 

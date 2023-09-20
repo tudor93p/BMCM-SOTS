@@ -1694,8 +1694,16 @@ function get_extract_oper_both(P::AbstractDict,
 												)::Tuple{Vector{Float64},String}
 	
 		lab = extract_oper_check(data, oper; kwargs...)
-		
-		x = data[lab][sort!(partialsortperm(data["Energy"],1:2,by=abs2))]
+
+		i01,i02,ig = partialsortperm(data["Energy"],1:3,by=abs2)
+
+		x = data[lab][i01<i02 ? [i01,i02] : [i02,i01]]
+
+		if lab=="Energy"
+
+			x /= abs(data[lab][ig])
+
+		end 
 
 		return (x,lab)
 
@@ -1865,9 +1873,6 @@ function Spectrum0D_vsX(init_dict::AbstractDict;
 
 		end 
 
-		@assert y≈vcat(first.(Data)...)
-		@assert z≈vcat([d[2] for d in Data]...)
-
 		out = Dict{String,Any}(
 
 							"x" => x,
@@ -1879,11 +1884,14 @@ function Spectrum0D_vsX(init_dict::AbstractDict;
 
 		zlim = extrema(z)  
 
+
 		if zlim[1]<zlim[2]
+
 
 			out["z"] = z 
 			out["zlabel"] = only(unique(last.(Data)))
-			out["zlim"] = zlim 
+			out["zlim"] = [get(P,"opermin",zlim[1]), get(P,"opermax",zlim[2])]
+
 
 		end 
 
