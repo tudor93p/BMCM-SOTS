@@ -175,20 +175,23 @@ function Compute_(P::UODict, target, get_fname::Nothing=nothing;
 									operators::AbstractVector{<:AbstractString},
 										kwargs...)::Dict{String,Any}
 
-	latt = lattice(P) 
+	@showtime latt = lattice(P) 
 
-	hopp = MODEL.get_Hopping(P)
+	@showtime hopp = MODEL.get_Hopping(P)
 
-	atoms = Lattices.PosAtoms(latt)
+	@showtime atoms = Lattices.PosAtoms(latt)
 
+	@showtime h = TBmodel.Bloch_Hamilt(Lattices.NearbyUCs(latt,atoms); hopp...)
 
   return BandStructure.Diagonalize(
 
-		TBmodel.Bloch_Hamilt(Lattices.NearbyUCs(latt,atoms); hopp...),
+		h,
 		
 		zeros(1,1);
 		
 		dim=2,
+
+		nr_bands=22,
 		
 		storemethod = FILE_STORE_METHOD,
 

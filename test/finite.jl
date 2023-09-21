@@ -3,14 +3,14 @@ import BMCMSOTS: FiniteSyst, MB
 
 import myPlots  
 
-include("../input_file_13.jl")
+include("../input_file_11.jl")
 
 P = (
 		 braiding_time = 1/8,
 		 s0_Hamilt = 0.0,
 		 s_Hamilt = 0,
 		 b_Hamilt = 1,
-		 width = 5,
+		 width = 6,
 		 )
 
 
@@ -34,11 +34,11 @@ tasks = [
 				 #init(BMCMSOTS, :LocalOper0D),
 #				 init(BMCMSOTS, :LocalOper0D_oneState),
 #				 init(BMCMSOTS, :OperMZMs_vsX; X=:width),
-				init(BMCMSOTS, :Spectrum0D_vsX; X=:braiding_time),
+#				init(BMCMSOTS, :Spectrum0D_vsX; X=:braiding_time),
 				 ];
 
 
-Data =map(tasks[2:end]) do task1 
+Data =map(tasks) do task1 
 
 	pP = tasks[1].get_plotparams(P) 
 
@@ -48,14 +48,16 @@ Data =map(tasks[2:end]) do task1
 	println() 
 @show pP 
 
-#data = task1.get_data(pP,fromPlot=true,mute=false) 
-#
-#data |> keys |> println 
+data = task1.get_data(pP,fromPlot=true,mute=false,force_comp=true)
+
+data |> keys |> println 
 
 pl = task1.plot(pP) 
 
 
 pl |>   keys |> println
+
+@show extrema(pl["y"])
 
 return pl 
 

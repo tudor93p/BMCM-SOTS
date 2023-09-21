@@ -101,14 +101,18 @@ tiers3 = [Dict(
 tiers4 = [
 					Dict(
 							 "toad"=>47,
-							 "yoshi"=>60,
-#							 "spaceml4"=>3,
-							 "nut"=>10,
-							 "kis"=>7,
-							 "horon"=>2,
-							 )
+							 "yoshi"=>25,#60,
+							 "spaceml4"=>7,
+							 "nut"=>4,
+							 "kis"=>4,
+							 "horon"=>1,
+#							 "taranis"=>1,
+							 "neper"=>1,
+							 "sia"=>1,
+							 "re"=>1,
+							 "uneg"=>1,
+)
 					]
-
 
 
 
